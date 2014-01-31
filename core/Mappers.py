@@ -1897,6 +1897,9 @@ class FieldValues(object):
         def __bool__(self):
             return False
 
+        def __len__(self):
+            return 0
+
 
 class FNone(FieldValues.NoneValue):
     """ Алиас для FieldValues.NoneValue для краткой записи внутри FieldTypesConverter """
