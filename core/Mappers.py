@@ -1894,6 +1894,12 @@ class FieldValues(object):
         def __ne__(self, other):
             return other is not None and isinstance(other, FieldValues.NoneValue) is False
 
+        def __pos__(self):
+            return False
+
+        def __neq__(self):
+            return True
+
 
 class FNone(FieldValues.NoneValue):
     """ Алиас для FieldValues.NoneValue для краткой записи внутри FieldTypesConverter """
