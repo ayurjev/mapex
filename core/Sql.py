@@ -616,13 +616,18 @@ class SelectQuery(ConditionsMixin, JoinMixin, BaseSqlQuery):
         @rtype : str
 
         """
-        if len(list(filter(lambda f: f.endswith("]"), self.fields))) > 0:
-            return self.builder.fields_enumeration(
-                list(filter(lambda f: f.endswith("]") is False, self.fields)),
-                self.table_name
-            )
-        else:
+        need_to_group = len(list(filter(lambda f: f.endswith("]"), self.fields))) > 0
+        if not need_to_group:
             return ""
+        fields = list(filter(lambda f: f.endswith("]") is False, self.fields))
+        fields_from_order = self.params.get("order") or []
+        if type(fields_from_order) is tuple:
+            fields_from_order = [fields_from_order]
+
+        for field in fields_from_order:
+            if field[0] not in fields:
+                fields.append(field[0])
+        return self.builder.fields_enumeration(fields, self.table_name) if len(fields) > 0 else ""
 
     def set_params(self, params: dict):
         """

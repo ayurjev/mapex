@@ -316,7 +316,7 @@ class RecordModel(object):
         
         """
         data = {}
-        stringify_depth, stringify_level_max = stringify_depth if stringify_depth else 0, 1
+        stringify_depth, stringify_level_max = stringify_depth if stringify_depth else (0, 1)
         embeded_models_properties = {}
         if type(properties) is tuple:
             properties, embeded_models_properties = properties

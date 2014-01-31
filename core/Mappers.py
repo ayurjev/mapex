@@ -1077,7 +1077,7 @@ class SqlMapper(metaclass=ABCMeta):
         """
         return self._reversed_foreign_tables_to_mapper_fields.get(table_name)
 
-    def get_joined_tables(self, conditions: dict, fields: list=None):
+    def get_joined_tables(self, conditions: dict, fields: list=None, order=None):
         """
         Возвращает часть словаря _joined, оставив только те таблицы, которые используются в conditions и fields
         @param conditions: Условия выборки
@@ -1088,10 +1088,17 @@ class SqlMapper(metaclass=ABCMeta):
         @rtype : dict
 
         """
+        if order:
+            if type(order) is tuple:
+                order = [order]
+            order_fields = [f[0] for f in order]
+        else:
+            order_fields = []
         fields, conditions = fields if fields else [], conditions if conditions else {}
         foreign_tables = list(set(filter(
             None,
-            [field.split(".")[0] if field.find(".") > -1 else None for field in (fields + list(conditions.keys()))])))
+            [field.split(".")[0] if field.find(".") > -1 else None for field in
+             (fields + list(conditions.keys()) + order_fields)])))
         return {joined_table_name: self._joined[joined_table_name] for joined_table_name in foreign_tables}
 
     def get_db_type(self, field_name: str) -> str:
@@ -1171,8 +1178,8 @@ class SqlMapper(metaclass=ABCMeta):
             if fields not in [[], None] else list(self._reversed_map.keys())
 
         conditions = self.translate_and_convert(conditions)
-        params = self.convert_params(params)
-        joined_tables = self.get_joined_tables(conditions, fields)
+        params = self.convert_params(params) if params else {}
+        joined_tables = self.get_joined_tables(conditions, fields, params.get("order"))
 
         for row in self.db.select_query(self.table_name, fields, conditions, params, joined_tables, "get_rows"):
             result = {fields[it]: row[it] for it in range(len(fields))}

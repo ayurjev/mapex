@@ -351,6 +351,10 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(2, len(res))
         self.assertCountEqual(["FirstUser", "SecondUser"], [res[0].name, res[1].name])
 
+        # join, основанный только на полях сортировки:
+        res = list(users.get_items(params={"order": ("tags.name", "ASC")}))
+        self.assertCountEqual(["FirstUser", "SecondUser"], [res[0].name, res[1].name])
+
         res = users.get_property_list("name", {"tags.name": ("in", ["FirstTag", "SecondTag"])})
         self.assertCountEqual(['FirstUser', 'SecondUser'], list(res))
 
@@ -378,7 +382,7 @@ class TableModelTest(unittest.TestCase):
 
         res = list(
             users.get_properties_list(
-                ["tags.weight", "tags.name"], {"account.email": "email@email.com"}
+                ["tags.weight", "tags.name"], {"account.email": "email@email.com"}, {"order": ("uid", "ASC")}
             )
         )
         self.assertEqual(
