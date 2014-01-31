@@ -7,8 +7,8 @@ from abc import abstractmethod, ABCMeta
 from collections import OrderedDict
 from collections import defaultdict
 
-from z9.Mapex.core.Exceptions import TableModelException, TableMapperException
-from z9.Mapex.core.Models import RecordModel, TableModel
+from mapex.core.Exceptions import TableModelException, TableMapperException
+from mapex.core.Models import RecordModel, TableModel
 
 
 class Primary(object):
