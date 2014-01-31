@@ -1894,11 +1894,8 @@ class FieldValues(object):
         def __ne__(self, other):
             return other is not None and isinstance(other, FieldValues.NoneValue) is False
 
-        def __pos__(self):
+        def __bool__(self):
             return False
-
-        def __neq__(self):
-            return True
 
 
 class FNone(FieldValues.NoneValue):
