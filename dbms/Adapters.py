@@ -1,10 +1,4 @@
 """ Модуль с адаптерами для подключения к СУБД """
-import mysql
-import mysql.connector
-import postgresql
-import pyodbc
-import pymongo
-
 
 from mapex.core.Exceptions import AdapterException
 from mapex.core.Sql import Adapter, PgDbField, MySqlDbField, MsSqlDbField
@@ -28,6 +22,7 @@ class PgSqlDbAdapter(Adapter):
         :param connection_data: Данные для подключение к СУБД
         :return:               Экземпляр соединения
         """
+        import postgresql
         return postgresql.open("pq://%s:%s@%s:%s/%s" % (
             connection_data[2], connection_data[3], connection_data[0], connection_data[1], connection_data[4])
         )
@@ -117,6 +112,7 @@ class MySqlDbAdapter(Adapter):
         :param connection_data: Данные для подключение к СУБД
         :return:               Экземпляр соединения
         """
+        import mysql.connector
         return mysql.connector.connect(
             user=connection_data[2], password=connection_data[3],
             host=connection_data[0], port=connection_data[1], database=connection_data[4],
@@ -200,6 +196,7 @@ class MsSqlDbAdapter(Adapter):
         :param connection_data: Данные для подключение к СУБД
         :return:               Экземпляр соединения
         """
+        import pyodbc
         return pyodbc.connect(
             'DSN=egServer70;DATABASE='+connection_data[4]+';UID='+connection_data[2]+';PWD='+connection_data[3]
         )
@@ -292,6 +289,7 @@ class MongoDbAdapter(AdapterLogger):
 
     def connect(self, host: str, port: int, database: str):
         """ Выполняет подключение к СУБД по переданным реквизитам """
+        import pymongo
         self.db = pymongo.MongoClient(host, port)[database]
 
     def count_query(self, collection_name: str, conditions: dict, joined_tables) -> int:
@@ -381,6 +379,7 @@ class MongoDbAdapter(AdapterLogger):
         @param val: Значение для конвертации (может быть tuple или list of tuples)
         @return:
         """
+        import pymongo
         fixer = lambda v: pymongo.DESCENDING if v.upper() == "DESC" else pymongo.ASCENDING
         if type(val) is tuple:
             val = val[0], fixer(val[1])
