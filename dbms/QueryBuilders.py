@@ -2,7 +2,7 @@
 Построители sql-синтаксиса для различных СУБД
 """
 
-from z9.Mapex.core.Sql import SqlBuilder, SelectQuery, DeleteQuery, InsertQuery, UpdateQuery
+from mapex.core.Sql import SqlBuilder, SelectQuery, DeleteQuery, InsertQuery, UpdateQuery
 
 
 # noinspection PyMethodMayBeStatic

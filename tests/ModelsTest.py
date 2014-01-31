@@ -7,8 +7,8 @@
 import unittest
 from datetime import date
 
-from z9.Mapex.tests.framework.TestFramework import for_all_dbms
-from z9.Mapex.core.Exceptions import TableModelException
+from mapex.tests.framework.TestFramework import for_all_dbms
+from mapex.core.Exceptions import TableModelException
 
 
 class TableModelTest(unittest.TestCase):

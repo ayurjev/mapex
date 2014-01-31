@@ -3,9 +3,9 @@
 """
 
 from abc import ABCMeta, abstractmethod
-from z9.Mapex.dbms.Adapters import PgSqlDbAdapter, MySqlDbAdapter, MsSqlDbAdapter, MongoDbAdapter
-from z9.Mapex.core.Models import RecordModel, TableModel
-from z9.Mapex.core.Mappers import SqlMapper, FieldTypes, NoSqlMapper
+from mapex.dbms.Adapters import PgSqlDbAdapter, MySqlDbAdapter, MsSqlDbAdapter, MongoDbAdapter
+from mapex.core.Models import RecordModel, TableModel
+from mapex.core.Mappers import SqlMapper, FieldTypes, NoSqlMapper
 
 import time
 import re

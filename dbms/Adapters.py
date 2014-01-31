@@ -6,11 +6,11 @@ import pyodbc
 import pymongo
 
 
-from z9.Mapex.core.Exceptions import AdapterException
-from z9.Mapex.core.Sql import Adapter, PgDbField, MySqlDbField, MsSqlDbField
-from z9.Mapex.core.Mappers import FieldTypes
-from z9.Mapex.dbms.QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder
-from z9.Mapex.core.Sql import AdapterLogger
+from mapex.core.Exceptions import AdapterException
+from mapex.core.Sql import Adapter, PgDbField, MySqlDbField, MsSqlDbField
+from mapex.core.Mappers import FieldTypes
+from mapex.dbms.QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder
+from mapex.core.Sql import AdapterLogger
 
 
 class PgSqlDbAdapter(Adapter):

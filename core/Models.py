@@ -4,7 +4,7 @@
 import hashlib
 
 
-from z9.Mapex.core.Exceptions import TableModelException
+from mapex.core.Exceptions import TableModelException
 
 
 class TableModel(object):

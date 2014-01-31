@@ -3,9 +3,9 @@
 import unittest
 import re
 from collections import OrderedDict
-from z9.Mapex.dbms.QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder,  \
+from mapex.dbms.QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder,  \
     SelectQuery, DeleteQuery, InsertQuery, UpdateQuery
-from z9.Mapex.core.Sql import PlaceHoldersCounter
+from mapex.core.Sql import PlaceHoldersCounter
 
 
 class QueryBuildersTest(unittest.TestCase):
