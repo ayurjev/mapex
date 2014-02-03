@@ -2058,14 +2058,18 @@ class FieldTypesConverter(object):
         """
         v = FieldTypesConverter.handle_none_value_for_list_types(v)
         if mf.get_items_collection_mapper().primary.compound:
-            v = {
+            v = [
                 dict(zip(mf.get_items_collection_mapper().primary.name(), val.split("$!")))
                 for val in filter(lambda val: val not in [None, ""], v)
                 if type(val) in [str, int]
-            }
+            ]
         else:
-            v = list(set(filter(None, v)))
-        return FieldValues.ListValue([mf.get_new_item().load_by_primary(objid, cache) for objid in v])
+            v = filter(None, v)
+        unique = []
+        for i in v:
+            if i not in unique:
+                unique.append(i)
+        return FieldValues.ListValue([mf.get_new_item().load_by_primary(objid, cache) for objid in unique])
 
     @staticmethod
     def handle_none_value_for_list_types(v):
