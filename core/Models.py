@@ -331,7 +331,7 @@ class RecordModel(object):
                     )
                 else:
                     value = None
-            elif type(value) is list:
+            elif isinstance(value, list):
                 value = [
                     item.stringify(
                         embeded_models_properties.get(property_name),

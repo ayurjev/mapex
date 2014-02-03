@@ -1562,7 +1562,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
     def bind(self):
         """ Переопределить в суб-класса  """
 
-    def get_joined_tables(self, conditions: dict, fields: list=None):
+    def get_joined_tables(self, conditions: dict, fields: list=None, order=None):
         """ Переопределяем базовый метод, join'ы не поддерживаются """
         return {}
 
@@ -1906,6 +1906,9 @@ class FieldValues(object):
 
         def __len__(self):
             return 0
+        
+        def __repr__(self):
+            return "None"
 
 
 class FNone(FieldValues.NoneValue):
@@ -2055,13 +2058,13 @@ class FieldTypesConverter(object):
         """
         v = FieldTypesConverter.handle_none_value_for_list_types(v)
         if mf.get_items_collection_mapper().primary.compound:
-            v = [
+            v = {
                 dict(zip(mf.get_items_collection_mapper().primary.name(), val.split("$!")))
                 for val in filter(lambda val: val not in [None, ""], v)
                 if type(val) in [str, int]
-            ]
+            }
         else:
-            v = filter(None, v)
+            v = list(set(filter(None, v)))
         return FieldValues.ListValue([mf.get_new_item().load_by_primary(objid, cache) for objid in v])
 
     @staticmethod
