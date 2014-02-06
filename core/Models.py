@@ -132,7 +132,7 @@ class RecordModel(object):
     """ Класс создания моделей записей в таблицах БД """
     mapper = None
 
-    def __init__(self):
+    def __init__(self, data=None, loaded_from_db=False):
         self._lazy_load = None
         self._mapper_fields = []
         self._loaded_from_db = False
@@ -143,6 +143,8 @@ class RecordModel(object):
             raise TableModelException("No mapper for %s model" % self)
         # noinspection PyCallingNonCallable
         self.set_mapper(self.__class__.mapper())
+        if data:
+            self.load_from_array(data, loaded_from_db)
 
     def set_mapper(self, mapper):
         if mapper:

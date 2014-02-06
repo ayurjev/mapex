@@ -1409,7 +1409,28 @@ class TableModelTest(unittest.TestCase):
 class RecordModelTest(unittest.TestCase):
     """ Модульные тесты для класса TableModel """
     def setUp(self):
+        # noinspection PyPep8Naming
         self.maxDiff = None
+
+    @for_all_dbms
+    def test_load_by_constructor(self, dbms_fw):
+        """ Для инициализации модели можно передать словарь с данными в конструктор """
+        users = dbms_fw.get_new_users_collection_instance()
+        self.assertEqual(0, users.count())
+
+        user = dbms_fw.get_new_user_instance({"name": "Андрей", "age": 25})
+        self.assertEqual("Андрей", user.name)
+        self.assertEqual(25, user.age)
+        user.save()
+        self.assertEqual(1, users.count())
+
+        users.delete()
+        self.assertEqual(0, users.count())
+        user = dbms_fw.get_new_user_instance({"uid": 1, "name": "Андрей", "age": 25}, True)
+        self.assertEqual("Андрей", user.name)
+        self.assertEqual(25, user.age)
+        user.save()
+        self.assertEqual(0, users.count())
 
     @for_all_dbms
     def test_get_data_and_stringify(self, dbms_fw):

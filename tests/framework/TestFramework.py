@@ -70,7 +70,7 @@ class DbMock(object, metaclass=ABCMeta):
         """ Уничтожает созданные в процессе тестирования таблицы базы данных """
 
     @abstractmethod
-    def get_new_user_instance(self):
+    def get_new_user_instance(self, data=None, loaded_from_db=False):
         """ Возвращает новый экземпляр класса пользователя """
 
     @abstractmethod
@@ -208,9 +208,9 @@ class SqlDbMock(DbMock):
         SqlDocumentsMapper.kill_instance()
         SqlNoPrimaryMapper.kill_instance()
 
-    def get_new_user_instance(self):
+    def get_new_user_instance(self, data=None, loaded_from_db=False):
         """ Возвращает новый экземпляр класса пользователя """
-        return SqlUser()
+        return SqlUser(data, loaded_from_db)
 
     def get_new_users_collection_instance(self):
         """ Возвращает новый экземпляр коллекции пользователей """
@@ -336,9 +336,9 @@ class NoSqlDbMock(DbMock):
         NoSqlDocumentsMapper.kill_instance()
         NoSqlNoPrimaryMapper.kill_instance()
 
-    def get_new_user_instance(self):
+    def get_new_user_instance(self, data=None, loaded_from_db=False):
         """ Возвращает новый экземпляр класса пользователя """
-        return NoSqlUser()
+        return NoSqlUser(data, loaded_from_db)
 
     def get_new_users_collection_instance(self):
         """ Возвращает новый экземпляр коллекции пользователей """
