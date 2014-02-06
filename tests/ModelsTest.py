@@ -382,7 +382,7 @@ class TableModelTest(unittest.TestCase):
 
         res = list(
             users.get_properties_list(
-                ["tags.weight", "tags.name"], {"account.email": "email@email.com"}, {"order": ("uid", "ASC")}
+                ["tags.weight", "tags.name"], {"account.email": "email@email.com"}, {"order": ("tags.name", "ASC")}
             )
         )
         self.assertEqual(

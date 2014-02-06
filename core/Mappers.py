@@ -973,10 +973,19 @@ class SqlMapper(metaclass=ABCMeta):
         Линкует маппер к указанной таблице, с помощтю переданного коннекта к БД
         @param table_name: Имя таблицы БД
         @type table_name: str
-
+        @deprecated
         """
         self.table_name = table_name
         self._db_fields, self.db_primary_key = self.db.get_table_fields(self.table_name)
+
+    def set_collection_name(self, collection_name: str):
+        """
+        Линкует маппер к указанной таблице, с помощтю переданного коннекта к БД
+        @param collection_name: Имя таблицы БД
+        @type collection_name: str
+
+        """
+        self.attach(collection_name)
 
     def _analyze_map(self):
         """
@@ -1271,12 +1280,14 @@ class SqlMapper(metaclass=ABCMeta):
             for it in data:
                 self.insert(it, new_item)
         elif type(data) is dict:
+            if data == {}:
+                raise TableModelException("Can't insert an empty record")
             flat_data, lists_objects = self.split_data_by_relation_type(data)
             last_record = self.db.insert_query(
                 self.table_name, self.translate_and_convert(flat_data), self.primary
             )
             last_record = self.primary.grab_value_from(
-                last_record if self.primary.defined_by_user is False else flat_data
+                last_record if self.primary.defined_by_user is False and last_record != 0 else flat_data
             )
             if new_item and self.primary.exists():
                 self.link_all_list_objects(lists_objects, new_item().load_by_primary(last_record))

@@ -50,7 +50,7 @@ CREATE TABLE "passportsTable" (
 );
 
 IF OBJECT_ID('documentsTable', 'Table') IS NULL
-CREATE TABLE "passportsTable" (
+CREATE TABLE "documentsTable" (
   "ID" BIGINT PRIMARY KEY IDENTITY,
   "Series" BIGINT,
   "Number" BIGINT,

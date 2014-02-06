@@ -38,7 +38,7 @@ def for_all_dbms(test_function):
     def wrapped(*args, **kwargs):
         print()
         print("%s..." % test_doc)
-        for test_framework in [PgDbMock(), MongoDbMock()]:
+        for test_framework in [PgDbMock(), MyDbMock(), MongoDbMock()]:
             test_framework.up()
             try:
                 with Profiler() as p:
@@ -486,7 +486,7 @@ class SqlUsersMapper(SqlMapper):
         """ Настроим маппер """
         self.set_new_item(SqlUser)
         self.set_new_collection(SqlUsers)
-        self.attach(table_name="usersTable")
+        self.set_collection_name("usersTable")
         self.set_map([
             self.int("uid", "ID"),
             self.str("name", "Name"),
@@ -511,7 +511,7 @@ class NoSqlUsersMapper(NoSqlMapper):
         """ Настроим маппер """
         self.set_new_item(NoSqlUser)
         self.set_new_collection(NoSqlUsers)
-        self.attach(table_name="usersTable")
+        self.set_collection_name("usersTable")
         self.set_map([
             self.object_id("uid", "_id"),
             self.str("name", "Name"),
@@ -565,7 +565,7 @@ class SqlAccountsMapper(SqlMapper):
     def bind(self):
         self.set_new_item(SqlAccount)
         self.set_new_collection(SqlAccounts)
-        self.attach(table_name="accountsTable")
+        self.set_collection_name("accountsTable")
         self.set_map([
             self.int("id", "AccountID"),
             self.str("email", "EmailField"),
@@ -578,7 +578,7 @@ class NoSqlAccountsMapper(NoSqlMapper):
     def bind(self):
         self.set_new_item(NoSqlAccount)
         self.set_new_collection(NoSqlAccounts)
-        self.attach(table_name="accountsTable")
+        self.set_collection_name("accountsTable")
         self.set_map([
             self.object_id("id", "_id"),
             self.str("email", "EmailField"),
@@ -610,7 +610,7 @@ class NoSqlAccount(RecordModel):
 # noinspection PyDocstring
 class SqlTagsMapper(SqlMapper):
     def bind(self):
-        self.attach(table_name="tagsTable")
+        self.set_collection_name("tagsTable")
         self.set_new_item(SqlTag)
         self.set_new_collection(SqlTags)
         self.set_map([
@@ -623,7 +623,7 @@ class SqlTagsMapper(SqlMapper):
 # noinspection PyDocstring
 class SqlUsersTagsMapper(SqlMapper):
     def bind(self):
-        self.attach(table_name="users_tags_relations")
+        self.set_collection_name("users_tags_relations")
         self.set_new_item(SqlUsersTagsItem)
         self.set_new_collection(SqlUsersTags)
         self.set_map([
@@ -636,7 +636,7 @@ class SqlUsersTagsMapper(SqlMapper):
 # noinspection PyDocstring
 class NoSqlTagsMapper(NoSqlMapper):
     def bind(self):
-        self.attach(table_name="tagsTable")
+        self.set_collection_name("tagsTable")
         self.set_new_item(NoSqlTag)
         self.set_new_collection(NoSqlTags)
         self.set_map([
@@ -649,7 +649,7 @@ class NoSqlTagsMapper(NoSqlMapper):
 # noinspection PyDocstring
 class NoSqlUsersTagsMapper(NoSqlMapper):
     def bind(self):
-        self.attach(table_name="users_tags_relations")
+        self.set_collection_name("users_tags_relations")
         self.set_new_item(NoSqlUsersTagsItem)
         self.set_new_collection(NoSqlUsersTags)
         self.set_map([
@@ -703,7 +703,7 @@ class NoSqlUsersTagsItem(RecordModel):
 # noinspection PyDocstring
 class SqlStatusesMapper(SqlMapper):
     def bind(self):
-        self.attach(table_name="statusesTable")
+        self.set_collection_name("statusesTable")
         self.set_new_item(SqlStatus)
         self.set_new_collection(SqlStatuses)
         self.set_map([
@@ -717,7 +717,7 @@ class SqlStatusesMapper(SqlMapper):
 # noinspection PyDocstring
 class NoSqlStatusesMapper(NoSqlMapper):
     def bind(self):
-        self.attach(table_name="statusesTable")
+        self.set_collection_name("statusesTable")
         self.set_new_item(NoSqlStatus)
         self.set_new_collection(NoSqlStatuses)
         self.set_map([
@@ -752,7 +752,7 @@ class SqlStatus(RecordModel):
 # noinspection PyDocstring
 class SqlProfilesMapper(SqlMapper):
     def bind(self):
-        self.attach(table_name="profilesTable")
+        self.set_collection_name("profilesTable")
         self.set_new_item(SqlProfile)
         self.set_new_collection(SqlProfiles)
         self.set_map([
@@ -766,7 +766,7 @@ class SqlProfilesMapper(SqlMapper):
 # noinspection PyDocstring
 class NoSqlProfilesMapper(NoSqlMapper):
     def bind(self):
-        self.attach(table_name="profilesTable")
+        self.set_collection_name("profilesTable")
         self.set_new_item(NoSqlProfile)
         self.set_new_collection(NoSqlProfiles)
         self.set_map([
@@ -802,7 +802,7 @@ class SqlProfile(RecordModel):
 # noinspection PyDocstring
 class SqlPassportsMapper(SqlMapper):
     def bind(self):
-        self.attach(table_name="passportsTable")
+        self.set_collection_name("passportsTable")
         self.set_new_item(SqlPassport)
         self.set_new_collection(SqlPassports)
         self.set_map([
@@ -816,7 +816,7 @@ class SqlPassportsMapper(SqlMapper):
 # noinspection PyDocstring
 class NoSqlPassportsMapper(NoSqlMapper):
     def bind(self):
-        self.attach(table_name="passportsTable")
+        self.set_collection_name("passportsTable")
         self.set_new_item(NoSqlPassport)
         self.set_new_collection(NoSqlPassports)
         self.set_map([
@@ -850,7 +850,7 @@ class NoSqlPassport(RecordModel):
 # noinspection PyDocstring
 class SqlDocumentsMapper(SqlMapper):
     def bind(self):
-        self.attach(table_name="documentsTable")
+        self.set_collection_name("documentsTable")
         self.set_new_item(SqlDocument)
         self.set_new_collection(SqlDocuments)
         self.set_map([
@@ -864,7 +864,7 @@ class SqlDocumentsMapper(SqlMapper):
 # noinspection PyDocstring
 class NoSqlDocumentsMapper(NoSqlMapper):
     def bind(self):
-        self.attach(table_name="DocumentsTable")
+        self.set_collection_name("DocumentsTable")
         self.set_new_item(NoSqlDocument)
         self.set_new_collection(NoSqlDocuments)
         self.set_map([
@@ -897,7 +897,7 @@ class NoSqlDocument(RecordModel):
 # noinspection PyDocstring
 class SqlNoPrimaryMapper(SqlMapper):
     def bind(self):
-        self.attach(table_name="tableWithoutPrimaryKey")
+        self.set_collection_name("tableWithoutPrimaryKey")
         self.set_new_item(SqlNoPrimaryItem)
         self.set_new_collection(SqlNoPrimaryItems)
         self.set_map([
@@ -911,7 +911,7 @@ class SqlNoPrimaryMapper(SqlMapper):
 # noinspection PyDocstring
 class NoSqlNoPrimaryMapper(NoSqlMapper):
     def bind(self):
-        self.attach(table_name="tableWithoutPrimaryKey")
+        self.set_collection_name("tableWithoutPrimaryKey")
         self.set_new_item(NoSqlNoPrimaryItem)
         self.set_new_collection(NoSqlNoPrimaryItems)
         self.set_map([
