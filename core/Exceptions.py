@@ -3,6 +3,10 @@
 """
 
 
+class DublicateRecordException(Exception):
+    pass
+
+
 class AdapterException(Exception):
     """ Исключение работы на уровне адаптера базы данных """
     pass

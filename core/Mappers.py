@@ -7,7 +7,7 @@ from abc import abstractmethod, ABCMeta
 from collections import OrderedDict
 from collections import defaultdict
 
-from mapex.core.Exceptions import TableModelException, TableMapperException
+from mapex.core.Exceptions import TableModelException, TableMapperException, DublicateRecordException
 from mapex.core.Models import RecordModel, TableModel
 
 
@@ -849,6 +849,8 @@ class SqlMapper(metaclass=ABCMeta):
 
     ###################################### Mapper Initialization ###################################################
 
+    dublicate_record_exception = DublicateRecordException
+
     def __init__(self):
         if not self.__class__._inited:
             self.__class__._inited = True
@@ -1276,22 +1278,25 @@ class SqlMapper(metaclass=ABCMeta):
         @return: Значение первичного ключа для добавленной записи
         
         """
-        if type(data) is list:
-            for it in data:
-                self.insert(it, new_item)
-        elif type(data) is dict:
-            if data == {}:
-                raise TableModelException("Can't insert an empty record")
-            flat_data, lists_objects = self.split_data_by_relation_type(data)
-            last_record = self.db.insert_query(
-                self.table_name, self.translate_and_convert(flat_data), self.primary
-            )
-            last_record = self.primary.grab_value_from(
-                last_record if self.primary.defined_by_user is False and last_record != 0 else flat_data
-            )
-            if new_item and self.primary.exists():
-                self.link_all_list_objects(lists_objects, new_item().load_by_primary(last_record))
-            return last_record
+        try:
+            if type(data) is list:
+                for it in data:
+                    self.insert(it, new_item)
+            elif type(data) is dict:
+                if data == {}:
+                    raise TableModelException("Can't insert an empty record")
+                flat_data, lists_objects = self.split_data_by_relation_type(data)
+                last_record = self.db.insert_query(
+                    self.table_name, self.translate_and_convert(flat_data), self.primary
+                )
+                last_record = self.primary.grab_value_from(
+                    last_record if self.primary.defined_by_user is False and last_record != 0 else flat_data
+                )
+                if new_item and self.primary.exists():
+                    self.link_all_list_objects(lists_objects, new_item().load_by_primary(last_record))
+                return last_record
+        except DublicateRecordException as err:
+            raise self.__class__.dublicate_record_exception(err)
 
     def update(self, data: dict, conditions: dict=None, new_item=None):
         """

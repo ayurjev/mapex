@@ -1,14 +1,10 @@
 """ Модуль с адаптерами для подключения к СУБД """
 
-from mapex.core.Exceptions import AdapterException
+from mapex.core.Exceptions import AdapterException, DublicateRecordException
 from mapex.core.Sql import Adapter, PgDbField, MySqlDbField, MsSqlDbField
 from mapex.core.Mappers import FieldTypes
 from mapex.dbms.QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder
 from mapex.core.Sql import AdapterLogger
-
-
-class DublicateRecord(Exception):
-    pass
 
 
 class PgSqlDbAdapter(Adapter):
@@ -59,7 +55,7 @@ class PgSqlDbAdapter(Adapter):
                 yield res
         except self.dublicate_record_exception as err:
             self.reconnect()
-            raise DublicateRecord(err)
+            raise DublicateRecordException(err)
         statement.close()
 
     def get_table_fields(self, table_name):
@@ -162,7 +158,7 @@ class MySqlDbAdapter(Adapter):
             else:
                 yield cursor.lastrowid
         except self.dublicate_record_exception as err:
-            raise DublicateRecord(err)
+            raise DublicateRecordException(err)
         finally:
             cursor.close()
 
@@ -243,7 +239,7 @@ class MsSqlDbAdapter(Adapter):
         try:
             cursor.execute(sql, params if params is not None else [])
         except self.dublicate_record_exception as err:
-            raise DublicateRecord(err)
+            raise DublicateRecordException(err)
         if cursor.rowcount == 0:
             return
         elif cursor.rowcount == -1:
@@ -346,7 +342,7 @@ class MongoDbAdapter(AdapterLogger):
         try:
             return self.db[collection_name].insert(data)
         except self.dublicate_record_exception as err:
-            raise DublicateRecord(err)
+            raise DublicateRecordException(err)
 
     def select_query(self, collection_name: str, fields: list, conditions: dict, params=None):
         """

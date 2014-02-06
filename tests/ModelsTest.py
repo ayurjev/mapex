@@ -99,11 +99,18 @@ class TableModelTest(unittest.TestCase):
         uid = users.insert({"name": "first"})
         self.assertEqual(1, users.count())
 
-        from mapex.dbms.Adapters import DublicateRecord
+        from mapex import DublicateRecordException
         user2 = dbms_fw.get_new_user_instance({"uid": uid, "name": "second"})
-        self.assertRaises(DublicateRecord, user2.save)
+        self.assertRaises(DublicateRecordException, user2.save)
 
+        # Теперь назначим другое исключение на эту ситуацию для данного маппера
+        class CustomException(Exception):
+            pass
 
+        users.mapper.__class__.dublicate_record_exception = CustomException
+        self.assertRaises(CustomException, user2.save)
+
+        users.mapper.__class__.dublicate_record_exception = DublicateRecordException
 
     @for_all_dbms
     def test_get_property_list(self, dbms_fw):
