@@ -944,6 +944,7 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
     def __init__(self):
         self.connection_data = (None,)
         self.connection = None
+        self.dublicate_record_exception = None
         self.query_builder = self.get_query_builder()
         super().__init__()
 

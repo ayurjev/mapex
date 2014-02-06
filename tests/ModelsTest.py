@@ -90,6 +90,22 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(3, users.count())
 
     @for_all_dbms
+    def test_dbms_exceptions(self, dbms_fw):
+        """ Проверим обработку исключений, генерируемых адаптерами. Они должны заменяться на исключения mapex """
+
+        ##################################### DublicateRecord ###################################################
+        users = dbms_fw.get_new_users_collection_instance()
+        self.assertEqual(0, users.count())
+        uid = users.insert({"name": "first"})
+        self.assertEqual(1, users.count())
+
+        from mapex.dbms.Adapters import DublicateRecord
+        user2 = dbms_fw.get_new_user_instance({"uid": uid, "name": "second"})
+        self.assertRaises(DublicateRecord, user2.save)
+
+
+
+    @for_all_dbms
     def test_get_property_list(self, dbms_fw):
         """ Проверим способ получения свойств для объектов, хранящихся в модели """
         users = dbms_fw.get_new_users_collection_instance()

@@ -7,6 +7,10 @@ from mapex.dbms.QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder
 from mapex.core.Sql import AdapterLogger
 
 
+class DublicateRecord(Exception):
+    pass
+
+
 class PgSqlDbAdapter(Adapter):
     """ Адаптер для работы с PostgreSQL """
 
@@ -23,6 +27,8 @@ class PgSqlDbAdapter(Adapter):
         :return:               Экземпляр соединения
         """
         import postgresql
+        import postgresql.exceptions
+        self.dublicate_record_exception = postgresql.exceptions.UniqueError
         return postgresql.open("pq://%s:%s@%s:%s/%s" % (
             connection_data[2], connection_data[3], connection_data[0], connection_data[1], connection_data[4])
         )
@@ -48,8 +54,12 @@ class PgSqlDbAdapter(Adapter):
         """
         statement = self.connection.prepare(sql)
         *args, = params if params is not None else []
-        for res in statement(*args):
-            yield res
+        try:
+            for res in statement(*args):
+                yield res
+        except self.dublicate_record_exception as err:
+            self.reconnect()
+            raise DublicateRecord(err)
         statement.close()
 
     def get_table_fields(self, table_name):
@@ -113,6 +123,8 @@ class MySqlDbAdapter(Adapter):
         :return:               Экземпляр соединения
         """
         import mysql.connector
+        import mysql.connector.errors
+        self.dublicate_record_exception = mysql.connector.errors.IntegrityError
         return mysql.connector.connect(
             user=connection_data[2], password=connection_data[3],
             host=connection_data[0], port=connection_data[1], database=connection_data[4],
@@ -149,6 +161,8 @@ class MySqlDbAdapter(Adapter):
                     yield res
             else:
                 yield cursor.lastrowid
+        except self.dublicate_record_exception as err:
+            raise DublicateRecord(err)
         finally:
             cursor.close()
 
@@ -197,6 +211,9 @@ class MsSqlDbAdapter(Adapter):
         :return:               Экземпляр соединения
         """
         import pyodbc
+        # noinspection PyUnresolvedReferences
+        self.dublicate_record_exception = pyodbc.IntegrityError
+        # noinspection PyUnresolvedReferences
         return pyodbc.connect(
             'DSN=egServer70;DATABASE='+connection_data[4]+';UID='+connection_data[2]+';PWD='+connection_data[3]
         )
@@ -223,7 +240,10 @@ class MsSqlDbAdapter(Adapter):
         :param params:      Параметры для плейсхолдеров запроса
         """
         cursor = self.connection.cursor()
-        cursor.execute(sql, params if params is not None else [])
+        try:
+            cursor.execute(sql, params if params is not None else [])
+        except self.dublicate_record_exception as err:
+            raise DublicateRecord(err)
         if cursor.rowcount == 0:
             return
         elif cursor.rowcount == -1:
@@ -287,6 +307,9 @@ class MongoDbAdapter(AdapterLogger):
         super().__init__()
         self.db = None
 
+        import pymongo.errors
+        self.dublicate_record_exception = pymongo.errors.DuplicateKeyError
+
     def connect(self, host: str, port: int, database: str):
         """ Выполняет подключение к СУБД по переданным реквизитам """
         import pymongo
@@ -317,9 +340,13 @@ class MongoDbAdapter(AdapterLogger):
         @param data: Данные для вставки
         @param primary_key: Первичный ключ коллекции
         """
+
         if self.query_analyzer:
             self.query_analyzer.log("insert", data)
-        return self.db[collection_name].insert(data)
+        try:
+            return self.db[collection_name].insert(data)
+        except self.dublicate_record_exception as err:
+            raise DublicateRecord(err)
 
     def select_query(self, collection_name: str, fields: list, conditions: dict, params=None):
         """
