@@ -217,7 +217,8 @@ class RecordModel(object):
         :param data:    Словарь с данными
         """
         self._loaded_from_db = loaded_from_db
-        self.__dict__.update(data)
+        for key in data:
+            self.__setattr__(key, data[key])
         if loaded_from_db:
             self.md5 = self.calc_sum()
         return self
