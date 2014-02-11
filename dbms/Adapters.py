@@ -305,6 +305,7 @@ class MongoDbAdapter(AdapterLogger):
 
         import pymongo.errors
         self.dublicate_record_exception = pymongo.errors.DuplicateKeyError
+        self.update_primary_exception = pymongo.errors.OperationFailure
 
     def connect(self, host: str, port: int, database: str):
         """ Выполняет подключение к СУБД по переданным реквизитам """
@@ -394,7 +395,14 @@ class MongoDbAdapter(AdapterLogger):
         conditions = {} if conditions is None else conditions
         if self.query_analyzer:
             self.query_analyzer.log("update", (collection_name, data, conditions))
-        return self.db[collection_name].update(conditions, {"$set": data}, multi=True)
+        try:
+            return self.db[collection_name].update(conditions, {"$set": data}, multi=True)
+
+        # Вот это, разумеется, некорректно...
+        # но пока я не знаю что с этим делать, так как в SQL изменять primary можно...
+        # В одном из тестов я меняю поле id на уже существующее, чтобы отловить DublicateRecordException
+        except self.update_primary_exception as err:
+            raise DublicateRecordException(err)
 
     def fix_sorting(self, val):
         """

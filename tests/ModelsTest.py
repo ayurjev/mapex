@@ -108,8 +108,16 @@ class TableModelTest(unittest.TestCase):
             pass
 
         users.mapper.__class__.dublicate_record_exception = CustomException
+
         self.assertRaises(CustomException, user2.save)
 
+        # Это же исключение мы получим если попытаемся сделать update и данные совпадут:
+        user2 = dbms_fw.get_new_user_instance({"name": "second"})
+        user2.save()
+        self.assertEqual(2, users.count())
+        self.assertRaises(CustomException, users.update, {"uid": uid}, {"name": "second"})
+
+        # Возвращаем исходный тип исключения
         users.mapper.__class__.dublicate_record_exception = DublicateRecordException
 
     @for_all_dbms

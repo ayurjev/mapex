@@ -1279,25 +1279,25 @@ class SqlMapper(metaclass=ABCMeta):
         @return: Значение первичного ключа для добавленной записи
         
         """
-        try:
-            if type(data) is list:
-                for it in data:
-                    self.insert(it, new_item)
-            elif type(data) is dict:
-                if data == {}:
-                    raise TableModelException("Can't insert an empty record")
-                flat_data, lists_objects = self.split_data_by_relation_type(data)
+        if type(data) is list:
+            for it in data:
+                self.insert(it, new_item)
+        elif type(data) is dict:
+            if data == {}:
+                raise TableModelException("Can't insert an empty record")
+            flat_data, lists_objects = self.split_data_by_relation_type(data)
+            try:
                 last_record = self.db.insert_query(
                     self.table_name, self.translate_and_convert(flat_data), self.primary
                 )
-                last_record = self.primary.grab_value_from(
-                    last_record if self.primary.defined_by_user is False and last_record != 0 else flat_data
-                )
-                if new_item and self.primary.exists():
-                    self.link_all_list_objects(lists_objects, new_item().load_by_primary(last_record))
-                return last_record
-        except DublicateRecordException as err:
-            raise self.__class__.dublicate_record_exception(err)
+            except DublicateRecordException as err:
+                raise self.__class__.dublicate_record_exception(err)
+            last_record = self.primary.grab_value_from(
+                last_record if self.primary.defined_by_user is False and last_record != 0 else flat_data
+            )
+            if new_item and self.primary.exists():
+                self.link_all_list_objects(lists_objects, new_item().load_by_primary(last_record))
+            return last_record
 
     def update(self, data: dict, conditions: dict=None, new_item=None):
         """
@@ -1322,10 +1322,13 @@ class SqlMapper(metaclass=ABCMeta):
         # Сохраняем записи в основной таблице
         if flat_data != {}:
             converted_conditions = self.translate_and_convert(conditions)
-            self.db.update_query(
-                self.table_name, self.translate_and_convert(flat_data), converted_conditions,
-                self.get_joined_tables(converted_conditions), self.primary
-            )
+            try:
+                self.db.update_query(
+                    self.table_name, self.translate_and_convert(flat_data), converted_conditions,
+                    self.get_joined_tables(converted_conditions), self.primary
+                )
+            except DublicateRecordException as err:
+                raise self.__class__.dublicate_record_exception(err)
         # Получаем id измененных записей и пересохраняем привязанные к ним объекты (если требуется)
         if lists_objects != {}:
             if self.primary.exists():           # Если, конечно, первичный ключ определен
