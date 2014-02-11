@@ -38,7 +38,7 @@ def for_all_dbms(test_function):
     def wrapped(*args, **kwargs):
         print()
         print("%s..." % test_doc)
-        for test_framework in [PgDbMock(), MyDbMock(), MongoDbMock(), MsDbMock()]:
+        for test_framework in [PgDbMock(), MyDbMock(), MongoDbMock()]:
             test_framework.up()
             try:
                 with Profiler() as p:

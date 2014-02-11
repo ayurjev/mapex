@@ -432,7 +432,7 @@ class FieldTypes(object):
             self.items_collection_mapper = item.mapper
 
             if item.mapper.binded:
-                if not (item.mapper.primary.exists()) and self.is_primary_required():
+                if item.mapper.primary.exists() is False and self.is_primary_required():
                     raise TableModelException("There is no primary key in %s" % item.mapper)
 
         @staticmethod
@@ -835,6 +835,7 @@ class SqlMapper(metaclass=ABCMeta):
     _instance = None
     _inited = False
     db = None
+    dependencies = []
 
     def __new__(cls, *a, **kwa):
         if cls._instance is None:
@@ -853,6 +854,8 @@ class SqlMapper(metaclass=ABCMeta):
 
     def __init__(self):
         if not self.__class__._inited:
+            for dep in self.__class__.dependencies:
+                dep.mapper()
             self.__class__._inited = True
             self.db = self.__class__.db                 # Объект подключения к базе данных
             self.item_class = RecordModel
@@ -1948,6 +1951,7 @@ class FieldTypesConverter(object):
         ("String", "Date"): lambda v, mf, cache: FieldTypesConverter.str2date(v) if v else FNone(),
         ("String", "Time"): lambda v, mf, cache: FieldTypesConverter.str2time(v) if v else FNone(),
         ("String", "DateTime"): lambda v, mf, cache: FieldTypesConverter.str2datetime(v) if v else FNone(),
+        ('String', 'Link'): lambda v, mf, cache: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
         ("String", "List"): lambda v, mf, cache: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
         ("String", "ReversedLink"): lambda v, mf, cache:  FieldTypesConverter.to_reversed_link(mf, v, cache),
         ("Float", "Float"): lambda v, mf, cache: v if v else FNone(),
@@ -1966,7 +1970,7 @@ class FieldTypesConverter(object):
         ("DateTime", "Int"): lambda v, mf, cache: int(time.mktime(v.timetuple())) if v else FNone(),
         ("DateTime", "Date"): lambda v, mf, cache: date(v.year, v.month, v.day) if v else FNone(),
         ("Link", "Int"): lambda v, mf, cache: v.save() if v else FNone(),
-        ("Link", "String"): lambda v, mf, cache: json.dumps(v.save()) if v else FNone(),
+        ("Link", "String"): lambda v, mf, cache: str(v.save()) if v else FNone(),
         ("Link", "ObjectID"): lambda v, mf, cache: v.save() if v else FNone(),
         ("List", "String"): lambda v, mf, cache: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
         ("List", "ObjectID"): lambda v, mf, cache: [it.save() for it in v] if v is not None else [],
