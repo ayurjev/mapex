@@ -153,6 +153,9 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual("FirstItem", items[0].name)
         self.assertEqual("SecondItem", items[1].name)
 
+        items = users.get_items({"or": [{"age": 1}, {"age": 2}]})
+        self.assertEqual(2, len(items))
+
     @for_all_dbms
     def test_params(self, dbms_fw):
         """ Проверим сортировку и ограничение выборки """

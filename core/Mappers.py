@@ -1,7 +1,6 @@
 """ Модуль для работы с БД """
 import re
 import time
-import json
 from datetime import datetime, date, time as dtime
 from abc import abstractmethod, ABCMeta
 from collections import OrderedDict
@@ -857,7 +856,6 @@ class SqlMapper(metaclass=ABCMeta):
             for dep in self.__class__.dependencies:
                 dep.mapper()
             self.__class__._inited = True
-            self.db = self.__class__.db                 # Объект подключения к базе данных
             self.item_class = RecordModel
             self.item_collection_class = TableModel
             self.table_name = None                      # Имя основной таблицы
@@ -1417,14 +1415,18 @@ class SqlMapper(metaclass=ABCMeta):
         if type(value) is list:
             return [self.translate_and_convert(newvalue, direction, cache) for newvalue in value]
         elif type(value) is dict:
-            return {
-                self.translate_and_convert(newvalue, direction, cache): (
-                    self.get_mapper_field(newvalue, direction).convert(
-                        value[newvalue], direction, cache
-                    ) if type(value[newvalue]) is not tuple else value[newvalue]
-                )
-                for newvalue in value
-            }
+            converted = {}
+            for field in value:
+                if field in ["or", "and"]:
+                    converted[field] = self.translate_and_convert(value[field], direction, cache)
+                else:
+                    translted_field = self.translate_and_convert(field, direction, cache)
+                    if type(value[field]) is tuple:
+                        converted[translted_field] = value[field]
+                    else:
+                        mapper_field = self.get_mapper_field(field, direction)
+                        converted[translted_field] = mapper_field.convert(value[field], direction, cache)
+            return converted
         elif type(value) is str:
             return self.translate(value, direction)
         else:
@@ -1853,10 +1855,18 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
         @return: Преобразованный словарь
         """
         for key in conditions:
+            # Обрабатываем случае конъюнкции и дизъюнкции
+            if key in ["and", "or"]:
+                conditions["$%s" % key] = [NoSqlMapper.to_mongo_conditions_format(sub) for sub in conditions[key]]
+                del conditions[key]
+                continue
+
+            # Обрабатываем случай проверки наличия значения в поле
             if type(conditions[key]) is tuple:
                 if conditions[key][0] == "exists":
                     conditions[key] = ("ne" if conditions[key] else "e", None)
 
+            # Конвертируем все остальные операторы сравнения
             if type(conditions[key]) is tuple:
                 conditions[key] = {"$%s" % conditions[key][0]: conditions[key][1]}
         return conditions
