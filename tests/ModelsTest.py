@@ -243,6 +243,27 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(2, users.count())
 
     @for_all_dbms
+    def test_mapper_boundaries(self, dbms_fw):
+        """
+        Проверим возможность создания мапперов с предопределенными границами, которые нельзя переопределять в моделях
+        """
+        users = dbms_fw.get_new_users_collection_instance()
+        ausers = dbms_fw.get_new_users_collection_instance_with_boundaries()        # {"name": ("match", "a*")}
+
+        self.assertEqual(0, users.count())
+        self.assertEqual(0, ausers.count())
+
+        users.insert([
+            {"name": "andrey", "age": 0},
+            {"name": "alexey", "age": 0},
+            {"name": "nikolay", "age": 0},
+            {"name": "vasiliy", "age": 0}
+        ])
+
+        self.assertEqual(4, users.count())
+        self.assertEqual(2, ausers.count())
+
+    @for_all_dbms
     def test_query_with_links(self, dbms_fw):
         """ Проверим возможность запросов к коллекции с условиями, включающими обращения к полям типа Link """
         users = dbms_fw.get_new_users_collection_instance()

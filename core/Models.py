@@ -50,10 +50,18 @@ class TableModel(object):
             return data
 
     def mix_boundaries(self, conditions: dict=None):
-        if self.object_boundaries and conditions:
+        if self.object_boundaries and conditions and self.mapper.boundaries:
+            conditions = {"and": [conditions, self.object_boundaries, self.mapper.boundaries]}
+        elif self.object_boundaries and self.mapper.boundaries:
+            conditions = {"and": [self.object_boundaries, self.mapper.boundaries]}
+        elif conditions and self.mapper.boundaries:
+            conditions = {"and": [conditions, self.mapper.boundaries]}
+        elif conditions and self.object_boundaries:
             conditions = {"and": [conditions, self.object_boundaries]}
         elif self.object_boundaries:
             conditions = self.object_boundaries
+        elif self.mapper.boundaries:
+            conditions = self.mapper.boundaries
         return conditions
 
     def count(self, conditions=None):

@@ -871,6 +871,7 @@ class SqlMapper(metaclass=ABCMeta):
             self.item_collection_class = TableModel
             self.table_name = None                      # Имя основной таблицы
             self.primary = Primary(self)                # Объект, представляющий собой первичный ключ маппера
+            self.boundaries = None
             self._db_fields = {}
             self.db_primary_key = ""
             self._properties = {}
@@ -1003,6 +1004,13 @@ class SqlMapper(metaclass=ABCMeta):
 
         """
         self.attach(collection_name)
+
+    def set_boundaries(self, boundaries: dict):
+        """
+        Устанавливает границы действия маппера
+        @param boundaries: Словарь, определяющий границы
+        """
+        self.boundaries = boundaries
 
     def _analyze_map(self):
         """

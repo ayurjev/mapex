@@ -78,6 +78,10 @@ class DbMock(object, metaclass=ABCMeta):
         """ Возвращает новый экземпляр коллекции пользователей """
 
     @abstractmethod
+    def get_new_users_collection_instance_with_boundaries(self):
+        """ Возвращает новый экземпляр коллекции пользователей с границами """
+
+    @abstractmethod
     def get_new_account_instance(self):
         """ Возвращает новый экземпляр класса аккаунта пользователя """
 
@@ -186,6 +190,7 @@ class SqlDbMock(DbMock):
         """ Создает нужные для проведения тестирования таблицы в базе данных """
         self.exec_sql_from_file(self.up_script)
         SqlUsersMapper.db = self.db
+        SqlUsersMapperWithBoundaries.db = self.db
         SqlAccountsMapper.db = self.db
         SqlTagsMapper.db = self.db
         SqlUsersTagsMapper.db = self.db
@@ -199,6 +204,7 @@ class SqlDbMock(DbMock):
         """ Уничтожает созданные в процессе тестирования таблицы базы данных """
         self.exec_sql_from_file(self.down_script)
         SqlUsersMapper.kill_instance()
+        SqlUsersMapperWithBoundaries.kill_instance()
         SqlAccountsMapper.kill_instance()
         SqlTagsMapper.kill_instance()
         SqlUsersTagsMapper.kill_instance()
@@ -215,6 +221,10 @@ class SqlDbMock(DbMock):
     def get_new_users_collection_instance(self, boundaries=None):
         """ Возвращает новый экземпляр коллекции пользователей """
         return SqlUsers(boundaries)
+
+    def get_new_users_collection_instance_with_boundaries(self):
+        """ Возвращает новый экземпляр коллекции пользователей с границами """
+        return SqlUsersWithBoundaries()
 
     def get_new_account_instance(self):
         """ Возвращает новый экземпляр класса аккаунта пользователя """
@@ -307,6 +317,7 @@ class NoSqlDbMock(DbMock):
     def up(self):
         """ Создает нужные для проведения тестирования таблицы в базе данных """
         NoSqlUsersMapper.db = self.db
+        NoSqlUsersMapperWithBoundaries.db = self.db
         NoSqlAccountsMapper.db = self.db
         NoSqlTagsMapper.db = self.db
         NoSqlUsersTagsMapper.db = self.db
@@ -327,6 +338,7 @@ class NoSqlDbMock(DbMock):
         self.db.db.drop_collection("testTableFieldTypes")
         self.db.db.drop_collection("tableWithoutPrimaryKey")
         NoSqlUsersMapper.kill_instance()
+        NoSqlUsersMapperWithBoundaries.kill_instance()
         NoSqlAccountsMapper.kill_instance()
         NoSqlTagsMapper.kill_instance()
         NoSqlUsersTagsMapper.kill_instance()
@@ -343,6 +355,10 @@ class NoSqlDbMock(DbMock):
     def get_new_users_collection_instance(self, boundaries=None):
         """ Возвращает новый экземпляр коллекции пользователей """
         return NoSqlUsers(boundaries)
+
+    def get_new_users_collection_instance_with_boundaries(self):
+        """ Возвращает новый экземпляр коллекции пользователей с границами """
+        return NoSqlUsersWithBoundaries()
 
     def get_new_account_instance(self):
         """ Возвращает новый экземпляр класса аккаунта пользователя """
@@ -505,6 +521,26 @@ class SqlUsersMapper(SqlMapper):
         ])
 
 
+class SqlUsersMapperWithBoundaries(SqlMapper):
+
+    def bind(self):
+        """ Настроим маппер """
+        self.set_new_item(SqlUser)
+        self.set_new_collection(SqlUsersWithBoundaries)
+        self.set_boundaries({"name": ("match", "a*")})
+        self.set_collection_name("usersTable")
+        self.set_map([
+            self.int("uid", "ID"),
+            self.str("name", "Name"),
+            self.int("age", "IntegerField"),
+            self.bool("is_system", "isSystem"),
+            self.float("latitude", "xCoord"),
+            self.date("register_date", "DateField"),
+            self.time("register_time", "TimeField"),
+            self.datetime("register_datetime", "DateTimeField")
+        ])
+
+
 class NoSqlUsersMapper(NoSqlMapper):
     """ Тестовый маппер для класса Users """
     def bind(self):
@@ -530,9 +566,32 @@ class NoSqlUsersMapper(NoSqlMapper):
         ])
 
 
+class NoSqlUsersMapperWithBoundaries(NoSqlMapper):
+    def bind(self):
+        """ Настроим маппер """
+        self.set_new_item(NoSqlUser)
+        self.set_new_collection(NoSqlUsersWithBoundaries)
+        self.set_boundaries({"name": ("match", "a*")})
+        self.set_collection_name("usersTable")
+        self.set_map([
+            self.int("uid", "ID"),
+            self.str("name", "Name"),
+            self.int("age", "IntegerField"),
+            self.bool("is_system", "isSystem"),
+            self.float("latitude", "xCoord"),
+            self.date("register_date", "DateField"),
+            self.time("register_time", "TimeField"),
+            self.datetime("register_datetime", "DateTimeField")
+        ])
+
+
 # noinspection PyDocstring
 class SqlUsers(TableModel):
     mapper = SqlUsersMapper
+
+
+class SqlUsersWithBoundaries(SqlUsers):
+    mapper = SqlUsersMapperWithBoundaries
 
 
 # noinspection PyDocstring
@@ -552,6 +611,10 @@ class SqlUser(RecordModel):
 # noinspection PyDocstring
 class NoSqlUsers(TableModel):
     mapper = NoSqlUsersMapper
+
+
+class NoSqlUsersWithBoundaries(NoSqlUsers):
+    mapper = NoSqlUsersMapperWithBoundaries
 
 
 # noinspection PyDocstring
