@@ -164,6 +164,8 @@ class FieldTypes(object):
             for mapperType in field_types:
                 if db_type in field_types[mapperType]:
                     return mapperType
+            return FieldTypes.Unknown
+            #raise TableMapperException("Unknown database field type: %s" % db_type)
 
         def get_default_value(self):
             """
@@ -308,6 +310,15 @@ class FieldTypes(object):
 
     class NoSqlString(String, NoSqlBaseField):
         pass
+
+    class Repr(String):
+        ident = "Repr"
+
+    class Unknown(String):
+        ident = "Unknown"
+
+    class NoSqlUnknown(NoSqlString):
+        ident = "Unknown"
 
     class NoSqlObjectID(NoSqlBaseField, BaseField):
 
@@ -876,6 +887,9 @@ class SqlMapper(metaclass=ABCMeta):
 
     def str(self, mapper_field_name, db_field_name):
         return FieldTypes.String(self, mapper_field_name, db_field_name=db_field_name)
+
+    def repr(self, mapper_field_name, db_field_name):
+        return FieldTypes.Repr(self, mapper_field_name, db_field_name=db_field_name)
 
     def bool(self, mapper_field_name, db_field_name):
         return FieldTypes.Bool(self, mapper_field_name, db_field_name=db_field_name)
@@ -1516,6 +1530,10 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
         return FieldTypes.NoSqlString(self, mapper_field_name, db_field_name=db_field_name,
                                       db_field_type=db_field_type if db_field_type else FieldTypes.NoSqlString)
 
+    def repr(self, mapper_field_name, db_field_name, db_field_type=None):
+        return FieldTypes.Repr(self, mapper_field_name, db_field_name=db_field_name,
+                               db_field_type=db_field_type if db_field_type else FieldTypes.NoSqlString)
+
     def bool(self, mapper_field_name, db_field_name, db_field_type=None):
         return FieldTypes.NoSqlBool(self, mapper_field_name, db_field_name=db_field_name,
                                     db_field_type=db_field_type if db_field_type else FieldTypes.NoSqlBool)
@@ -1996,7 +2014,23 @@ class FieldTypesConverter(object):
         ("ObjectID", "List"): lambda v, mf, cache: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
         ("ObjectID", "Link"): lambda v, mf, cache: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
         ("ObjectID", "ReversedLink"): lambda v, mf, cache: FieldTypesConverter.to_reversed_link(mf, v, cache),
-        ("ObjectID", "ObjectID"): lambda v, mf, cache: v
+        ("ObjectID", "ObjectID"): lambda v, mf, cache: v,
+        ("Unknown", "String"): lambda v, mf, cache: str(v),
+        ("Int", "Repr"): lambda v, mf, cache: str(v),
+        ("String", "Repr"): lambda v, mf, cache: str(v),
+        ("Float", "Repr"): lambda v, mf, cache: str(v),
+        ("Bool", "Repr"): lambda v, mf, cache: str(v),
+        ("Date", "Repr"): lambda v, mf, cache: str(v),
+        ("Time", "Repr"): lambda v, mf, cache: str(v),
+        ("DateTime", "Repr"): lambda v, mf, cache: str(v),
+        ("DateTime", "Repr"): lambda v, mf, cache: str(v),
+        ("Link", "Repr"): lambda v, mf, cache: str(v),
+        ("List", "Repr"): lambda v, mf, cache: str(v),
+        ("EmbeddedLink", "Repr"): lambda v, mf, cache: str(v),
+        ("EmbeddedDocument", "Repr"): lambda v, mf, cache: str(v),
+        ("EmbeddedList", "Repr"): lambda v, mf, cache: str(v),
+        ("ObjectID", "Repr"): lambda v, mf, cache: str(v),
+        ("Unknown", "Repr"): lambda v, mf, cache: str(v)
     }
 
     @staticmethod
