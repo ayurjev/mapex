@@ -185,6 +185,64 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual("SecondItem", res[0].name)
 
     @for_all_dbms
+    def test_collections_boundaries(self, dbms_fw):
+        """ Проверим возможность создания коллекций с жесткими границами в пределах одной, большой коллекции """
+        users = dbms_fw.get_new_users_collection_instance()
+        ausers = dbms_fw.get_new_users_collection_instance({"name": ("match", "a*")})
+
+        self.assertEqual(0, users.count())
+        self.assertEqual(0, ausers.count())
+
+        users.insert([
+            {"name": "andrey", "age": 0},
+            {"name": "alexey", "age": 0},
+            {"name": "nikolay", "age": 0},
+            {"name": "vasiliy", "age": 0}
+        ])
+
+        # test counting
+        self.assertEqual(4, users.count())
+        self.assertEqual(2, ausers.count())
+        self.assertEqual(1, users.count({"name": ("match", "*ay")}))
+        self.assertEqual(0, ausers.count({"name": ("match", "*ay")}))
+
+        # test get_items
+        self.assertEqual(4, len(list(users.get_items())))
+        self.assertEqual(2, len(list(ausers.get_items())))
+        self.assertEqual(1, len(list(users.get_items({"name": ("match", "*ay")}))))
+        self.assertEqual(0, len(list(ausers.get_items({"name": ("match", "*ay")}))))
+        self.assertIsNotNone(users.get_item({"name": ("match", "*ay")}))
+        self.assertIsNotNone(ausers.get_item({"name": ("match", "*rey")}))
+        self.assertIsNone(ausers.get_item({"name": ("match", "*ay")}))
+
+        # test get_property
+        self.assertEqual(["andrey", "alexey"], list(ausers.get_property_list("name")))
+        self.assertEqual(
+            [{"name": "andrey", "age": 0}, {"name": "alexey", "age": 0}],
+            list(ausers.get_properties_list(["name", "age"]))
+        )
+
+        # test update
+        ausers.update({"age": 1}, {"name": "nikolay"})  # Изменяем возраст для nikolay в коллекции ausers
+        self.assertEqual(0, users.count({"age": 1}))    # Ничего измениться не должно, так как nikolay не в ausers
+        ausers.update({"age": 2})                       # Изменяем возраст для всех записей в коллекции ausers
+        self.assertEqual(2, users.count({"age": 2}))    # Обе записи в ausers изменены
+
+        # test delete
+        self.assertEqual(2, ausers.count())
+        ausers.delete({"name": "nikolay"})
+        self.assertEqual(2, ausers.count())
+        ausers.delete({"name": "andrey"})
+        self.assertEqual(1, ausers.count())
+        self.assertEqual(3, users.count())
+        ausers.delete()
+        self.assertEqual(0, ausers.count())
+        self.assertEqual(2, users.count())
+        ausers.delete()
+        self.assertEqual(0, ausers.count())
+        self.assertEqual(2, users.count())
+
+    @for_all_dbms
     def test_query_with_links(self, dbms_fw):
         """ Проверим возможность запросов к коллекции с условиями, включающими обращения к полям типа Link """
         users = dbms_fw.get_new_users_collection_instance()

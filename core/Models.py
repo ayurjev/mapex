@@ -11,10 +11,11 @@ class TableModel(object):
     """ Класс создания моделей таблиц БД """
     mapper = None
 
-    def __init__(self):
+    def __init__(self, boundaries=None):
         if self.__class__.mapper is None:
             raise TableModelException("No mapper for %s model" % self)
         # noinspection PyCallingNonCallable
+        self.object_boundaries = boundaries
         self.mapper = self.__class__.mapper()
 
     def get_new_item(self):
@@ -48,12 +49,19 @@ class TableModel(object):
                 raise TableModelException("Invalid data for inserting into the collection")
             return data
 
+    def mix_boundaries(self, conditions: dict=None):
+        if self.object_boundaries and conditions:
+            conditions = {"and": [conditions, self.object_boundaries]}
+        elif self.object_boundaries:
+            conditions = self.object_boundaries
+        return conditions
+
     def count(self, conditions=None):
         """
         Выполняет подсчет объектов в коллекции по заданным условиям
         :param conditions: Условия подсчета строк в коллекции
         """
-        return self.mapper.count(conditions)
+        return self.mapper.count(self.mix_boundaries(conditions))
 
     def insert(self, data):
         """
@@ -67,16 +75,18 @@ class TableModel(object):
         Удаляет записи из коллекции в соответствии с переданными условиями
         :param conditions:  Условия удаления записей из таблицы
         """
-        return self.mapper.delete(conditions)
+        return self.mapper.delete(self.mix_boundaries(conditions))
 
     def update(self, data, conditions=None):
         """ Обновляет записи в коллекции
         :param data:        Данные для обновления записей
         :param conditions:  Условия обновления записей в коллекции
         """
-        return self.mapper.update(self.check_incoming_data(data), conditions, lambda: self.get_new_item())
+        return self.mapper.update(
+            self.check_incoming_data(data), self.mix_boundaries(conditions), lambda: self.get_new_item()
+        )
 
-    def get_property_list(self, property_name, conditions=None, params=None):
+    def get_property_list(self, property_name: str, conditions=None, params=None):
         """
         Возврашает список значений какого-либо свойства текущей коллекции в соответствии с уловиями и
         параметрами выборки
@@ -84,17 +94,17 @@ class TableModel(object):
         :param conditions:          Условия выборки записей
         :param params:              Параметры выборки записей
         """
-        for item in self.mapper.get_column(property_name, conditions, params):
+        for item in self.mapper.get_column(property_name, self.mix_boundaries(conditions), params):
             yield item
 
-    def get_properties_list(self, properties_names, conditions=None, params=None):
+    def get_properties_list(self, properties_names: list, conditions=None, params=None):
         """
         Возвращает список, где каждый элемент состоит из значений всех запрошенных полей
         :param properties_names:     Список запрошенных полей
         :param conditions:          Условия выборки записей
         :param params:              Параметры выборки записей
         """
-        for item in self.mapper.get_rows(properties_names, conditions, params):
+        for item in self.mapper.get_rows(properties_names, self.mix_boundaries(conditions), params):
             yield item
 
     def get_item(self, unique_bounds):
@@ -117,7 +127,7 @@ class TableModel(object):
         :return: :raise:            TableModelException
         """
         cache = TableModelCache(self.mapper)
-        generator = self.mapper.get_rows([], bounds, params, cache)
+        generator = self.mapper.get_rows([], self.mix_boundaries(bounds), params, cache)
         if isinstance(self.get_new_item().mapper, self.mapper.__class__) is False:
             raise TableModelException("Collection mapper and collection item mapper should be equal")
         arrays, items = [], []

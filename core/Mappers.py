@@ -1887,6 +1887,11 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
                 if conditions[key][0] == "exists":
                     conditions[key] = ("ne" if conditions[key] else "e", None)
 
+            # Обрабатываем случай проверки вхождения подстроки в строку
+            if type(conditions[key]) is tuple:
+                if conditions[key][0] == "match":
+                    conditions[key] = ("regex", "^%s$" % conditions[key][1].replace("*", ".*"))
+
             # Конвертируем все остальные операторы сравнения
             if type(conditions[key]) is tuple:
                 conditions[key] = {"$%s" % conditions[key][0]: conditions[key][1]}

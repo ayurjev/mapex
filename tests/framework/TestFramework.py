@@ -74,7 +74,7 @@ class DbMock(object, metaclass=ABCMeta):
         """ Возвращает новый экземпляр класса пользователя """
 
     @abstractmethod
-    def get_new_users_collection_instance(self):
+    def get_new_users_collection_instance(self, boundaries=None):
         """ Возвращает новый экземпляр коллекции пользователей """
 
     @abstractmethod
@@ -212,9 +212,9 @@ class SqlDbMock(DbMock):
         """ Возвращает новый экземпляр класса пользователя """
         return SqlUser(data, loaded_from_db)
 
-    def get_new_users_collection_instance(self):
+    def get_new_users_collection_instance(self, boundaries=None):
         """ Возвращает новый экземпляр коллекции пользователей """
-        return SqlUsers()
+        return SqlUsers(boundaries)
 
     def get_new_account_instance(self):
         """ Возвращает новый экземпляр класса аккаунта пользователя """
@@ -340,9 +340,9 @@ class NoSqlDbMock(DbMock):
         """ Возвращает новый экземпляр класса пользователя """
         return NoSqlUser(data, loaded_from_db)
 
-    def get_new_users_collection_instance(self):
+    def get_new_users_collection_instance(self, boundaries=None):
         """ Возвращает новый экземпляр коллекции пользователей """
-        return NoSqlUsers()
+        return NoSqlUsers(boundaries)
 
     def get_new_account_instance(self):
         """ Возвращает новый экземпляр класса аккаунта пользователя """
