@@ -184,7 +184,9 @@ class FieldTypes(object):
             """
             if value and self.value_assertion(value) is False:
                 raise TableModelException(
-                    "\ntype of the value for field with type %s can't be %s" % (self, type(value))
+                    "\ntype of the value for field '%s' with type %s can't be %s (%s)" % (
+                        self.mapper_field_name, self, value, type(value)
+                    )
                 )
 
         def convert(self, value, direction, cache):
@@ -865,7 +867,7 @@ class SqlMapper(metaclass=ABCMeta):
     def __init__(self):
         if not self.__class__._inited:
             for dep in self.__class__.dependencies:
-                dep.mapper()
+                dep()
             self.__class__._inited = True
             self.item_class = RecordModel
             self.item_collection_class = TableModel
@@ -878,7 +880,6 @@ class SqlMapper(metaclass=ABCMeta):
             self._joined = OrderedDict()
             self._reversed_map = {}
             self._reversed_foreign_tables_to_mapper_fields = {}
-            self._reversed_mappers_to_mapper_fields = {}
             self.binded = False
             self.bind()                     # Запускаем процесс инициализации маппера
             self.binded = True
@@ -1022,7 +1023,6 @@ class SqlMapper(metaclass=ABCMeta):
         """
         self._reversed_map = {}
         self._reversed_foreign_tables_to_mapper_fields = {}
-        self._reversed_mappers_to_mapper_fields = {}
         for mapperFieldName in self._properties:
             mapper_field = self._properties[mapperFieldName]
             self._reversed_map[mapper_field.get_db_name()] = mapper_field
@@ -1030,7 +1030,6 @@ class SqlMapper(metaclass=ABCMeta):
                 rel_mapper = mapper_field.get_relations_mapper()
                 collection_mapper = mapper_field.get_items_collection_mapper()
                 self._reversed_foreign_tables_to_mapper_fields[collection_mapper.table_name] = mapper_field
-                self._reversed_mappers_to_mapper_fields[collection_mapper] = mapper_field
                 if isinstance(mapper_field, FieldTypes.SqlListWithRelationsTable):
                     main_table_key = rel_mapper.get_property_that_is_link_for(self).get_db_name()
                     collecection_table_key = rel_mapper.get_property_that_is_link_for(collection_mapper).get_db_name()
@@ -1054,7 +1053,6 @@ class SqlMapper(metaclass=ABCMeta):
                 linked_mapper = mapper_field.get_items_collection_mapper()
                 foreign_table = linked_mapper.table_name
                 self._reversed_foreign_tables_to_mapper_fields[foreign_table] = mapper_field
-                self._reversed_mappers_to_mapper_fields[linked_mapper] = mapper_field
                 self._joined[foreign_table] = {
                     (self.table_name, mapper_field.get_db_name()):
                     (foreign_table, linked_mapper.db_primary_key)
@@ -1099,7 +1097,7 @@ class SqlMapper(metaclass=ABCMeta):
         @rtype : FieldTypes.BaseField
 
         """
-        return self._reversed_mappers_to_mapper_fields.get(foreign_mapper)
+        return self.get_property_that_mapped_to_table(foreign_mapper.table_name)
 
     def get_property_that_mapped_to_table(self, table_name):
         """

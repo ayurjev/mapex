@@ -91,7 +91,7 @@ class TableModel(object):
         :param conditions:  Условия обновления записей в коллекции
         """
         return self.mapper.update(
-            self.check_incoming_data(data), self.mix_boundaries(conditions), lambda: self.get_new_item()
+            data, self.mix_boundaries(conditions), lambda: self.get_new_item()
         )
 
     def get_property_list(self, property_name: str, conditions=None, params=None):
@@ -162,7 +162,7 @@ class RecordModel(object):
         # noinspection PyCallingNonCallable
         self.set_mapper(self.__class__.mapper())
         if data:
-            self.load_from_array(data, loaded_from_db)
+            self.load_from_array(data.get_data() if isinstance(data, RecordModel) else data, loaded_from_db)
 
     def set_mapper(self, mapper):
         if mapper:
