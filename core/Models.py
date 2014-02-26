@@ -212,6 +212,10 @@ class RecordModel(object):
             raise TableModelException("there is no primary key for this model, so method remove() is not allowed")
         self._collection.delete(self.mapper.primary.eq_condition(self.get_old_primary_value()))
 
+    def refresh(self):
+        """ Обновляет состояние модели в соответствии с состоянием в БД """
+        self.load_from_array(self.get_new_collection().get_item(self.mapper.primary.eq_condition(self.get_actual_primary_value())).get_data(), loaded_from_db=True)
+
     def load_by_primary(self, primary, cache=None):
         """
         Выполняет отложенную инициализацю объекта по значению первичного ключа.

@@ -2164,9 +2164,9 @@ class FieldTypesConverter(object):
             v = [v]
         if type(v) in [int, str]:
             if type(v) is str and v.find(",") > -1:
-                v = [int(it) if it.isdigit() else it for it in v.split(",")]
+                v = [int(it) if it.isdigit() and not it.startswith("0") else it for it in v.split(",")]
             else:
-                v = [int(v) if v.isdigit() else v]
+                v = [int(v) if v.isdigit() and not v.startswith("0") else v]
         return v
 
     @staticmethod
