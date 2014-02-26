@@ -142,6 +142,14 @@ class DbMock(object, metaclass=ABCMeta):
         """ Возвращает новый экземпляр класса документа """
 
     @abstractmethod
+    def get_new_multi_mapped_collection_instance(self):
+        """ Возвращает коллекцию элементов, имеющих два разных типа отношений с одним и тем же внешним маппером """
+
+    @abstractmethod
+    def get_new_multi_mapped_collection_item(self):
+        """ Возвращает запись, имеющую два разных типа отношений с одним и тем же внешним маппером """
+
+    @abstractmethod
     def get_link_field_type(self):
         """ Возвращает тип поля маппера, используемый для связей 1-к-м """
 
@@ -199,6 +207,7 @@ class SqlDbMock(DbMock):
         SqlPassportsMapper.db = self.db
         SqlDocumentsMapper.db = self.db
         SqlNoPrimaryMapper.db = self.db
+        SqlMultiMappedCollectionMapper.db = self.db
 
     def down(self):
         """ Уничтожает созданные в процессе тестирования таблицы базы данных """
@@ -213,6 +222,7 @@ class SqlDbMock(DbMock):
         SqlPassportsMapper.kill_instance()
         SqlDocumentsMapper.kill_instance()
         SqlNoPrimaryMapper.kill_instance()
+        SqlMultiMappedCollectionMapper.kill_instance()
 
     def get_new_user_instance(self, data=None, loaded_from_db=False):
         """ Возвращает новый экземпляр класса пользователя """
@@ -286,6 +296,14 @@ class SqlDbMock(DbMock):
         """ Возвращает новый экземпляр класса документа """
         return SqlDocument()
 
+    def get_new_multi_mapped_collection_instance(self):
+        """ Возвращает коллекцию элементов, имеющих два разных типа отношений с одним и тем же внешним маппером """
+        return SqlMultiMappedCollection()
+
+    def get_new_multi_mapped_collection_item(self):
+        """ Возвращает запись, имеющую два разных типа отношений с одним и тем же внешним маппером """
+        return SqlMultiMappedCollectionItem()
+
     def get_link_field_type(self):
         """ Возвращает тип поля маппера, используемый для связей 1-к-м """
         return FieldTypes.SqlLink
@@ -326,6 +344,7 @@ class NoSqlDbMock(DbMock):
         NoSqlNoPrimaryMapper.db = self.db
         NoSqlPassportsMapper.db = self.db
         NoSqlDocumentsMapper.db = self.db
+        NoSqlMultiMappedCollectionMapper.db = self.db
 
     def down(self):
         """ Уничтожает созданные в процессе тестирования таблицы базы данных """
@@ -337,6 +356,7 @@ class NoSqlDbMock(DbMock):
         self.db.db.drop_collection("statusesTable")
         self.db.db.drop_collection("testTableFieldTypes")
         self.db.db.drop_collection("tableWithoutPrimaryKey")
+        self.db.db.drop_collection("multiMappedTable")
         NoSqlUsersMapper.kill_instance()
         NoSqlUsersMapperWithBoundaries.kill_instance()
         NoSqlAccountsMapper.kill_instance()
@@ -347,6 +367,7 @@ class NoSqlDbMock(DbMock):
         NoSqlPassportsMapper.kill_instance()
         NoSqlDocumentsMapper.kill_instance()
         NoSqlNoPrimaryMapper.kill_instance()
+        NoSqlMultiMappedCollectionMapper.kill_instance()
 
     def get_new_user_instance(self, data=None, loaded_from_db=False):
         """ Возвращает новый экземпляр класса пользователя """
@@ -419,6 +440,14 @@ class NoSqlDbMock(DbMock):
     def get_new_document_instance(self):
         """ Возвращает новый экземпляр класса документа """
         return NoSqlDocument()
+
+    def get_new_multi_mapped_collection_instance(self):
+        """ Возвращает коллекцию элементов, имеющих два разных типа отношений с одним и тем же внешним маппером """
+        return NoSqlMultiMappedCollection()
+
+    def get_new_multi_mapped_collection_item(self):
+        """ Возвращает запись, имеющую два разных типа отношений с одним и тем же внешним маппером """
+        return NoSqlMultiMappedCollectionItem()
 
     def get_link_field_type(self):
         """ Возвращает тип поля маппера, используемый для связей 1-к-м """
@@ -525,7 +554,7 @@ class SqlUsersMapperWithBoundaries(SqlMapper):
 
     def bind(self):
         """ Настроим маппер """
-        self.set_new_item(SqlUser)
+        self.set_new_item(SqlUserWithBoundaries)
         self.set_new_collection(SqlUsersWithBoundaries)
         self.set_boundaries({"name": ("match", "a*")})
         self.set_collection_name("usersTable")
@@ -569,12 +598,12 @@ class NoSqlUsersMapper(NoSqlMapper):
 class NoSqlUsersMapperWithBoundaries(NoSqlMapper):
     def bind(self):
         """ Настроим маппер """
-        self.set_new_item(NoSqlUser)
+        self.set_new_item(NoSqlUserWithBoundaries)
         self.set_new_collection(NoSqlUsersWithBoundaries)
         self.set_boundaries({"name": ("match", "a*")})
         self.set_collection_name("usersTable")
         self.set_map([
-            self.int("uid", "ID"),
+            self.object_id("uid", "_id"),
             self.str("name", "Name"),
             self.int("age", "IntegerField"),
             self.bool("is_system", "isSystem"),
@@ -590,7 +619,7 @@ class SqlUsers(TableModel):
     mapper = SqlUsersMapper
 
 
-class SqlUsersWithBoundaries(SqlUsers):
+class SqlUsersWithBoundaries(TableModel):
     mapper = SqlUsersMapperWithBoundaries
 
 
@@ -608,18 +637,27 @@ class SqlUser(RecordModel):
         })
 
 
+class SqlUserWithBoundaries(SqlUser):
+    mapper = SqlUsersMapperWithBoundaries
+
+
 # noinspection PyDocstring
 class NoSqlUsers(TableModel):
     mapper = NoSqlUsersMapper
 
 
-class NoSqlUsersWithBoundaries(NoSqlUsers):
+class NoSqlUsersWithBoundaries(TableModel):
     mapper = NoSqlUsersMapperWithBoundaries
 
 
 # noinspection PyDocstring
 class NoSqlUser(SqlUser):
     mapper = NoSqlUsersMapper
+
+
+class NoSqlUserWithBoundaries(NoSqlUser):
+    mapper = NoSqlUsersMapperWithBoundaries
+
 
 
 ############################################ Коллекция аккаунтов (Связь 1-к-м) ########################################
@@ -1003,3 +1041,47 @@ class NoSqlNoPrimaryItems(TableModel):
 # noinspection PyDocstring
 class NoSqlNoPrimaryItem(RecordModel):
     mapper = NoSqlNoPrimaryMapper
+
+
+################## Коллекция. имеющая два разных свойства, замапленных на одну и ту же таблицу ########################
+
+class SqlMultiMappedCollectionMapper(SqlMapper):
+    def bind(self):
+        self.set_collection_name("multiMappedTable")
+        self.set_new_item(SqlMultiMappedCollectionItem)
+        self.set_new_collection(SqlMultiMappedCollection)
+        self.set_map([
+            self.int("id", "ID"),
+            self.str("name", "Name"),
+            self.link("author", "authorID", collection=SqlUsersWithBoundaries),
+            self.link("user", "userID", collection=SqlUsers)
+        ])
+
+
+class NoSqlMultiMappedCollectionMapper(NoSqlMapper):
+    def bind(self):
+        self.set_collection_name("multiMappedTable")
+        self.set_new_item(NoSqlMultiMappedCollectionItem)
+        self.set_new_collection(NoSqlMultiMappedCollection)
+        self.set_map([
+            self.object_id("id", "_id"),
+            self.str("name", "Name"),
+            self.link("author", "authorID", collection=NoSqlUsersWithBoundaries),
+            self.link("user", "userID", collection=NoSqlUsers)
+        ])
+
+
+class SqlMultiMappedCollection(TableModel):
+    mapper = SqlMultiMappedCollectionMapper
+
+
+class SqlMultiMappedCollectionItem(RecordModel):
+    mapper = SqlMultiMappedCollectionMapper
+
+
+class NoSqlMultiMappedCollection(TableModel):
+    mapper = NoSqlMultiMappedCollectionMapper
+
+
+class NoSqlMultiMappedCollectionItem(RecordModel):
+    mapper = NoSqlMultiMappedCollectionMapper

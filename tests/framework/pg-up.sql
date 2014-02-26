@@ -63,3 +63,10 @@ CREATE TABLE IF NOT EXISTS "tableWithoutPrimaryKey" (
     "Time" timestamp,
     "userID" integer
 );
+
+CREATE TABLE IF NOT EXISTS "multiMappedTable" (
+    "ID" serial primary key,
+    "Name" varchar(32),
+    "authorID" integer,
+    "userID" integer
+);

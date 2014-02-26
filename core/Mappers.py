@@ -247,7 +247,7 @@ class FieldTypes(object):
 
                 if name.find(".") > -1:
                     table_name, field_name = name.split(".")
-                    mapper_property = self.mapper.get_property_that_mapped_to_table(table_name)
+                    mapper_property = self.mapper.get_property_that_mapped_to_table(table_name, field_name)
                     return '%s.%s' % (
                         mapper_property.get_name(),
                         mapper_property.get_items_collection_mapper().translate(field_name, "database2mapper")
@@ -1029,7 +1029,9 @@ class SqlMapper(metaclass=ABCMeta):
             if isinstance(mapper_field, FieldTypes.SqlList):
                 rel_mapper = mapper_field.get_relations_mapper()
                 collection_mapper = mapper_field.get_items_collection_mapper()
-                self._reversed_foreign_tables_to_mapper_fields[collection_mapper.table_name] = mapper_field
+                if not collection_mapper.table_name in self._reversed_foreign_tables_to_mapper_fields:
+                    self._reversed_foreign_tables_to_mapper_fields[collection_mapper.table_name] = {}
+                self._reversed_foreign_tables_to_mapper_fields[collection_mapper.table_name][mapper_field.get_db_name()] = mapper_field
                 if isinstance(mapper_field, FieldTypes.SqlListWithRelationsTable):
                     main_table_key = rel_mapper.get_property_that_is_link_for(self).get_db_name()
                     collecection_table_key = rel_mapper.get_property_that_is_link_for(collection_mapper).get_db_name()
@@ -1052,7 +1054,9 @@ class SqlMapper(metaclass=ABCMeta):
             elif isinstance(mapper_field, FieldTypes.RelationField):
                 linked_mapper = mapper_field.get_items_collection_mapper()
                 foreign_table = linked_mapper.table_name
-                self._reversed_foreign_tables_to_mapper_fields[foreign_table] = mapper_field
+                if not foreign_table in self._reversed_foreign_tables_to_mapper_fields:
+                    self._reversed_foreign_tables_to_mapper_fields[foreign_table] = {}
+                self._reversed_foreign_tables_to_mapper_fields[foreign_table][mapper_field.get_db_name()] = mapper_field
                 self._joined[foreign_table] = {
                     (self.table_name, mapper_field.get_db_name()):
                     (foreign_table, linked_mapper.db_primary_key)
@@ -1099,7 +1103,7 @@ class SqlMapper(metaclass=ABCMeta):
         """
         return self.get_property_that_mapped_to_table(foreign_mapper.table_name)
 
-    def get_property_that_mapped_to_table(self, table_name):
+    def get_property_that_mapped_to_table(self, table_name, table_field_name=None):
         """
         Возвращает имя поля маппера, соответствующее внешней таблице
         @param table_name: Имя таблицы
@@ -1107,7 +1111,14 @@ class SqlMapper(metaclass=ABCMeta):
         @return: Имя поля маппера
         @rtype : FieldTypes.BaseField
         """
-        return self._reversed_foreign_tables_to_mapper_fields.get(table_name)
+        options = self._reversed_foreign_tables_to_mapper_fields.get(table_name) or {}
+        if options:
+            if table_field_name:
+                best_opt = options.get(table_field_name)
+                if best_opt:
+                    return best_opt
+        for opt in options:
+            return options[opt]
 
     def get_joined_tables(self, conditions: dict, fields: list=None, order=None):
         """
@@ -1488,7 +1499,7 @@ class SqlMapper(metaclass=ABCMeta):
             mapper_field_name, mapper_field_property = field_name.split(".")
             if direction == "database2mapper":
                 foreign_table, foreign_table_field_name = mapper_field_name, mapper_field_property
-                mapper_field_name = self.get_property_that_mapped_to_table(foreign_table).get_name()
+                mapper_field_name = self.get_property_that_mapped_to_table(foreign_table, foreign_table_field_name).get_name()
                 first_mapper_field = self.get_property(mapper_field_name)
                 # noinspection PyUnresolvedReferences
                 linked_mapper = first_mapper_field.get_items_collection_mapper()
@@ -1829,7 +1840,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
         for key in conditions:
             if key.find(".") > -1:
                 db_collection_name, other_collection_db_property_name = key.split(".")
-                mf = self.get_property_that_mapped_to_table(db_collection_name)
+                mf = self.get_property_that_mapped_to_table(db_collection_name, other_collection_db_property_name)
                 if self.is_real_embedded(mf):
                     conditions["%s.%s" % (mf.get_db_name(), other_collection_db_property_name)] = conditions[key]
                     del conditions[key]

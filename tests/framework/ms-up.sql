@@ -71,3 +71,11 @@ CREATE TABLE "tableWithoutPrimaryKey" (
   "Time" DATETIME,
   "userID" BIGINT
 );
+
+IF OBJECT_ID('multiMappedTable', 'Table') IS NULL
+CREATE TABLE "multiMappedTable" (
+  "ID" BIGINT PRIMARY KEY IDENTITY,
+  "Name" NVARCHAR(32),
+  "authorID" BIGINT,
+  "userID" BIGINT
+);

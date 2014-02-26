@@ -89,3 +89,13 @@ CREATE TABLE IF NOT EXISTS `tableWithoutPrimaryKey` (
 )
   COLLATE='utf8_general_ci'
   ENGINE=MyISAM;
+
+CREATE TABLE IF NOT EXISTS `multiMappedTable` (
+    `ID` INT(11) NOT NULL AUTO_INCREMENT,
+    `Name` varchar(32) DEFAULT NULL,
+    `authorID` INT(11) DEFAULT NULL,
+    `userID` INT(11) DEFAULT NULL,
+	  PRIMARY KEY (`ID`)
+)
+  COLLATE='utf8_general_ci'
+  ENGINE=MyISAM;

@@ -8,3 +8,4 @@ DROP TABLE IF EXISTS `users_tags_relations`;
 DROP TABLE IF EXISTS `profilesTable`;
 DROP TABLE IF EXISTS `passportsTable`;
 DROP TABLE IF EXISTS `documentsTable`;
+DROP TABLE IF EXISTS `multiMappedTable`;

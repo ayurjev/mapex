@@ -1425,6 +1425,47 @@ class TableModelTest(unittest.TestCase):
         )
 
     @for_all_dbms
+    def test_multi_mapped_collections(self, dbms_fw):
+        """ Проверим что мапперы, имеющие могут иметь несколько типов отношений с одним и тем же внешним маппером """
+        multi_mapped_items = dbms_fw.get_new_multi_mapped_collection_instance()
+        users = dbms_fw.get_new_users_collection_instance()
+        ausers = dbms_fw.get_new_users_collection_instance_with_boundaries()
+        self.assertEqual(0, users.count())
+        self.assertEqual(0, ausers.count())
+        self.assertEqual(0, multi_mapped_items.count())
+
+        user = dbms_fw.get_new_user_instance()
+        user.name = "user"
+        user.save()
+
+        author = dbms_fw.get_new_user_instance()
+        author.name = "author"
+        author.save()
+
+        self.assertEqual(2, users.count())
+        self.assertEqual(1, ausers.count())
+        self.assertEqual(0, multi_mapped_items.count())
+
+        # Объект автора необходимо получить из соответствующей коллекции, на которую замаплено поле author,
+        # Так как назначить в поле author экземпляр коллекции users мы не можем - разные мапперы
+        author = ausers.get_item({"name": "author"})
+
+        # Первый случай, указаны оба элемента, они должны быть корректно разделены:
+        multi_mapped_item = dbms_fw.get_new_multi_mapped_collection_item()
+        multi_mapped_item.name = "first_item"
+        multi_mapped_item.author = author
+        multi_mapped_item.user = user
+        uid = multi_mapped_item.save()
+
+        self.assertEqual(2, users.count())
+        self.assertEqual(1, ausers.count())
+        self.assertEqual(1, multi_mapped_items.count())
+
+        multi_mapped_item = multi_mapped_items.get_item({"id": uid})
+        self.assertEqual("user", multi_mapped_item.user.name)
+        self.assertEqual("author", multi_mapped_item.author.name)
+
+    @for_all_dbms
     def test_performance_things_on_getting_items(self, dbms_fw):
         """ Проверим основные особенности получения элементов коллекции с точки зрения производительности """
         users = dbms_fw.get_new_users_collection_instance()
