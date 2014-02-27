@@ -493,8 +493,6 @@ class JoinMixin(BaseSqlQuery):
 
                 if self.joined_tables[joined_table_name][join_conditions][2] not in unique_joined_tables:
                     unique_joined_tables[self.joined_tables[joined_table_name][join_conditions][2]] = self.joined_tables[joined_table_name][join_conditions][0]
-            if joined_table_name not in unique_joined_tables:
-                unique_joined_tables[joined_table_name] = self.joined_tables[joined_table_name][join_conditions][2]
 
         return all_left_joins_strings, unique_joined_tables, all_join_conditions
 
