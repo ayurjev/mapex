@@ -235,7 +235,7 @@ class FieldTypes(object):
                     mapper_field_name, mapper_property = name.split(".")
                     linked_mapper = self.mapper.get_property(mapper_field_name).get_items_collection_mapper()
                     return "%s.%s" % (
-                        linked_mapper.table_name,
+                        mapper_field_name,
                         linked_mapper.translate(mapper_property, "mapper2database")
                     )
                 else:
@@ -247,7 +247,7 @@ class FieldTypes(object):
 
                 if name.find(".") > -1:
                     table_name, field_name = name.split(".")
-                    mapper_property = self.mapper.get_property_that_mapped_to_table(table_name, field_name)
+                    mapper_property = self.mapper.get_property(table_name)
                     return '%s.%s' % (
                         mapper_property.get_name(),
                         mapper_property.get_items_collection_mapper().translate(field_name, "database2mapper")
@@ -1035,32 +1035,57 @@ class SqlMapper(metaclass=ABCMeta):
                 if isinstance(mapper_field, FieldTypes.SqlListWithRelationsTable):
                     main_table_key = rel_mapper.get_property_that_is_link_for(self).get_db_name()
                     collecection_table_key = rel_mapper.get_property_that_is_link_for(collection_mapper).get_db_name()
-                    self._joined[collection_mapper.table_name] = OrderedDict()
+                    if collection_mapper.table_name not in self._joined:
+                        self._joined[collection_mapper.table_name] = OrderedDict()
                     self._joined[collection_mapper.table_name][(self.table_name, self.db_primary_key)] = \
-                        rel_mapper.table_name, main_table_key,
+                        rel_mapper.table_name, main_table_key, rel_mapper.table_name
                     self._joined[collection_mapper.table_name][(rel_mapper.table_name, collecection_table_key)] = \
-                        collection_mapper.table_name, collection_mapper.db_primary_key
+                        collection_mapper.table_name, collection_mapper.db_primary_key, collection_mapper.table_name
 
-                    self._joined[rel_mapper.table_name] = {
-                        (self.table_name, self.db_primary_key):
-                        (rel_mapper.table_name, rel_mapper.get_property_that_is_link_for(self).get_db_name()),
-                    }
+                    if rel_mapper.table_name not in self._joined:
+                        self._joined[rel_mapper.table_name] = OrderedDict()
+                    self._joined[rel_mapper.table_name][(self.table_name, self.db_primary_key)] = (
+                        rel_mapper.table_name, rel_mapper.get_property_that_is_link_for(self).get_db_name(), rel_mapper.table_name
+                    )
+
+                    if mapper_field.get_name() not in self._joined:
+                        self._joined[mapper_field.get_name()] = OrderedDict()
+                    self._joined[mapper_field.get_name()][(self.table_name, self.db_primary_key)] = (
+                        rel_mapper.table_name, main_table_key, rel_mapper.table_name
+                    )
+                    self._joined[mapper_field.get_name()][(rel_mapper.table_name, collecection_table_key)] = (
+                        collection_mapper.table_name, collection_mapper.db_primary_key, mapper_field.get_name()
+                    )
                 else:
                     collection_mapper = mapper_field.get_items_collection_mapper()
                     main_table_key = collection_mapper.get_property_that_is_link_for(self).get_db_name()
-                    self._joined[collection_mapper.table_name] = {
-                        (self.table_name, self.db_primary_key): (collection_mapper.table_name, main_table_key)
-                    }
+                    if collection_mapper.table_name not in self._joined:
+                        self._joined[collection_mapper.table_name] = OrderedDict()
+                    self._joined[collection_mapper.table_name][(self.table_name, self.db_primary_key)] = (
+                        collection_mapper.table_name, main_table_key, collection_mapper.table_name
+                    )
+                    if mapper_field.get_name() not in self._joined:
+                        self._joined[mapper_field.get_name()] = OrderedDict()
+                    self._joined[mapper_field.get_name()][(self.table_name, self.db_primary_key)] = (
+                        collection_mapper.table_name, main_table_key, mapper_field.get_name()
+                    )
+
             elif isinstance(mapper_field, FieldTypes.RelationField):
                 linked_mapper = mapper_field.get_items_collection_mapper()
                 foreign_table = linked_mapper.table_name
                 if not foreign_table in self._reversed_foreign_tables_to_mapper_fields:
                     self._reversed_foreign_tables_to_mapper_fields[foreign_table] = {}
+                if foreign_table not in self._joined:
+                    self._joined[foreign_table] = OrderedDict()
                 self._reversed_foreign_tables_to_mapper_fields[foreign_table][mapper_field.get_db_name()] = mapper_field
-                self._joined[foreign_table] = {
-                    (self.table_name, mapper_field.get_db_name()):
-                    (foreign_table, linked_mapper.db_primary_key)
-                }
+                self._joined[foreign_table][(self.table_name, mapper_field.get_db_name())] = (
+                    foreign_table, linked_mapper.db_primary_key, mapper_field.get_name()
+                )
+                if mapper_field.get_name() not in self._joined:
+                    self._joined[mapper_field.get_name()] = OrderedDict()
+                self._joined[mapper_field.get_name()][(self.table_name, mapper_field.get_db_name())] = (
+                    foreign_table, linked_mapper.db_primary_key, mapper_field.get_name()
+                )
 
     def get_properties(self) -> list:
         """
@@ -1499,7 +1524,7 @@ class SqlMapper(metaclass=ABCMeta):
             mapper_field_name, mapper_field_property = field_name.split(".")
             if direction == "database2mapper":
                 foreign_table, foreign_table_field_name = mapper_field_name, mapper_field_property
-                mapper_field_name = self.get_property_that_mapped_to_table(foreign_table, foreign_table_field_name).get_name()
+                mapper_field_name = self.get_property(foreign_table).get_name()
                 first_mapper_field = self.get_property(mapper_field_name)
                 # noinspection PyUnresolvedReferences
                 linked_mapper = first_mapper_field.get_items_collection_mapper()

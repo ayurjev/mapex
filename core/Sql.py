@@ -464,36 +464,37 @@ class JoinMixin(BaseSqlQuery):
         @rtype : str
 
         """
-        unique_joined_tables = []
+        unique_joined_tables = {}
         all_left_joins_strings = []
         all_join_conditions = []
         for joined_table_name in self.joined_tables:
             for join_conditions in self.joined_tables[joined_table_name]:
                 if (
                         joined_table_name not in unique_joined_tables and
-                        self.joined_tables[joined_table_name][join_conditions][0] not in unique_joined_tables
+                        self.joined_tables[joined_table_name][join_conditions][2] not in unique_joined_tables
                 ):
                     # Сохраняем условие присоединения таблицы:
                     join_condition = "(%s.%s = %s.%s)" % (
                         self.builder.wrap_table(join_conditions[0]),
                         self.builder.wrap_field(join_conditions[1]),
-                        self.builder.wrap_table(self.joined_tables[joined_table_name][join_conditions][0]),
+                        self.builder.wrap_table(self.joined_tables[joined_table_name][join_conditions][2]),
                         self.builder.wrap_field(self.joined_tables[joined_table_name][join_conditions][1])
                     )
                     all_join_conditions.append(join_condition)
 
                     # Сохраняем строку с LEFT JOIN, присоединяющую эту таблицу
                     all_left_joins_strings.append(
-                        "LEFT JOIN %s ON %s" % (
+                        "LEFT JOIN %s as %s ON %s" % (
                             self.builder.wrap_table(self.joined_tables[joined_table_name][join_conditions][0]),
+                            self.builder.wrap_table(self.joined_tables[joined_table_name][join_conditions][2]),
                             join_condition
                         )
                     )
 
-                if self.joined_tables[joined_table_name][join_conditions][0] not in unique_joined_tables:
-                    unique_joined_tables.append(self.joined_tables[joined_table_name][join_conditions][0])
+                if self.joined_tables[joined_table_name][join_conditions][2] not in unique_joined_tables:
+                    unique_joined_tables[self.joined_tables[joined_table_name][join_conditions][2]] = self.joined_tables[joined_table_name][join_conditions][0]
             if joined_table_name not in unique_joined_tables:
-                unique_joined_tables.append(joined_table_name)
+                unique_joined_tables[joined_table_name] = self.joined_tables[joined_table_name][join_conditions][2]
 
         return all_left_joins_strings, unique_joined_tables, all_join_conditions
 
@@ -513,7 +514,10 @@ class JoinMixin(BaseSqlQuery):
         @rtype : list
 
         """
-        return [self.builder.wrap_table(table) for table in self.joined_tables_list]
+        return ["%s as %s" %(
+            self.builder.wrap_table(self.joined_tables_list[table]),
+            self.builder.wrap_table(table)
+        ) for table in self.joined_tables_list]
 
     def get_join_conditions(self) -> str:
         """

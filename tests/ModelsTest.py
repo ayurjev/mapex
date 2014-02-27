@@ -1465,6 +1465,20 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual("user", multi_mapped_item.user.name)
         self.assertEqual("author", multi_mapped_item.author.name)
 
+        # Второй случай, один из двух элементов не указан вообще, должно работать вне зависимости от порядка join'a
+        multi_mapped_item2 = dbms_fw.get_new_multi_mapped_collection_item()
+        multi_mapped_item2.name = "second_item"
+        multi_mapped_item2.author = author
+        uid = multi_mapped_item2.save()
+        multi_mapped_item = multi_mapped_items.get_item({"id": uid})
+        self.assertEqual(None, multi_mapped_item.user)
+        self.assertEqual("author", multi_mapped_item.author.name)
+
+        # При таком положении дел, удаление, обновление, использующие join's, должны проходить корректно в 100% случаев,
+        # вне зависимости от порядка присоединения таблиц
+        multi_mapped_items.delete({"author.name": "author"})
+        self.assertEqual(0, multi_mapped_items.count())
+
     @for_all_dbms
     def test_performance_things_on_getting_items(self, dbms_fw):
         """ Проверим основные особенности получения элементов коллекции с точки зрения производительности """
