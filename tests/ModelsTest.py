@@ -979,8 +979,8 @@ class TableModelTest(unittest.TestCase):
         # Создадим первого пользователя, у которого есть оба паспорта
         first_user_id = users.insert({"name": "FirstUser", "documents": [document1, document2]})
         self.assertCountEqual(
-            [d.number for d in users.get_item({"uid": first_user_id}).documents],
-            [document1.number, document2.number]
+            [document1.number, document2.number],
+            [d.number for d in users.get_item({"uid": first_user_id}).documents]
         )
 
         self.assertEqual(1, users.count())

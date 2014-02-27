@@ -235,7 +235,7 @@ class FieldTypes(object):
                     mapper_field_name, mapper_property = name.split(".")
                     linked_mapper = self.mapper.get_property(mapper_field_name).get_items_collection_mapper()
                     return "%s.%s" % (
-                        mapper_field_name,
+                        mapper_field_name if self.mapper.support_joins else self.translate(mapper_field_name, "mapper2database"),
                         linked_mapper.translate(mapper_property, "mapper2database")
                     )
                 else:
@@ -848,6 +848,7 @@ class SqlMapper(metaclass=ABCMeta):
     _inited = False
     db = None
     dependencies = []
+    support_joins = True
 
     def __new__(cls, *a, **kwa):
         if cls._instance is None:
@@ -1561,6 +1562,8 @@ class SqlMapper(metaclass=ABCMeta):
 
 class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
     """ Класс для создания мапперов к NoSql коллекциям """
+    support_joins = False
+
     def object_id(self, mapper_field_name, db_field_name):
         return FieldTypes.NoSqlObjectID(self, mapper_field_name, db_field_name=db_field_name)
 
@@ -1688,7 +1691,6 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
             for key in conditions:
                 if key.find(".") > -1 and self.is_rel(self.get_property(key.split(".")[0])):
                     collection_conditions[key.split(".")[0]] = {key.split(".")[1]: conditions[key]}
-
         # Конвертируем параметры выборки
         params = self.convert_params(params)
 
@@ -1862,37 +1864,33 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
         @param conditions: Исходные условия
         @return: Сконвертированный результат
         """
+        new_conditions = {}
         for key in conditions:
             if key.find(".") > -1:
-                db_collection_name, other_collection_db_property_name = key.split(".")
-                mf = self.get_property_that_mapped_to_table(db_collection_name, other_collection_db_property_name)
+                mapper_field_name, other_mapper_property_name = key.split(".")
+                mf = self.get_property(mapper_field_name)
                 if self.is_real_embedded(mf):
-                    conditions["%s.%s" % (mf.get_db_name(), other_collection_db_property_name)] = conditions[key]
-                    del conditions[key]
+                    new_conditions["%s.%s" % (mf.get_name(), other_mapper_property_name)] = conditions[key]
                 elif self.is_rel(mf):
                     # noinspection PyUnresolvedReferences
                     fmapper = mf.get_items_collection_mapper()
                     if self.is_list_with_dependencies(mf):
-                        conditions[key] = fmapper.db.select_query(
+                        sub_conditions = fmapper.db.select_query(
                             fmapper.table_name, [fmapper.get_property_that_is_link_for(self).get_db_name()],
-                            self.to_mongo_conditions_format({other_collection_db_property_name: conditions[key]})
+                            self.to_mongo_conditions_format({fmapper.translate(other_mapper_property_name, "mapper2database"): conditions[key]})
                         )
-                        conditions["_id"] = {
-                            "$in": [
-                                el[fmapper.get_property_that_is_link_for(self).get_db_name()] for el in conditions[key]
-                            ]
-                        }
-                        del conditions[key]
+                        new_conditions["_id"] = (
+                            "in", [el[fmapper.get_property_that_is_link_for(self).get_db_name()] for el in sub_conditions]
+                        )
                     else:
-                        conditions[key] = fmapper.db.select_query(
+                        sub_conditions = fmapper.db.select_query(
                             fmapper.table_name, [fmapper.primary.db_name()],
-                            self.to_mongo_conditions_format({other_collection_db_property_name: conditions[key]})
+                            self.to_mongo_conditions_format({fmapper.translate(other_mapper_property_name, "mapper2database"): conditions[key]})
                         )
-                        conditions[mf.get_db_name()] = {"$in": [
-                            el[fmapper.primary.db_name()] for el in conditions[key]]
-                        }
-                        del conditions[key]
-        return conditions
+                        new_conditions[mf.get_db_name()] = ("in", [el[fmapper.primary.db_name()] for el in sub_conditions])
+            else:
+                new_conditions[key] = conditions[key]
+        return new_conditions
 
     def translate_and_convert(self, value, direction: str="mapper2database", cache=None):
         """
@@ -1905,10 +1903,13 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
         """
         if direction == "database2mapper" and value == "_id" and self.get_property_by_db_name(value) is None:
             return value
-        super_res = super().translate_and_convert(value, direction, cache)
-        if type(super_res) is dict:
-            return self.to_mongo_conditions_format(self.convert_conditions_to_one_collection(super_res))
-        return super_res
+        if type(value) is dict:
+            value = self.convert_conditions_to_one_collection(value)
+            value = super().translate_and_convert(value, direction, cache)
+            value = self.to_mongo_conditions_format(value)
+        else:
+            value = super().translate_and_convert(value, direction, cache)
+        return value
 
     @staticmethod
     def to_mongo_conditions_format(conditions):
