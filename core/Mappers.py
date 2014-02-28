@@ -235,7 +235,8 @@ class FieldTypes(object):
                     mapper_field_name, mapper_property = name.split(".")
                     linked_mapper = self.mapper.get_property(mapper_field_name).get_items_collection_mapper()
                     return "%s.%s" % (
-                        mapper_field_name if self.mapper.support_joins else self.translate(mapper_field_name, "mapper2database"),
+                        mapper_field_name
+                        if self.mapper.support_joins else self.translate(mapper_field_name, "mapper2database"),
                         linked_mapper.translate(mapper_property, "mapper2database")
                     )
                 else:
@@ -880,7 +881,6 @@ class SqlMapper(metaclass=ABCMeta):
             self._properties = {}
             self._joined = OrderedDict()
             self._reversed_map = {}
-            self._reversed_foreign_tables_to_mapper_fields = {}
             self.binded = False
             self.bind()                     # Запускаем процесс инициализации маппера
             self.binded = True
@@ -1023,63 +1023,33 @@ class SqlMapper(metaclass=ABCMeta):
 
         """
         self._reversed_map = {}
-        self._reversed_foreign_tables_to_mapper_fields = {}
         for mapperFieldName in self._properties:
             mapper_field = self._properties[mapperFieldName]
-
             self._reversed_map[mapper_field.get_db_name()] = mapper_field
             if isinstance(mapper_field, FieldTypes.RelationField):
                 collection_mapper = mapper_field.get_items_collection_mapper()
-
-                if not collection_mapper.table_name in self._reversed_foreign_tables_to_mapper_fields:
-                    self._reversed_foreign_tables_to_mapper_fields[collection_mapper.table_name] = {}
-                self._reversed_foreign_tables_to_mapper_fields[collection_mapper.table_name][mapper_field.get_db_name()] = mapper_field
-
-                if collection_mapper.table_name not in self._joined:
-                    self._joined[collection_mapper.table_name] = OrderedDict()
-
-                if mapper_field.get_name() not in self._joined:
-                    self._joined[mapper_field.get_name()] = OrderedDict()
-
-                def link_with_alias(first_mapper, second_mapper, main_key, alias):
-                    if alias or second_mapper.table_name not in self._joined:
-                        self._joined[alias or second_mapper.table_name] = OrderedDict()
-                    self._joined[second_mapper.table_name][(first_mapper.table_name, main_key)] = (
-                        second_mapper.table_name, second_mapper.db_primary_key, alias
-                    )
-                    self._joined[alias][(first_mapper.table_name, main_key)] = (
-                        second_mapper.table_name, second_mapper.db_primary_key, alias
-                    )
-
-                def link_mapper(first_mapper, second_mapper, alias=None):
-                    if alias or second_mapper.table_name not in self._joined:
-                        self._joined[alias or second_mapper.table_name] = OrderedDict()
-
-                    self._joined[alias or second_mapper.table_name][(first_mapper.table_name, first_mapper.db_primary_key)] = (
-                        second_mapper.table_name, second_mapper.get_property_that_is_link_for(first_mapper).get_db_name(), second_mapper.table_name
-                    )
-
-                def link_mapper_2(first_mapper, second_mapper, alias):
-                    self._joined[alias][(first_mapper.table_name, first_mapper.db_primary_key)] = (
-                        second_mapper.table_name, second_mapper.get_property_that_is_link_for(first_mapper).get_db_name(), alias
-                    )
-
-                def link_mapper_reversed(first_mapper, second_mapper, alias=None):
-                    self._joined[alias][(first_mapper.table_name, first_mapper.get_property_that_is_link_for(second_mapper).get_db_name())] = (
-                        second_mapper.table_name, second_mapper.db_primary_key, alias
-                    )
-
                 if isinstance(mapper_field, FieldTypes.SqlList):
                     if isinstance(mapper_field, FieldTypes.SqlListWithRelationsTable):
                         rel_mapper = mapper_field.get_relations_mapper()
-                        link_mapper(self, rel_mapper)
-                        link_mapper(self, rel_mapper, mapper_field.get_name())
-                        link_mapper_reversed(rel_mapper, collection_mapper, mapper_field.get_name())
+                        first_mapper_key_in_rel_mapper = rel_mapper.get_property_that_is_link_for(self).get_db_name()
+                        target_mapper_key_in_rel_mapper = rel_mapper.get_property_that_is_link_for(collection_mapper).get_db_name()
+                        self.link_mappers(self, rel_mapper, self.db_primary_key, first_mapper_key_in_rel_mapper, rel_mapper.table_name, rel_mapper.table_name)
+                        self.link_mappers(self, rel_mapper, self.db_primary_key, first_mapper_key_in_rel_mapper, mapper_field.get_name(), rel_mapper.table_name)
+                        self.link_mappers(rel_mapper, collection_mapper, target_mapper_key_in_rel_mapper, collection_mapper.db_primary_key, mapper_field.get_name(), mapper_field.get_name())
                     else:
-                        link_mapper(self, collection_mapper)
-                        link_mapper_2(self, collection_mapper, mapper_field.get_name())
+                        first_mapper_key_in_target_mapper = collection_mapper.get_property_that_is_link_for(self).get_db_name()
+                        self.link_mappers(self, collection_mapper, self.db_primary_key, first_mapper_key_in_target_mapper, collection_mapper.table_name, collection_mapper.table_name)
+                        self.link_mappers(self, collection_mapper, self.db_primary_key, first_mapper_key_in_target_mapper, mapper_field.get_name(), collection_mapper.table_name)
+                        self.link_mappers(self, collection_mapper, self.db_primary_key, first_mapper_key_in_target_mapper, mapper_field.get_name(), mapper_field.get_name())
                 else:
-                    link_with_alias(self, collection_mapper, mapper_field.get_db_name(), mapper_field.get_name())
+                    self.link_mappers(self, collection_mapper, mapper_field.get_db_name(), collection_mapper.db_primary_key, mapper_field.get_name(), mapper_field.get_name())
+
+    def link_mappers(self, first_mapper, second_mapper, first_key, second_key, target, alias):
+        if target not in self._joined:
+            self._joined[target] = OrderedDict()
+        self._joined[target][(first_mapper.table_name, first_key)] = (
+            second_mapper.table_name, second_key, alias
+        )
 
     def get_properties(self) -> list:
         """
@@ -1120,10 +1090,12 @@ class SqlMapper(metaclass=ABCMeta):
         @rtype : FieldTypes.BaseField
 
         """
-        options = self._reversed_foreign_tables_to_mapper_fields.get(foreign_mapper.table_name) or {}
-        if options:
-            for opt in options:
-                return options[opt]
+        for prop in self.get_properties():
+            prop = self.get_property(prop)
+            if self.is_rel(prop):
+                # noinspection PyUnresolvedReferences
+                if prop.get_items_collection_mapper() == foreign_mapper:
+                    return prop
 
     def get_joined_tables(self, conditions: dict, fields: list=None, order=None):
         """
@@ -1856,17 +1828,25 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
                     if self.is_list_with_dependencies(mf):
                         sub_conditions = fmapper.db.select_query(
                             fmapper.table_name, [fmapper.get_property_that_is_link_for(self).get_db_name()],
-                            self.to_mongo_conditions_format({fmapper.translate(other_mapper_property_name, "mapper2database"): conditions[key]})
+                            self.to_mongo_conditions_format(
+                                {fmapper.translate(other_mapper_property_name, "mapper2database"): conditions[key]}
+                            )
                         )
                         new_conditions["_id"] = (
-                            "in", [el[fmapper.get_property_that_is_link_for(self).get_db_name()] for el in sub_conditions]
+                            "in",
+                            [el[fmapper.get_property_that_is_link_for(self).get_db_name()] for el in sub_conditions]
                         )
                     else:
                         sub_conditions = fmapper.db.select_query(
                             fmapper.table_name, [fmapper.primary.db_name()],
-                            self.to_mongo_conditions_format({fmapper.translate(other_mapper_property_name, "mapper2database"): conditions[key]})
+                            self.to_mongo_conditions_format(
+                                {fmapper.translate(other_mapper_property_name, "mapper2database"): conditions[key]}
+                            )
                         )
-                        new_conditions[mf.get_db_name()] = ("in", [el[fmapper.primary.db_name()] for el in sub_conditions])
+                        new_conditions[mf.get_db_name()] = (
+                            "in",
+                            [el[fmapper.primary.db_name()] for el in sub_conditions]
+                        )
             else:
                 new_conditions[key] = conditions[key]
         return new_conditions
