@@ -2170,9 +2170,9 @@ class FieldTypesConverter(object):
         to_int = isinstance(mf.mapper.get_property(mf.mapper.primary.name()), FieldTypes.Int)
         if type(v) in [int, str]:
             if type(v) is str and v.find(",") > -1:
-                v = [int(it) if to_int else it for it in v.split(",")]
+                v = [int(it) if it.isdigit() and to_int else it for it in v.split(",")]
             else:
-                v = [int(v) if to_int else v]
+                v = [int(v) if v.isdigit() and to_int else v]
         return v
 
     @staticmethod
