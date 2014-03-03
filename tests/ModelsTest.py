@@ -264,6 +264,47 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(2, ausers.count())
 
     @for_all_dbms
+    def test_mapper_as_a_factory(self, dbms_fw):
+        """ Проверим, что можно использовать коллекции TableModel как фабрики инстансов разного типа """
+        users = dbms_fw.get_new_users_collection_instance()
+        self.assertEqual(0, users.count())
+        users.insert({"name": "FirstUser", "age": 5})
+        users.insert({"name": "SecondUser", "age": 35})
+        users.insert({"name": "ThirdUser", "age": 67})
+        self.assertEqual(3, users.count())
+        self.assertTrue(isinstance(users.get_item({"age": 5}), dbms_fw.get_new_user_instance().__class__))
+        self.assertTrue(isinstance(users.get_item({"age": 35}), dbms_fw.get_new_user_instance().__class__))
+        self.assertTrue(isinstance(users.get_item({"age": 67}), dbms_fw.get_new_user_instance().__class__))
+        self.assertEqual("FirstUser", users.get_item({"age": 5}).name)
+
+        class Kid(dbms_fw.get_new_user_instance().__class__):
+            pass
+
+        class Adult(dbms_fw.get_new_user_instance().__class__):
+            pass
+
+        class Old(dbms_fw.get_new_user_instance().__class__):
+            pass
+
+        def factory_method(user: dbms_fw.get_new_user_instance().__class__):
+            if user.age == 5:
+                return Kid(user)
+            elif user.age == 35:
+                return Adult(user)
+            else:
+                return Old(user)
+
+        default_factory_method = users.mapper.factory_method
+        users.mapper.factory_method = factory_method
+        self.assertTrue(isinstance(users.get_item({"age": 5}), Kid))
+        self.assertTrue(isinstance(users.get_item({"age": 35}), Adult))
+        self.assertTrue(isinstance(users.get_item({"age": 67}), Old))
+        self.assertEqual("FirstUser", users.get_item({"age": 5}).name)
+        self.assertEqual("SecondUser", users.get_item({"age": 35}).name)
+        self.assertEqual("ThirdUser", users.get_item({"age": 67}).name)
+        users.mapper.factory_method = default_factory_method
+
+    @for_all_dbms
     def test_query_with_links(self, dbms_fw):
         """ Проверим возможность запросов к коллекции с условиями, включающими обращения к полям типа Link """
         users = dbms_fw.get_new_users_collection_instance()

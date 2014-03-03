@@ -885,6 +885,15 @@ class SqlMapper(metaclass=ABCMeta):
             self.bind()                     # Запускаем процесс инициализации маппера
             self.binded = True
 
+    @staticmethod
+    def factory_method(item):
+        """
+        Фабричный метод, который может быть переопределен для настройки генерации маппером новых инстансов
+        @param item: Базовый тип генерируемых маппером инстансов (тот, что установлен через set_new_item())
+        @return:
+        """
+        return item
+
     def int(self, mapper_field_name, db_field_name):
         return FieldTypes.Int(self, mapper_field_name, db_field_name=db_field_name)
 

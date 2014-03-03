@@ -141,7 +141,8 @@ class TableModel(object):
         arrays, items = [], []
         for row in generator:
             arrays.append(row)
-            items.append(self.get_new_item().load_from_array(row, True))
+            item = self.mapper.factory_method(self.get_new_item().load_from_array(row, True))
+            items.append(item)
         cache.cache(arrays)
         return items
 
@@ -214,7 +215,9 @@ class RecordModel(object):
 
     def refresh(self):
         """ Обновляет состояние модели в соответствии с состоянием в БД """
-        self.load_from_array(self.get_new_collection().get_item(self.mapper.primary.eq_condition(self.get_actual_primary_value())).get_data(), loaded_from_db=True)
+        self.load_from_array(self.get_new_collection().get_item(
+            self.mapper.primary.eq_condition(self.get_actual_primary_value())
+        ).get_data(), loaded_from_db=True)
 
     def load_by_primary(self, primary, cache=None):
         """
