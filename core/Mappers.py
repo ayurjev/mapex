@@ -2116,7 +2116,7 @@ class FieldTypesConverter(object):
         @raise TableMapperException: Если поле маппера сконфигурировано неправильно и представляет более одной записи
 
         """
-        v = FieldTypesConverter.handle_none_value_for_list_types(v)
+        v = FieldTypesConverter.handle_none_value_for_list_types(v, mf)
         collection = list(filter(None, v))
         length = len(collection)
         if length > 1:
@@ -2139,7 +2139,7 @@ class FieldTypesConverter(object):
         @rtype : FieldValues.ListValue
 
         """
-        v = FieldTypesConverter.handle_none_value_for_list_types(v)
+        v = FieldTypesConverter.handle_none_value_for_list_types(v, mf)
         if mf.get_items_collection_mapper().primary.compound:
             v = [
                 dict(zip(mf.get_items_collection_mapper().primary.name(), val.split("$!")))
@@ -2155,7 +2155,7 @@ class FieldTypesConverter(object):
         return FieldValues.ListValue([mf.get_new_item().load_by_primary(objid, cache) for objid in unique])
 
     @staticmethod
-    def handle_none_value_for_list_types(v):
+    def handle_none_value_for_list_types(v, mf):
         """
         Конвертирует возможные входные значения к формату полей List маппера, учитывая ситуации с None значениями...
         Нужно учитывать разные случаи:
@@ -2167,11 +2167,12 @@ class FieldTypesConverter(object):
         """
         if v is None:
             v = [v]
+        to_int = isinstance(mf.mapper.get_property(mf.mapper.primary.name()), FieldTypes.Int)
         if type(v) in [int, str]:
             if type(v) is str and v.find(",") > -1:
-                v = [int(it) if it.isdigit() and not it.startswith("0") else it for it in v.split(",")]
+                v = [int(it) if to_int else it for it in v.split(",")]
             else:
-                v = [int(v) if v.isdigit() and not v.startswith("0") else v]
+                v = [int(v) if to_int else v]
         return v
 
     @staticmethod
