@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS "usersTable" (
     "isSystem" boolean DEFAULT TRUE,
     "xCoord" float(32) DEFAULT NULL,
     "AccountID" integer DEFAULT NULL,
-    "TagsStorage" text DEFAULT NULL
+    "CustomPropertyValue" integer DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS "accountsTable" (

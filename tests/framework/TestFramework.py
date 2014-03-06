@@ -4,7 +4,7 @@
 
 from abc import ABCMeta, abstractmethod
 from mapex.dbms.Adapters import PgSqlDbAdapter, MySqlDbAdapter, MsSqlDbAdapter, MongoDbAdapter
-from mapex.core.Models import RecordModel, TableModel
+from mapex.core.Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
 from mapex.core.Mappers import SqlMapper, FieldTypes, NoSqlMapper
 
 import time
@@ -525,6 +525,40 @@ class MongoDbMock(NoSqlDbMock):
 
 
 ########################################### Основная тестовая коллекция Users #########################################
+class CustomProperty(EmbeddedObject):
+    def __init__(self, value):
+        self.value = value
+
+    def get_value(self):
+        return self.value
+
+    @staticmethod
+    def get_value_type():
+        return int
+
+
+class CustomPropertyPositive(CustomProperty):
+    pass
+
+
+class CustomPropertyNegative(CustomProperty):
+    pass
+
+
+class CustomPropertyFactory(EmbeddedObjectFactory):
+
+    @classmethod
+    def get_instance_base_type(cls):
+        return CustomProperty
+
+    @classmethod
+    def get_instance(cls, value):
+        if value > 0:
+            return CustomPropertyPositive(value)
+        else:
+            return CustomPropertyNegative(value)
+
+
 class SqlUsersMapper(SqlMapper):
     """ Тестовый маппер для класса Users """
     def bind(self):
@@ -546,7 +580,8 @@ class SqlUsersMapper(SqlMapper):
             self.reversed_link("profile", collection=SqlProfiles),
             self.reversed_list("statuses", collection=SqlStatuses),
             self.embedded_link("passport", collection=SqlPassports),
-            self.embedded_list("documents", collection=SqlDocuments)
+            self.embedded_list("documents", collection=SqlDocuments),
+            self.embedded_object("custom_property_obj", "CustomPropertyValue", model=CustomProperty)
         ])
 
 
@@ -591,7 +626,8 @@ class NoSqlUsersMapper(NoSqlMapper):
             self.reversed_link("profile", collection=NoSqlProfiles),
             self.reversed_list("statuses", collection=NoSqlStatuses),
             self.embedded_link("passport", "Passport", collection=NoSqlPassports),
-            self.embedded_list("documents", "Documents", collection=NoSqlDocuments)
+            self.embedded_list("documents", "Documents", collection=NoSqlDocuments),
+            self.embedded_object("custom_property_obj", "CustomPropertyValue", model=CustomProperty)
         ])
 
 

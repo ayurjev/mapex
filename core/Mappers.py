@@ -7,7 +7,7 @@ from collections import OrderedDict
 from collections import defaultdict
 
 from mapex.core.Exceptions import TableModelException, TableMapperException, DublicateRecordException
-from mapex.core.Models import RecordModel, TableModel
+from mapex.core.Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
 
 
 class Primary(object):
@@ -155,6 +155,10 @@ class FieldTypes(object):
             return self.mapper.get_db_type(self.db_field_name)
 
         def get_mapper_type(self):
+            """ Возвращает тип, используемый для поля на стороне маппера """
+            return self.__class__
+
+        def get_db_type_in_mapper_terms(self):
             """
             Возвращает тип поля маппера
             @return: Тип поля маппера
@@ -185,7 +189,7 @@ class FieldTypes(object):
             if value and self.value_assertion(value) is False:
                 raise TableModelException(
                     "\ntype of the value for field '%s' with type %s can't be %s (%s)" % (
-                        self.mapper_field_name, self, value, type(value)
+                        self.mapper_field_name, self.get_mapper_type(), value, type(value)
                     )
                 )
 
@@ -208,10 +212,10 @@ class FieldTypes(object):
             if direction == "mapper2database":
                 if isinstance(value, FieldValues.NoneValue) is False:
                     self.check_value(value)
-                converted = try_convert(self.__class__.ident, self.get_mapper_type().ident)
+                converted = try_convert(self.get_mapper_type().ident, self.get_db_type_in_mapper_terms().ident)
                 return converted if isinstance(converted, FieldValues.NoneValue) is False else None
             else:
-                converted = try_convert(self.get_mapper_type().ident, self.__class__.ident)
+                converted = try_convert(self.get_db_type_in_mapper_terms().ident, self.get_mapper_type().ident)
                 if isinstance(converted, FieldValues.NoneValue) is False:
                     self.check_value(converted)
                 return converted
@@ -261,7 +265,7 @@ class FieldTypes(object):
             super().__init__(mapper, mapper_field_name, **kwargs)
             self.db_field_type = kwargs.get("db_field_type", self.__class__)
 
-        def get_mapper_type(self) -> type:
+        def get_db_type_in_mapper_terms(self) -> type:
             """
             Возвращает тип поля маппера
             @return: Тип поля маппера
@@ -335,6 +339,56 @@ class FieldTypes(object):
 
             """
             return True
+
+    class EmbeddedObject(BaseField):
+        """ Класс для представления кастомного типа поля уровня маппера """
+
+        ident = "EmbeddedObject"
+
+        def __init__(self, mapper, mapper_field_name, model, **kwargs):
+            """
+            @param mapper: Основной маппер, которому принадлежит поле
+            @type mapper: Mapper
+            @param mapper_field_name: Имя поля маппера
+            @type mapper_field_name: str
+            @param model: Класс привязанной модели
+
+            """
+            super().__init__(mapper, mapper_field_name, **kwargs)
+            self.model = model
+
+        def get_value_type_in_mapper_terms(self, value_type):
+            return {
+                int: FieldTypes.Int,
+                str: FieldTypes.String,
+                float: FieldTypes.Float,
+                date: FieldTypes.Date,
+                time: FieldTypes.Time,
+                datetime: FieldTypes.DateTime,
+                bool: FieldTypes.Bool
+            }.get(value_type)
+
+        def value_assertion(self, v) -> bool:
+            if issubclass(self.model, EmbeddedObject):
+                model = self.model
+            elif issubclass(self.model, EmbeddedObjectFactory):
+                model = self.model.get_instance(v.get_value())
+            else:
+                return False
+            return isinstance(v, EmbeddedObject) and isinstance(v.get_value(), model.get_value_type())
+
+    class NoSqlEmbeddedObject(EmbeddedObject, NoSqlBaseField):
+        """ Класс для представления кастомного типа поля уровня маппера """
+        def get_value_type_in_mapper_terms(self, value_type):
+            return {
+                int: FieldTypes.NoSqlInt,
+                str: FieldTypes.NoSqlString,
+                float: FieldTypes.NoSqlFloat,
+                date: FieldTypes.NoSqlDate,
+                time: FieldTypes.NoSqlTime,
+                datetime: FieldTypes.NoSqlDateTime,
+                bool: FieldTypes.NoSqlBool
+            }.get(value_type)
 
     class Bool(BaseField):
         """ Класс для представления булевого типа поля уровня маппера """
@@ -937,6 +991,9 @@ class SqlMapper(metaclass=ABCMeta):
 
     def embedded_list(self, mapper_field_name, collection):
         return FieldTypes.SqlEmbeddedList(self, mapper_field_name, joined_collection=collection)
+
+    def embedded_object(self, mapper_field_name, db_field_name, model):
+        return FieldTypes.EmbeddedObject(self, mapper_field_name, db_field_name=db_field_name, model=model)
 
     def set_new_item(self, item_class):
         self.item_class = item_class
@@ -1605,6 +1662,9 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
             joined_collection=collection
         )
 
+    def embedded_object(self, mapper_field_name, db_field_name, model):
+        return FieldTypes.NoSqlEmbeddedObject(self, mapper_field_name, db_field_name=db_field_name, model=model)
+
     @abstractmethod
     def bind(self):
         """ Переопределить в суб-класса  """
@@ -2046,7 +2106,17 @@ class FieldTypesConverter(object):
         ("EmbeddedDocument", "Repr"): lambda v, mf, cache: str(v),
         ("EmbeddedList", "Repr"): lambda v, mf, cache: str(v),
         ("ObjectID", "Repr"): lambda v, mf, cache: str(v),
-        ("Unknown", "Repr"): lambda v, mf, cache: str(v)
+        ("Unknown", "Repr"): lambda v, mf, cache: str(v),
+        ("EmbeddedObject", "Int"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Int"),
+        ("EmbeddedObject", "String"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "String"),
+        ("EmbeddedObject", "Float"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Float"),
+        ("EmbeddedObject", "Bool"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Bool"),
+        ("EmbeddedObject", "Date"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Date"),
+        ("EmbeddedObject", "Time"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Time"),
+        ("EmbeddedObject", "DateTime"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "DateTime"),
+        ("EmbeddedObject", "EmbeddedObject"):
+        lambda v, mf, cache: None if not v else v.get_value() if isinstance(v, EmbeddedObject) else mf.model(v),
+        ("Int", "EmbeddedObject"): lambda v, mf, cache: mf.model(v) if v else None
     }
 
     @staticmethod
@@ -2184,3 +2254,12 @@ class FieldTypesConverter(object):
         return mf.get_new_item().load_from_array(
             mf.get_new_item().mapper.translate_and_convert(v, "database2mapper"), True
         ) if v else FNone()
+
+    @staticmethod
+    def custom_types(v, mf, cache, target_type):
+        if not v:
+            return None
+        target_lambda = FieldTypesConverter.converters.get(
+            (mf.get_value_type_in_mapper_terms(v.get_value_type()).ident, target_type)
+        )
+        return target_lambda(v.get_value(), mf, cache)

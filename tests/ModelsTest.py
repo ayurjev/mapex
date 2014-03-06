@@ -7,7 +7,7 @@
 import unittest
 from datetime import date
 
-from mapex.tests.framework.TestFramework import for_all_dbms
+from mapex.tests.framework.TestFramework import for_all_dbms, CustomProperty, CustomPropertyFactory, CustomPropertyPositive, CustomPropertyNegative
 from mapex.core.Exceptions import TableModelException
 
 
@@ -303,6 +303,70 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual("SecondUser", users.get_item({"age": 35}).name)
         self.assertEqual("ThirdUser", users.get_item({"age": 67}).name)
         users.mapper.factory_method = default_factory_method
+
+    @for_all_dbms
+    def test_custom_datatypes(self, dbms_fw):
+        """
+        Проверим возможность маппинга поля базы данных на кастомный класс, который не маппится ни на какую таблицу
+
+        """
+        users = dbms_fw.get_new_users_collection_instance()
+        self.assertEqual(0, users.count())
+
+        user = dbms_fw.get_new_user_instance()
+        user.name = "andrey"
+        user.save()
+        self.assertEqual(1, users.count())
+
+        user.custom_property_obj = CustomProperty(-1)
+        user.save()
+        self.assertEqual(1, users.count({"custom_property_obj": CustomProperty(-1)}))
+        user.refresh()
+        self.assertTrue(isinstance(user.custom_property_obj, CustomProperty))
+        self.assertFalse(isinstance(user.custom_property_obj, CustomPropertyNegative))
+        self.assertEqual(-1, user.custom_property_obj.get_value())
+
+        user.custom_property_obj = CustomProperty(1)
+        user.save()
+        self.assertEqual(1, users.count({"custom_property_obj": CustomProperty(1)}))
+        user.refresh()
+        self.assertTrue(isinstance(user.custom_property_obj, CustomProperty))
+        self.assertFalse(isinstance(user.custom_property_obj, CustomPropertyPositive))
+        self.assertEqual(1, user.custom_property_obj.get_value())
+
+        # Теперь проверим использование фабрики типов:
+        users.mapper.set_field(
+            users.mapper.embedded_object("custom_property_obj", "CustomPropertyValue", model=CustomPropertyFactory)
+        )
+        # noinspection PyProtectedMember
+        users.mapper._analyze_map()
+
+        user.refresh()
+        self.assertTrue(isinstance(user.custom_property_obj, CustomProperty))
+        self.assertTrue(isinstance(user.custom_property_obj, CustomPropertyPositive))
+        self.assertEqual(1, user.custom_property_obj.get_value())
+
+        user.custom_property_obj = CustomProperty(-1)
+        user.save()
+        user.refresh()
+        self.assertTrue(isinstance(user.custom_property_obj, CustomProperty))
+        self.assertTrue(isinstance(user.custom_property_obj, CustomPropertyNegative))
+        self.assertEqual(-1, user.custom_property_obj.get_value())
+
+        # А на положительный CustomProperty поменяем теперь не через базовый CustomProperty,
+        # а сразу через корректный тип
+        user.custom_property_obj = CustomPropertyPositive(1)
+        user.save()
+        user.refresh()
+        self.assertTrue(isinstance(user.custom_property_obj, CustomPropertyPositive))
+        self.assertEqual(1, user.custom_property_obj.get_value())
+
+        # Возвращаем назад
+        users.mapper.set_field(
+            users.mapper.embedded_object("custom_property_obj", "CustomPropertyValue", model=CustomProperty)
+        )
+        # noinspection PyProtectedMember
+        users.mapper._analyze_map()
 
     @for_all_dbms
     def test_query_with_links(self, dbms_fw):
