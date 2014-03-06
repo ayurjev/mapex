@@ -7,7 +7,7 @@
 import unittest
 from datetime import date
 
-from mapex.tests.framework.TestFramework import for_all_dbms
+from mapex.tests.framework.TestFramework import for_all_dbms, CustomProperty
 from mapex.core.Exceptions import TableModelException
 
 
@@ -303,6 +303,27 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual("SecondUser", users.get_item({"age": 35}).name)
         self.assertEqual("ThirdUser", users.get_item({"age": 67}).name)
         users.mapper.factory_method = default_factory_method
+
+    @for_all_dbms
+    def test_custom_datatypes(self, dbms_fw):
+        """
+        Проверим возможность маппинга поля базы данных на кастомный класс, который не маппится ни на какую таблицу
+
+        """
+        users = dbms_fw.get_new_users_collection_instance()
+        self.assertEqual(0, users.count())
+
+        user = dbms_fw.get_new_user_instance()
+        user.name = "andrey"
+        user.custom_property_obj = CustomProperty(1)
+        user.save()
+
+        self.assertEqual(1, users.count())
+        self.assertEqual(1, users.count({"custom_property_obj": CustomProperty(1)}))
+
+        user.refresh()
+        self.assertTrue(isinstance(user.custom_property_obj, CustomProperty))
+        self.assertEqual(1, user.custom_property_obj.get_value())
 
     @for_all_dbms
     def test_query_with_links(self, dbms_fw):

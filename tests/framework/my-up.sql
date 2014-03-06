@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS `usersTable` (
 	`isSystem` BOOLEAN DEFAULT TRUE,
   `xCoord` FLOAT DEFAULT TRUE,
   `AccountID` INT(11) DEFAULT NULL,
+  `CustomPropertyValue` INT(11) DEFAULT NULL,
 	PRIMARY KEY (`ID`)
 )
   COLLATE='utf8_general_ci'

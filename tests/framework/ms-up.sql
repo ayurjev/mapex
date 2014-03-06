@@ -8,7 +8,8 @@ CREATE TABLE "usersTable" (
 	"DateTimeField" DATETIME2,
 	"isSystem" BIT DEFAULT 1,
   "xCoord" FLOAT,
-  "AccountID" BIGINT
+  "AccountID" BIGINT,
+  "CustomPropertyValue" BIGINT
 );
 
 IF OBJECT_ID('accountsTable', 'Table') IS NULL

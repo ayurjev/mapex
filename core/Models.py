@@ -2,8 +2,7 @@
 """ Модуль для работы с БД """
 
 import hashlib
-
-
+from abc import ABCMeta, abstractmethod
 from mapex.core.Exceptions import TableModelException
 
 
@@ -433,6 +432,49 @@ class RecordModel(object):
             return first == second if first and second else self.get_data() == other.get_data()
         else:
             return False
+
+
+class EmbeddedObject(object, metaclass=ABCMeta):
+    """
+    Класс для создания моделей, для которых в БД может храниться только одно значение,
+    на основе которого должно происходить конструирование экземпляров класса этой модели
+    """
+    @abstractmethod
+    def get_value(self):
+        """
+        @return: Значение, которое будет храниться в поле таблицы БД
+        и на основе которого будет конструироваться экземпляр данного класса
+        """
+
+    @staticmethod
+    @abstractmethod
+    def get_value_type():
+        """
+        @return: Тип значения, которое будует храниться в БД в качестве идентификатора данной модели
+        """
+
+
+class EmbeddedObjectFactory(object):
+
+    def __new__(cls, value):
+        return cls.get_instance(value)
+
+    @classmethod
+    @abstractmethod
+    def get_instance_base_type(cls):
+        """
+        Возвращает базовый тип данных, который может возвращать данная фабрика
+        @return:
+        """
+
+
+    @classmethod
+    @abstractmethod
+    def get_instance(cls, value):
+        """
+        @param value: Значение, для конструирования экземпляра класса
+        @return: Возвращает созданный экземпляр, корректного для данного value класса
+        """
 
 
 class TableModelCache(object):
