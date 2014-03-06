@@ -7,7 +7,7 @@ from collections import OrderedDict
 from collections import defaultdict
 
 from mapex.core.Exceptions import TableModelException, TableMapperException, DublicateRecordException
-from mapex.core.Models import RecordModel, TableModel, EmbeddedObject
+from mapex.core.Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
 
 
 class Primary(object):
@@ -357,7 +357,7 @@ class FieldTypes(object):
             super().__init__(mapper, mapper_field_name, **kwargs)
             self.model = model
 
-        def get_value_type_in_mapper_terms(self):
+        def get_value_type_in_mapper_terms(self, value_type):
             return {
                 int: FieldTypes.Int,
                 str: FieldTypes.String,
@@ -366,14 +366,20 @@ class FieldTypes(object):
                 time: FieldTypes.Time,
                 datetime: FieldTypes.DateTime,
                 bool: FieldTypes.Bool
-            }.get(self.model.get_value_type())
+            }.get(value_type)
 
         def value_assertion(self, v) -> bool:
-            return isinstance(v, EmbeddedObject) and isinstance(v.get_value(), self.model.get_value_type())
+            if issubclass(self.model, EmbeddedObject):
+                model = self.model
+            elif issubclass(self.model, EmbeddedObjectFactory):
+                model = self.model.get_instance(v.get_value())
+            else:
+                return False
+            return isinstance(v, EmbeddedObject) and isinstance(v.get_value(), model.get_value_type())
 
     class NoSqlEmbeddedObject(EmbeddedObject, NoSqlBaseField):
         """ Класс для представления кастомного типа поля уровня маппера """
-        def get_value_type_in_mapper_terms(self):
+        def get_value_type_in_mapper_terms(self, value_type):
             return {
                 int: FieldTypes.NoSqlInt,
                 str: FieldTypes.NoSqlString,
@@ -382,7 +388,7 @@ class FieldTypes(object):
                 time: FieldTypes.NoSqlTime,
                 datetime: FieldTypes.NoSqlDateTime,
                 bool: FieldTypes.NoSqlBool
-            }.get(self.model.get_value_type())
+            }.get(value_type)
 
     class Bool(BaseField):
         """ Класс для представления булевого типа поля уровня маппера """
@@ -2101,14 +2107,15 @@ class FieldTypesConverter(object):
         ("EmbeddedList", "Repr"): lambda v, mf, cache: str(v),
         ("ObjectID", "Repr"): lambda v, mf, cache: str(v),
         ("Unknown", "Repr"): lambda v, mf, cache: str(v),
-        ("EmbeddedObject", "Int"): lambda v, mf, cache: FieldTypesConverter.converters[(mf.get_value_type_in_mapper_terms().ident, "Int")](v.get_value(), mf, cache) if v else None,
-        ("EmbeddedObject", "String"): lambda v, mf, cache: FieldTypesConverter.converters[(mf.get_value_type_in_mapper_terms().ident, "String")](v.get_value(), mf, cache) if v else None,
-        ("EmbeddedObject", "Float"): lambda v, mf, cache: FieldTypesConverter.converters[(mf.get_value_type_in_mapper_terms().ident, "Float")](v.get_value(), mf, cache) if v else None,
-        ("EmbeddedObject", "Bool"): lambda v, mf, cache: FieldTypesConverter.converters[(mf.get_value_type_in_mapper_terms().ident, "Bool")](v.get_value(), mf, cache) if v else None,
-        ("EmbeddedObject", "Date"): lambda v, mf, cache: FieldTypesConverter.converters[(mf.get_value_type_in_mapper_terms().ident, "Date")](v.get_value(), mf, cache) if v else None,
-        ("EmbeddedObject", "Time"): lambda v, mf, cache: FieldTypesConverter.converters[(mf.get_value_type_in_mapper_terms().ident, "Time")](v.get_value(), mf, cache) if v else None,
-        ("EmbeddedObject", "DateTime"): lambda v, mf, cache: FieldTypesConverter.converters[(mf.get_value_type_in_mapper_terms().ident, "DateTime")](v.get_value(), mf, cache) if v else None,
-        ("EmbeddedObject", "EmbeddedObject"): lambda v, mf, cache: v.get_value() if isinstance(v, EmbeddedObject) else mf.model(v) if v else None if v else None,
+        ("EmbeddedObject", "Int"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Int"),
+        ("EmbeddedObject", "String"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "String"),
+        ("EmbeddedObject", "Float"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Float"),
+        ("EmbeddedObject", "Bool"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Bool"),
+        ("EmbeddedObject", "Date"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Date"),
+        ("EmbeddedObject", "Time"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Time"),
+        ("EmbeddedObject", "DateTime"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "DateTime"),
+        ("EmbeddedObject", "EmbeddedObject"):
+        lambda v, mf, cache: None if not v else v.get_value() if isinstance(v, EmbeddedObject) else mf.model(v),
         ("Int", "EmbeddedObject"): lambda v, mf, cache: mf.model(v) if v else None
     }
 
@@ -2247,3 +2254,12 @@ class FieldTypesConverter(object):
         return mf.get_new_item().load_from_array(
             mf.get_new_item().mapper.translate_and_convert(v, "database2mapper"), True
         ) if v else FNone()
+
+    @staticmethod
+    def custom_types(v, mf, cache, target_type):
+        if not v:
+            return None
+        target_lambda = FieldTypesConverter.converters.get(
+            (mf.get_value_type_in_mapper_terms(v.get_value_type()).ident, target_type)
+        )
+        return target_lambda(v.get_value(), mf, cache)
