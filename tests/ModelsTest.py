@@ -1744,6 +1744,7 @@ class RecordModelTest(unittest.TestCase):
                 "uid": None,
                 "name": "Андрей",
                 "age": 99,
+                "custom_property_obj": None,
                 "documents": [],
                 "passport": None,
                 "is_system": None,
@@ -1767,6 +1768,7 @@ class RecordModelTest(unittest.TestCase):
                 "uid": None,
                 "name": "Андрей",
                 "age": 99,
+                "custom_property_obj": None,
                 'new_property': 9900,               # Здесь обращаем внимание на новое поле, которого нет в маппере
                 "is_system": None,
                 "latitude": None,
