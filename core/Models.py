@@ -454,27 +454,18 @@ class EmbeddedObject(object, metaclass=ABCMeta):
         """
 
 
-class EmbeddedObjectFactory(object):
+class EmbeddedObjectFactory(object, metaclass=ABCMeta):
 
     def __new__(cls, value):
         return cls.get_instance(value)
 
     @classmethod
-    @abstractmethod
-    def get_instance_base_type(cls):
-        """
-        Возвращает базовый тип данных, который может возвращать данная фабрика
-        @return:
-        """
-
-
-    @classmethod
-    @abstractmethod
     def get_instance(cls, value):
         """
         @param value: Значение, для конструирования экземпляра класса
         @return: Возвращает созданный экземпляр, корректного для данного value класса
         """
+        raise NotImplementedError("method get_instance of EmbeddedObjectFactory is not implemented")
 
 
 class TableModelCache(object):
