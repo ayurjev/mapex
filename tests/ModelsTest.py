@@ -115,6 +115,7 @@ class TableModelTest(unittest.TestCase):
         user2 = dbms_fw.get_new_user_instance({"name": "second"})
         user2.save()
         self.assertEqual(2, users.count())
+        # TODO починить для MsDbMock()
         self.assertRaises(CustomException, users.update, {"uid": uid}, {"name": "second"})
 
         # Возвращаем исходный тип исключения
@@ -308,8 +309,8 @@ class TableModelTest(unittest.TestCase):
     def test_custom_datatypes(self, dbms_fw):
         """
         Проверим возможность маппинга поля базы данных на кастомный класс, который не маппится ни на какую таблицу
-
         """
+
         users = dbms_fw.get_new_users_collection_instance()
         self.assertEqual(0, users.count())
 
@@ -320,6 +321,7 @@ class TableModelTest(unittest.TestCase):
 
         user.custom_property_obj = CustomProperty(-1)
         user.save()
+        # TODO починить для MsDbMock()
         self.assertEqual(1, users.count({"custom_property_obj": CustomProperty(-1)}))
         user.refresh()
         self.assertTrue(isinstance(user.custom_property_obj, CustomProperty))
