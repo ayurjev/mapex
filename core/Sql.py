@@ -220,7 +220,7 @@ class SqlBuilder(object, metaclass=ABCMeta):
         @rtype : str
 
         """
-        return "LIMIT %d" % limit
+        return "LIMIT %d" % limit if limit else ""
 
     def order_section(self, order_data: tuple or list, main_table: str) -> str:
         """
@@ -590,7 +590,7 @@ class SelectQuery(ConditionsMixin, JoinMixin, BaseSqlQuery):
         super().__init__(builder)
         self.fields = []
         self.params = {
-            "limit": 20, "skip": 0, "order": None
+            "skip": 0, "order": None
         }
 
     def set_fields(self, fields: list):
