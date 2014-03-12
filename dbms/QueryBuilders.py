@@ -76,7 +76,7 @@ class PgSqlBuilder(SqlBuilder):
         @rtype : str
 
         """
-        return "LIMIT %d OFFSET %d" % (limit_value, skip_value)
+        return "%s OFFSET %d" % (self.limit_section(limit_value), skip_value)
 
     @staticmethod
     def build_select_query(query: SelectQuery) -> str:
@@ -227,7 +227,7 @@ class MySqlBuilder(SqlBuilder):
         @rtype : str
 
         """
-        return "LIMIT %d, %d" % (skip_value, limit_value)
+        return "LIMIT %d OFFSET %d" % (limit_value, skip_value) if limit_value else ""
 
     @staticmethod
     def build_select_query(query: SelectQuery) -> str:
@@ -382,7 +382,7 @@ class MsSqlBuilder(SqlBuilder):
         @rtype : str
 
         """
-        return "TOP(%d)" % limit_value
+        return "TOP(%d)" % limit_value if limit_value else ""
 
     @staticmethod
     def build_select_query(query: SelectQuery) -> str:

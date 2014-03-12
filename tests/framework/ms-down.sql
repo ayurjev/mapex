@@ -8,4 +8,4 @@ IF OBJECT_ID('users_tags_relations', 'Table') IS NOT NULL DROP TABLE "users_tags
 IF OBJECT_ID('profilesTable', 'Table') IS NOT NULL DROP TABLE "profilesTable";
 IF OBJECT_ID('passportsTable', 'Table') IS NOT NULL DROP TABLE "passportsTable";
 IF OBJECT_ID('documentsTable', 'Table') IS NOT NULL DROP TABLE "documentsTable";
-IF OBJECT_ID('multiMappedTable', 'Table') IS NOT NULL DROP TABLE "documentsTable";
+IF OBJECT_ID('multiMappedTable', 'Table') IS NOT NULL DROP TABLE "multiMappedTable";
