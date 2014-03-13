@@ -1053,6 +1053,7 @@ class SqlMapper(metaclass=ABCMeta):
         self.primary = Primary(self, name_in_mapper=field_name)
         self.primary.defined_by_user = True
         self.db_primary_key = self.primary.db_name()
+        self._analyze_map()
 
     def attach(self, table_name: str):
         """
@@ -1088,6 +1089,7 @@ class SqlMapper(metaclass=ABCMeta):
         б) создает карту join'ов маппера и других таблиц
 
         """
+        self._joined = OrderedDict()
         self._reversed_map = {}
         for mapperFieldName in self._properties:
             mapper_field = self._properties[mapperFieldName]
