@@ -39,6 +39,10 @@ class Primary(object):
             else:
                 self.db_primary_key = self.mapper.get_property(name_in_mapper).get_db_name()
 
+        self.autoincremented = False
+        if self.db_primary_key and self.db_primary_key in self.mapper.db_fields.keys():
+            self.autoincremented = self.mapper.db_fields.get(self.db_primary_key).autoincremented
+
     def db_name(self):
         """ Возвращает имя ключа в базе данных
         @return: Имя поля, являющегося первичным ключом в базе данных
@@ -815,12 +819,14 @@ class FieldTypes(object):
                 {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.get_actual_primary_value()}
             )
             for obj in filter(None, items):
-                obj.unset_primary()
+                if self.items_collection_mapper.primary.autoincremented:
+                    obj.unset_primary()
                 item_data = obj.get_data_for_write_operation()
                 item_data[main_record_key] = main_record_obj
                 copy = obj.get_new_collection().get_new_item()
                 copy.load_from_array(item_data)
                 copy.save()
+
 
         def clear_dependencies_from(self, main_records_ids: list):
             """
@@ -928,10 +934,10 @@ class SqlMapper(metaclass=ABCMeta):
             self.item_class = RecordModel
             self.item_collection_class = TableModel
             self.table_name = None                      # Имя основной таблицы
+            self.db_fields = {}
+            self.db_primary_key = ""
             self.primary = Primary(self)                # Объект, представляющий собой первичный ключ маппера
             self.boundaries = None
-            self._db_fields = {}
-            self.db_primary_key = ""
             self._properties = {}
             self._joined = OrderedDict()
             self._reversed_map = {}
@@ -1063,7 +1069,7 @@ class SqlMapper(metaclass=ABCMeta):
         @deprecated
         """
         self.table_name = table_name
-        self._db_fields, self.db_primary_key = self.db.get_table_fields(self.table_name)
+        self.db_fields, self.db_primary_key = self.db.get_table_fields(self.table_name)
 
     def set_collection_name(self, collection_name: str):
         """
@@ -1199,7 +1205,7 @@ class SqlMapper(metaclass=ABCMeta):
         @raise TableMapperException: Если такого поля в таблице нет
 
         """
-        field = self._db_fields.get(field_name)
+        field = self.db_fields.get(field_name)
         if field is None:
             raise TableMapperException("there is no field named '%s' in table '%s'" % (field_name, self.table_name))
         return field.db_type
