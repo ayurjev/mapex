@@ -69,6 +69,7 @@ class TableModelTest(unittest.TestCase):
         # Корректная модель
         users.insert(user)
         self.assertEqual(1, users.count())
+        self.assertNotEqual(None, user.uid)
         # Список корректных моделей
         user2 = dbms_fw.get_new_user_instance()
         user2.name = "Andrey"
@@ -76,6 +77,8 @@ class TableModelTest(unittest.TestCase):
         user3.name = "Alexey"
         users.insert([user2, user3])
         self.assertEqual(3, users.count())
+        self.assertNotEqual(None, user2.uid)
+        self.assertNotEqual(None, user3.uid)
 
         # Ну и проверим отказ в добавлении корректных с точки зрения формата моделей,
         # но нарушающих валидацию бизнес логики
