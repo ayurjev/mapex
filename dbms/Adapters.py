@@ -88,7 +88,7 @@ class PgSqlDbAdapter(Adapter):
                 fields[constraint[0]].is_primary = True
                 primary = constraint[0]
 
-            if constraint[2].startswith("nextval"):
+            if constraint[2] is not None and constraint[2].startswith("nextval"):
                 fields[constraint[0]].autoincremented = True
             else:
                 fields[constraint[0]].autoincremented = False
