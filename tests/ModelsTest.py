@@ -1173,9 +1173,8 @@ class TableModelTest(unittest.TestCase):
 
         self.assertEqual([document2.number], [d.number for d in second_user.documents])
         self.assertEqual([document3.number], [d.number for d in third_user.documents])
-        tmp = third_user.documents
-        third_user.documents = list(second_user.documents)
-        second_user.documents = list(tmp)
+        third_user.documents, second_user.documents = list(second_user.documents), list(third_user.documents)
+
         third_user.save()
         second_user.save()
         if documents:

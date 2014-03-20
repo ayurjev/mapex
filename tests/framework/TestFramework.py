@@ -197,10 +197,8 @@ class SqlDbMock(DbMock):
         Выполняет набор sql-запросов из указанного файла
         @param filepath: Путь до файла с sql-командами
         """
-        f = open(filepath)
-        script = "".join(f.readlines())
-        f.close()
-        self.db.execute_raw(script)
+        with open(filepath) as f:
+            self.db.execute_raw(f.read())
 
     def up(self):
         """ Создает нужные для проведения тестирования таблицы в базе данных """
