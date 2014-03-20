@@ -51,6 +51,12 @@ CREATE TABLE IF NOT EXISTS "documentsTable" (
     "userID" integer
 );
 
+CREATE TABLE IF NOT EXISTS "documentsWithoutAutoincrementTable" (
+    "Series" integer primary key,
+    "Number" integer,
+    "userID" integer
+);
+
 CREATE TABLE IF NOT EXISTS "users_tags_relations" (
     "ID" serial primary key,
     "userID" integer,

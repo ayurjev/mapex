@@ -142,6 +142,14 @@ class DbMock(object, metaclass=ABCMeta):
         """ Возвращает новый экземпляр класса документа """
 
     @abstractmethod
+    def get_new_document_not_ai_instance(self):
+        """ Возвращает экземпляр документа с неавтоинкрементным PK """
+
+    @abstractmethod
+    def get_new_documents_not_ai_instance(self):
+        """ Возвращает коллекцию документов с неавтоинкрементным PK """
+
+    @abstractmethod
     def get_new_multi_mapped_collection_instance(self):
         """ Возвращает коллекцию элементов, имеющих два разных типа отношений с одним и тем же внешним маппером """
 
@@ -206,6 +214,7 @@ class SqlDbMock(DbMock):
         SqlProfilesMapper.db = self.db
         SqlPassportsMapper.db = self.db
         SqlDocumentsMapper.db = self.db
+        SqlDocumentsNotAiMapper.db = self.db
         SqlNoPrimaryMapper.db = self.db
         SqlMultiMappedCollectionMapper.db = self.db
 
@@ -221,6 +230,7 @@ class SqlDbMock(DbMock):
         SqlProfilesMapper.kill_instance()
         SqlPassportsMapper.kill_instance()
         SqlDocumentsMapper.kill_instance()
+        SqlDocumentsNotAiMapper.kill_instance()
         SqlNoPrimaryMapper.kill_instance()
         SqlMultiMappedCollectionMapper.kill_instance()
 
@@ -292,9 +302,17 @@ class SqlDbMock(DbMock):
         """ Возвращает коллекцию документов """
         return SqlDocuments()
 
-    def get_new_document_instance(self):
+    def get_new_document_instance(self, data=None, loaded_from_db=False):
         """ Возвращает новый экземпляр класса документа """
-        return SqlDocument()
+        return SqlDocument(data, loaded_from_db)
+
+    def get_new_document_not_ai_instance(self, data=None, loaded_from_db=False):
+        """ Возвращает новый экземпляр класса документа """
+        return SqlNotAiDocument(data, loaded_from_db)
+
+    def get_new_documents_not_ai_instance(self):
+        """ Возвращает новый экземпляр класса документа """
+        return SqlNotAiDocuments()
 
     def get_new_multi_mapped_collection_instance(self):
         """ Возвращает коллекцию элементов, имеющих два разных типа отношений с одним и тем же внешним маппером """
@@ -344,6 +362,7 @@ class NoSqlDbMock(DbMock):
         NoSqlNoPrimaryMapper.db = self.db
         NoSqlPassportsMapper.db = self.db
         NoSqlDocumentsMapper.db = self.db
+        NoSqlDocumentsNotAiMapper.db = self.db
         NoSqlMultiMappedCollectionMapper.db = self.db
 
     def down(self):
@@ -366,6 +385,7 @@ class NoSqlDbMock(DbMock):
         NoSqlProfilesMapper.kill_instance()
         NoSqlPassportsMapper.kill_instance()
         NoSqlDocumentsMapper.kill_instance()
+        NoSqlDocumentsNotAiMapper.kill_instance()
         NoSqlNoPrimaryMapper.kill_instance()
         NoSqlMultiMappedCollectionMapper.kill_instance()
 
@@ -440,6 +460,14 @@ class NoSqlDbMock(DbMock):
     def get_new_document_instance(self):
         """ Возвращает новый экземпляр класса документа """
         return NoSqlDocument()
+
+    def get_new_document_not_ai_instance(self):
+        """ Возвращает документ с неавтоинкрементным PK """
+        return NoSqlNotAiDocument()
+
+    def get_new_documents_not_ai_instance(self):
+        """ Возвращает коллекцию документов с неавтоинкрементным PK """
+        return False
 
     def get_new_multi_mapped_collection_instance(self):
         """ Возвращает коллекцию элементов, имеющих два разных типа отношений с одним и тем же внешним маппером """
@@ -581,6 +609,7 @@ class SqlUsersMapper(SqlMapper):
             self.reversed_list("statuses", collection=SqlStatuses),
             self.embedded_link("passport", collection=SqlPassports),
             self.embedded_list("documents", collection=SqlDocuments),
+            self.embedded_list("documents_not_ai", collection=SqlNotAiDocuments),
             self.embedded_object("custom_property_obj", "CustomPropertyValue", model=CustomProperty)
         ])
 
@@ -1028,6 +1057,54 @@ class NoSqlDocuments(TableModel):
 # noinspection PyDocstring
 class NoSqlDocument(RecordModel):
     mapper = NoSqlDocumentsMapper
+
+################## Коллекция документов у которых первычный ключ не автоинкрементный (Embedded lists) ##################
+
+
+# noinspection PyDocstring
+class SqlDocumentsNotAiMapper(SqlMapper):
+    def bind(self):
+        self.set_collection_name("documentsWithoutAutoincrementTable")
+        self.set_new_item(SqlNotAiDocument)
+        self.set_new_collection(SqlNotAiDocuments)
+        self.set_map([
+            self.int("series", "Series"),
+            self.int("number", "Number"),
+            self.link("user", "userID", collection=SqlUsers)
+        ])
+
+
+# noinspection PyDocstring
+class NoSqlDocumentsNotAiMapper(SqlMapper):
+    def bind(self):
+        self.set_collection_name("documentsWithoutAutoincrementTable")
+        self.set_new_item(NoSqlNotAiDocument)
+        self.set_new_collection(NoSqlNotAiDocuments)
+        self.set_map([
+            self.int("series", "Series"),
+            self.int("number", "Number"),
+            self.link("user", "userID", collection=SqlUsers)
+        ])
+
+
+# noinspection PyDocstring
+class SqlNotAiDocuments(TableModel):
+    mapper = SqlDocumentsNotAiMapper
+
+
+# noinspection PyDocstring
+class SqlNotAiDocument(RecordModel):
+    mapper = SqlDocumentsNotAiMapper
+
+
+# noinspection PyDocstring
+class NoSqlNotAiDocuments(TableModel):
+    mapper = NoSqlDocumentsNotAiMapper
+
+
+# noinspection PyDocstring
+class NoSqlNotAiDocument(RecordModel):
+    mapper = NoSqlDocumentsNotAiMapper
 
 
 ####################################### Коллекция элементов, не имеющая первичного ключа ##############################
