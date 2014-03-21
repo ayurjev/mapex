@@ -654,6 +654,7 @@ class NoSqlUsersMapper(NoSqlMapper):
             self.reversed_list("statuses", collection=NoSqlStatuses),
             self.embedded_link("passport", "Passport", collection=NoSqlPassports),
             self.embedded_list("documents", "Documents", collection=NoSqlDocuments),
+            self.embedded_list("documents_not_ai", "Documentsnotai", collection=NoSqlNotAiDocuments),
             self.embedded_object("custom_property_obj", "CustomPropertyValue", model=CustomProperty)
         ])
 
@@ -1081,7 +1082,7 @@ class NoSqlDocumentsNotAiMapper(SqlMapper):
         self.set_map([
             self.int("series", "Series"),
             self.int("number", "Number"),
-            self.link("user", "userID", collection=SqlUsers)
+            self.link("user", "userID", collection=NoSqlUsers)
         ])
 
 
