@@ -843,6 +843,7 @@ class PgDbField(object):
         self.can_be_null = can_be_null
         self.db_type = db_type
         self.max_length = max_length
+        self.autoincremented = False
 
 
 class MySqlDbField(object):
@@ -856,18 +857,20 @@ class MySqlDbField(object):
         self.db_type = db_type.split("(")[0]
         self.max_length = db_type.split("(")[1].strip(")") if db_type.find("(") > -1 else None
         self.extra = extra
+        self.autoincremented = extra == "auto_increment"
 
 
 class MsSqlDbField(object):
     """ Класс реального поля таблицы базы данных MsSQL"""
 
-    def __init__(self, name, can_be_null, db_type, max_length, default, key):
+    def __init__(self, name, can_be_null, db_type, max_length, default, key, identity):
         self.name = name
         self.is_primary = key == name
         self.default = default
         self.can_be_null = can_be_null == "YES"
         self.db_type = db_type.split("(")[0]
         self.max_length = db_type.split("(")[1].strip(")") if db_type.find("(") > -1 else max_length
+        self.autoincremented = bool(identity)
 
 
 class QueriesAnalyzer(object):

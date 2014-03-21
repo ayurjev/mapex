@@ -76,9 +76,10 @@ class PgSqlDbAdapter(Adapter):
             fields[field[0]] = PgDbField(*field)
 
         constraints = list(self.get_rows('''
-            SELECT "column_name", "constraint_type"
+            SELECT "a"."column_name", "constraint_type", "column_default"
             FROM "information_schema"."constraint_column_usage" as "a"
             JOIN "information_schema"."table_constraints" as "b" ON ("a"."constraint_name" = "b"."constraint_name")
+            JOIN "information_schema"."columns" as "c" ON ("c"."table_name", "c"."column_name") = ("a"."table_name", "a"."column_name")
             WHERE "a"."table_name" = $1
         ''', [table_name]))
 
@@ -86,6 +87,11 @@ class PgSqlDbAdapter(Adapter):
             if constraint[1] == "PRIMARY KEY":
                 fields[constraint[0]].is_primary = True
                 primary = constraint[0]
+
+            if constraint[2] is not None and constraint[2].startswith("nextval"):
+                fields[constraint[0]].autoincremented = True
+            else:
+                fields[constraint[0]].autoincremented = False
 
         return fields, primary
 
@@ -265,7 +271,8 @@ class MsSqlDbAdapter(Adapter):
         INFORMATION_SCHEMA.COLUMNS.DATA_TYPE,
         INFORMATION_SCHEMA.COLUMNS.CHARACTER_MAXIMUM_LENGTH,
         INFORMATION_SCHEMA.COLUMNS.COLUMN_DEFAULT,
-        INFORMATION_SCHEMA.KEY_COLUMN_USAGE.COLUMN_NAME
+        INFORMATION_SCHEMA.KEY_COLUMN_USAGE.COLUMN_NAME,
+        COLUMNPROPERTY(object_id(INFORMATION_SCHEMA.COLUMNS.TABLE_NAME), INFORMATION_SCHEMA.COLUMNS.COLUMN_NAME, 'IsIdentity')
         FROM INFORMATION_SCHEMA.COLUMNS
         LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE ON (
             INFORMATION_SCHEMA.COLUMNS.COLUMN_NAME = INFORMATION_SCHEMA.KEY_COLUMN_USAGE.COLUMN_NAME AND
@@ -425,4 +432,8 @@ class MongoDbAdapter(AdapterLogger):
         @param table_name: Имя коллекции
         @return:
         """
-        return {}, "_id"
+        class NoSqlField(object):
+            def __init__(self):
+                self.autoincremented = True
+
+        return {"_id": NoSqlField()}, "_id"

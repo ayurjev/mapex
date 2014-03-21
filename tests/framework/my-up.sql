@@ -73,6 +73,15 @@ CREATE TABLE IF NOT EXISTS `documentsTable` (
   COLLATE='utf8_general_ci'
   ENGINE=MyISAM;
 
+CREATE TABLE IF NOT EXISTS `documentsWithoutAutoincrementTable` (
+  `Series` INT(32) NOT NULL,
+  `Number` INT(11) DEFAULT NULL,
+  `userID` INT(11) DEFAULT NULL,
+  PRIMARY KEY (`Series`)
+)
+  COLLATE='utf8_general_ci'
+  ENGINE=MyISAM;
+
 CREATE TABLE IF NOT EXISTS `users_tags_relations` (
     `ID` INT(11) NOT NULL AUTO_INCREMENT,
     `userID` INT(11) DEFAULT NULL,

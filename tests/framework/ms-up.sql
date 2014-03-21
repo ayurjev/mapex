@@ -58,6 +58,13 @@ CREATE TABLE "documentsTable" (
   "userID" BIGINT
 );
 
+IF OBJECT_ID('documentsWithoutAutoincrementTable', 'Table') IS NULL
+CREATE TABLE "documentsWithoutAutoincrementTable" (
+  "Series" BIGINT PRIMARY KEY,
+  "Number" BIGINT,
+  "userID" BIGINT
+);
+
 IF OBJECT_ID('users_tags_relations', 'Table') IS NULL
 CREATE TABLE "users_tags_relations" (
   "ID" BIGINT PRIMARY KEY IDENTITY,

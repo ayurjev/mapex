@@ -69,6 +69,8 @@ class TableModelTest(unittest.TestCase):
         # Корректная модель
         users.insert(user)
         self.assertEqual(1, users.count())
+        #TODO "user.uid" должен обновиться после вставки нового "user" в коллекцию
+        self.assertNotEqual(None, user.uid)
         # Список корректных моделей
         user2 = dbms_fw.get_new_user_instance()
         user2.name = "Andrey"
@@ -76,6 +78,8 @@ class TableModelTest(unittest.TestCase):
         user3.name = "Alexey"
         users.insert([user2, user3])
         self.assertEqual(3, users.count())
+        self.assertNotEqual(None, user2.uid)
+        self.assertNotEqual(None, user3.uid)
 
         # Ну и проверим отказ в добавлении корректных с точки зрения формата моделей,
         # но нарушающих валидацию бизнес логики
@@ -1045,6 +1049,56 @@ class TableModelTest(unittest.TestCase):
             self.assertEqual(1, passports.count({"user": ("exists", True)}))     # Только у одной из записей указан юзер
 
     @for_all_dbms
+    def test_embedded_lists_with_not_autoincremented_primary_key(self, dbms_fw):
+        """ Mapex не сможет переступить ограничения базы данных и скопировать список из одной модели в другую
+            если первичный ключ не автоинкрементный
+        """
+        users = dbms_fw.get_new_users_collection_instance()
+        documents = dbms_fw.get_new_documents_not_ai_instance()
+
+        if documents:
+            doc1 = dbms_fw.get_new_document_not_ai_instance({"series": 1, "number": 1})
+            doc2 = dbms_fw.get_new_document_not_ai_instance({"series": 2, "number": 2})
+            doc3 = dbms_fw.get_new_document_not_ai_instance({"series": 3, "number": 3})
+            doc4 = dbms_fw.get_new_document_not_ai_instance({"series": 4, "number": 4})
+            doc5 = dbms_fw.get_new_document_not_ai_instance({"series": 5, "number": 5})
+            doc6 = dbms_fw.get_new_document_not_ai_instance({"series": 6, "number": 6})
+
+            user1 = dbms_fw.get_new_user_instance({"name": "Vasya", "documents_not_ai": [doc1, doc2]})
+            user2 = dbms_fw.get_new_user_instance({"name": "Fedya", "documents_not_ai": [doc3, doc4]})
+
+            user1.save()
+            user2.save()
+
+            self.assertEqual(2, users.count())
+
+            self.assertCountEqual([doc1.number, doc2.number], [d.number for d in user1.documents_not_ai])
+            self.assertCountEqual([doc3.number, doc4.number], [d.number for d in user2.documents_not_ai])
+
+            # Копирование списка из модели в модель вызывает исключение т.к. нарушает уникальность первичного ключа
+            # Первичный ключ не автоинкрементный, а значит при переносе документов из модели в модель не сбрасывается
+            user1.documents_not_ai = list(user2.documents_not_ai)
+            from mapex.core.Exceptions import DublicateRecordException
+            self.assertRaises(DublicateRecordException, user1.save)
+
+            # Но можно создать новый список если он не нарушает уникальность
+            user1.documents_not_ai = [doc5, doc6]
+            user1.save()
+            self.assertEqual(4, documents.count())
+            self.assertCountEqual([doc5.number, doc6.number], [d.number for d in user1.documents_not_ai])
+            self.assertCountEqual([doc3.number, doc4.number], [d.number for d in user2.documents_not_ai])
+
+            # Или если позаботиться о том чтобы уникальность не нарушалась
+            user1.documents_not_ai = list(user2.documents_not_ai)
+            user2.documents_not_ai = []
+            user2.save()
+            user1.save()
+            self.assertEqual(2, documents.count())
+            self.assertCountEqual([doc3.number, doc4.number], [d.number for d in user1.documents_not_ai])
+            self.assertCountEqual([], [d.number for d in user2.documents_not_ai])
+
+
+    @for_all_dbms
     def test_query_with_embedded_lists(self, dbms_fw):
         """ Проверим возможность работы с встроенным списком объектов """
         users = dbms_fw.get_new_users_collection_instance()
@@ -1130,9 +1184,8 @@ class TableModelTest(unittest.TestCase):
 
         self.assertEqual([document2.number], [d.number for d in second_user.documents])
         self.assertEqual([document3.number], [d.number for d in third_user.documents])
-        tmp = third_user.documents
-        third_user.documents = list(second_user.documents)
-        second_user.documents = list(tmp)
+        third_user.documents, second_user.documents = list(second_user.documents), list(third_user.documents)
+
         third_user.save()
         second_user.save()
         if documents:
@@ -1748,6 +1801,7 @@ class RecordModelTest(unittest.TestCase):
                 "age": 99,
                 "custom_property_obj": None,
                 "documents": [],
+                "documents_not_ai": [],
                 "passport": None,
                 "is_system": None,
                 "latitude": None,
@@ -1785,6 +1839,7 @@ class RecordModelTest(unittest.TestCase):
                 "profile": None,
                 "statuses": [],
                 "documents": [],
+                "documents_not_ai": [],
                 "passport": None
             },
             user.stringify())
