@@ -7,7 +7,8 @@
 import unittest
 from datetime import date
 
-from mapex.tests.framework.TestFramework import for_all_dbms, CustomProperty, CustomPropertyFactory, CustomPropertyPositive, CustomPropertyNegative
+from mapex.tests.framework.TestFramework import for_all_dbms, CustomProperty, CustomPropertyFactory, \
+    CustomPropertyPositive, CustomPropertyNegative
 from mapex.core.Exceptions import TableModelException
 
 
@@ -119,7 +120,11 @@ class TableModelTest(unittest.TestCase):
         user2 = dbms_fw.get_new_user_instance({"name": "second"})
         user2.save()
         self.assertEqual(2, users.count())
+
         # TODO починить для MsDbMock()
+        # тест не имеет смысла для MsSQL так как строчкой ниже мы пытаемся сделать запись в автоинрементное поле,
+        # что невозможно на уровне СУБД.
+        # Пока оставлю непроходящий тест, но в будущем, думаю, придется этот assert удалить...
         self.assertRaises(CustomException, users.update, {"uid": uid}, {"name": "second"})
 
         # Возвращаем исходный тип исключения
@@ -1078,7 +1083,7 @@ class TableModelTest(unittest.TestCase):
             # Копирование списка из модели в модель вызывает исключение т.к. нарушает уникальность первичного ключа
             # Первичный ключ не автоинкрементный, а значит при переносе документов из модели в модель не сбрасывается
             user1.documents_not_ai = list(user2.documents_not_ai)
-            from mapex.core.Exceptions import DublicateRecordException
+            from mapex import DublicateRecordException
             self.assertRaises(DublicateRecordException, user1.save)
 
             # Но можно создать новый список если он не нарушает уникальность
@@ -1096,7 +1101,6 @@ class TableModelTest(unittest.TestCase):
             self.assertEqual(2, documents.count())
             self.assertCountEqual([doc3.number, doc4.number], [d.number for d in user1.documents_not_ai])
             self.assertCountEqual([], [d.number for d in user2.documents_not_ai])
-
 
     @for_all_dbms
     def test_query_with_embedded_lists(self, dbms_fw):
