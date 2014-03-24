@@ -35,15 +35,15 @@ class TableModel(object):
             return [self.check_incoming_data(item) for item in data]
         else:
             if type(data) is dict:
-                data = self.get_new_item().load_from_array(data, True)
+                data = self.get_new_item().load_from_array(data, False)
             if isinstance(data, RecordModel):
                 if data.mapper.__class__ != self.mapper.__class__:
                     raise TableModelException("Invalid data for inserting into the collection")
                 data.validate()
-                data = data.get_data_for_write_operation()
-                for mapper_field_name in data:
+                data_for_write_operation = data.get_data_for_write_operation()
+                for mapper_field_name in data_for_write_operation:
                     mapper_field = self.mapper.get_property(mapper_field_name)
-                    mapper_field.check_value(data[mapper_field_name])
+                    mapper_field.check_value(data_for_write_operation[mapper_field_name])
             else:
                 raise TableModelException("Invalid data for inserting into the collection")
             return data

@@ -1363,10 +1363,17 @@ class SqlMapper(metaclass=ABCMeta):
         if type(data) is list:
             for it in data:
                 self.insert(it, new_item)
-        elif type(data) is dict:
-            if data == {}:
+        else:
+            if isinstance(data, RecordModel):
+                model = data
+                data_dict = data.get_data_for_write_operation()
+            else:
+                model = new_item() if new_item else None
+                data_dict = data
+                
+            if data_dict == {}:
                 raise TableModelException("Can't insert an empty record")
-            flat_data, lists_objects = self.split_data_by_relation_type(data)
+            flat_data, lists_objects = self.split_data_by_relation_type(data_dict)
             try:
                 last_record = self.db.insert_query(
                     self.table_name, self.translate_and_convert(flat_data), self.primary
@@ -1377,7 +1384,7 @@ class SqlMapper(metaclass=ABCMeta):
                 last_record if self.primary.defined_by_user is False and last_record != 0 else flat_data
             )
             if new_item and self.primary.exists():
-                self.link_all_list_objects(lists_objects, new_item().load_by_primary(last_record))
+                self.link_all_list_objects(lists_objects, model.load_by_primary(last_record))
             return last_record
 
     def update(self, data: dict, conditions: dict=None, new_item=None):
