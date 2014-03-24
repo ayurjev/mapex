@@ -827,7 +827,6 @@ class FieldTypes(object):
                 copy.load_from_array(item_data)
                 copy.save()
 
-
         def clear_dependencies_from(self, main_records_ids: list):
             """
             Очищает зависимость присоединенных записей, от тех записей основной таблицы, которые были удалены и
@@ -1436,7 +1435,12 @@ class SqlMapper(metaclass=ABCMeta):
 
         """
         if self.primary.exists() and self.primary.compound is False:           # Если, конечно, первичный ключ определен
-            changed_records_ids = list(self.get_column(self.primary.name(), conditions))
+            changed_records_ids = list(
+                [
+                    i.get_value() if isinstance(i, EmbeddedObject) else i
+                    for i in self.get_column(self.primary.name(), conditions)
+                ]
+            )
             if len(changed_records_ids) > 0:
                 self.unlink_objects(changed_records_ids)
                 self.db.delete_query(
@@ -2124,7 +2128,8 @@ class FieldTypesConverter(object):
         ("EmbeddedObject", "DateTime"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "DateTime"),
         ("EmbeddedObject", "EmbeddedObject"):
         lambda v, mf, cache: None if not v else v.get_value() if isinstance(v, EmbeddedObject) else mf.model(v),
-        ("Int", "EmbeddedObject"): lambda v, mf, cache: mf.model(v) if v else None
+        ("Int", "EmbeddedObject"): lambda v, mf, cache: mf.model(v) if v else None,
+        ("String", "EmbeddedObject"): lambda v, mf, cache: mf.model(v) if v else None
     }
 
     @staticmethod
