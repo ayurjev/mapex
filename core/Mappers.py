@@ -1364,28 +1364,46 @@ class SqlMapper(metaclass=ABCMeta):
             for it in data:
                 self.insert(it, new_item)
         else:
-            if isinstance(data, RecordModel):
+            if isinstance(data, dict) and new_item:
+                model = new_item()
+                model.load_from_array(data)
+                data_dict = data
+            elif isinstance(data, dict):
+                model = None
+                data_dict = data
+            elif isinstance(data, RecordModel):
                 model = data
                 data_dict = data.get_data_for_write_operation()
             else:
-                model = new_item() if new_item else None
-                data_dict = data
-                
-            if data_dict == {}:
-                raise TableModelException("Can't insert an empty record")
+                raise TableMapperException("Insert failed: unknown item format")
+
             flat_data, lists_objects = self.split_data_by_relation_type(data_dict)
-            try:
-                last_record = self.db.insert_query(
-                    self.table_name, self.translate_and_convert(flat_data), self.primary
-                )
-            except DublicateRecordException as err:
-                raise self.__class__.dublicate_record_exception(err)
-            last_record = self.primary.grab_value_from(
-                last_record if self.primary.defined_by_user is False and last_record != 0 else flat_data
-            )
+            last_record = self._insert_raw_dict(flat_data)
+
             if new_item and self.primary.exists():
-                self.link_all_list_objects(lists_objects, model.load_by_primary(last_record))
+                model.set_primary_value(last_record)
+                self.link_all_list_objects(lists_objects, model.load_from_array(model.get_data(), loaded_from_db=True))
             return last_record
+
+    def _insert_raw_dict(self, data: dict):
+        """
+        Выполняет вставку новой записи в таблицу,
+        используя данные из переданного словаря и возвращает id вставленной записи.
+        Работает не на уровне моделей - самая низкоуровневая вставка на уровне маппера
+        @param data:
+        @return:
+        """
+        if data == {}:
+            raise TableModelException("Can't insert an empty record")
+        try:
+            last_record = self.db.insert_query(
+                self.table_name, self.translate_and_convert(data), self.primary
+            )
+        except DublicateRecordException as err:
+            raise self.__class__.dublicate_record_exception(err)
+        return self.primary.grab_value_from(
+            last_record if self.primary.defined_by_user is False and last_record != 0 else data
+        )
 
     def update(self, data: dict, conditions: dict=None, new_item=None):
         """
