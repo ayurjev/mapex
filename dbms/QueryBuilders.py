@@ -187,7 +187,7 @@ class MySqlBuilder(SqlBuilder):
         @rtype : str
 
         """
-        return "GROUP_CONCAT(%s)" % field
+        return "GROUP_CONCAT(DISTINCT(%s))" % field
 
     def concat_ws_function(self, field: str, table: str, separator: str):
         """
