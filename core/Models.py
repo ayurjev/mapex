@@ -516,7 +516,15 @@ class TableModelCache(object):
                     elif self._mapper.is_list(field_names_for_cache[field_name]["mapper_field"]):
                         for obj in row[field_name]:
                             cache[field_names_for_cache[field_name]["mapper"]].append(obj.get_actual_primary_value())
+
+        def _get_mapper_cache(m):
+            """ Собирает кэш маппера из внешней переменной cache """
+            mapper_cache = {}
+            for line in m.get_rows([], {m.primary.name(): ("in", cache[m])}, cache=self):
+                key = line[m.primary.name()]
+                mapper_cache[key.get_actual_primary_value() if isinstance(key, RecordModel) else key] = line
+            return mapper_cache
+
         for mapper in cache:
             if len(cache[mapper]) > 0:
-                self._cache[mapper] = lambda m: {line[m.primary.name()]: line for line in m.get_rows(
-                    [], {m.primary.name(): ("in", cache[m])}, cache=self)}
+                self._cache[mapper] = _get_mapper_cache
