@@ -1467,7 +1467,9 @@ class SqlMapper(metaclass=ABCMeta):
         if self.primary.exists() and self.primary.compound is False:           # Если, конечно, первичный ключ определен
             changed_records_ids = list(
                 [
-                    i.get_value() if isinstance(i, EmbeddedObject) else i
+                    i.get_value() if isinstance(i, EmbeddedObject) else
+                    i.get_actual_primary_value() if isinstance(i, RecordModel) else
+                    i
                     for i in self.get_column(self.primary.name(), conditions)
                 ]
             )
