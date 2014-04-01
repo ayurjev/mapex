@@ -195,16 +195,18 @@ class RecordModel(object):
         data_for_insert = self.get_data_for_write_operation()
         if self._loaded_from_db is False:
             res = self._collection.insert(data_for_insert)
-            self.set_primary_value(res)
+            self.__dict__ = res.__dict__
             self.md5 = self.calc_sum()
-            return res
+            self.set_primary_value(self.get_actual_primary_value())
+            return self
         else:
             # Если объект загружен из БД и его сумма не изменилась, то просто отдаем primary
             if self.md5 == self.calc_sum():
-                return self.get_actual_primary_value()
+                return self
             self.md5 = self.calc_sum()  # пересчет md5 должен происходить до Update, чтобы избежать рекурсии
             self._collection.update(data_for_insert, self.mapper.primary.eq_condition(self.get_old_primary_value()))
-            return self.set_primary_value(self.get_actual_primary_value())
+            self.set_primary_value(self.get_actual_primary_value())
+            return self
 
     def remove(self):
         """ Удаляет объект из коллекции """
@@ -309,6 +311,10 @@ class RecordModel(object):
 
         """
         return self.mapper.primary.grab_value_from(self.__dict__)
+
+    def get_primary_value(self):
+        """ Алиас для get_actual_primary_value() """
+        return self.get_actual_primary_value()
 
     def get_old_primary_value(self):
         """

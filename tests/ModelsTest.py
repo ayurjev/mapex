@@ -40,8 +40,8 @@ class TableModelTest(unittest.TestCase):
         users.delete()
         self.assertEqual(0, users.count())
 
-        uid = users.insert({"name": "InitialValue"})
-        users.update({"name": "NewValue"}, {"uid": uid})
+        user = users.insert({"name": "InitialValue"})
+        users.update({"name": "NewValue"}, {"uid": user.uid})
         self.assertEqual(0, users.count({"name": "InitalValue"}))
         self.assertEqual(1, users.count({"name": "NewValue"}))
 
@@ -70,7 +70,6 @@ class TableModelTest(unittest.TestCase):
         # Корректная модель
         users.insert(user)
         self.assertEqual(1, users.count())
-        #TODO "user.uid" должен обновиться после вставки нового "user" в коллекцию
         self.assertNotEqual(None, user.uid)
         # Список корректных моделей
         user2 = dbms_fw.get_new_user_instance()
@@ -101,11 +100,11 @@ class TableModelTest(unittest.TestCase):
         ##################################### DublicateRecord ###################################################
         users = dbms_fw.get_new_users_collection_instance()
         self.assertEqual(0, users.count())
-        uid = users.insert({"name": "first"})
+        user1 = users.insert({"name": "first"})
         self.assertEqual(1, users.count())
 
         from mapex import DublicateRecordException
-        user2 = dbms_fw.get_new_user_instance({"uid": uid, "name": "second"})
+        user2 = dbms_fw.get_new_user_instance({"uid": user1.uid, "name": "second"})
         self.assertRaises(DublicateRecordException, user2.save)
 
         # Теперь назначим другое исключение на эту ситуацию для данного маппера
@@ -125,7 +124,7 @@ class TableModelTest(unittest.TestCase):
         # тест не имеет смысла для MsSQL так как строчкой ниже мы пытаемся сделать запись в автоинрементное поле,
         # что невозможно на уровне СУБД.
         # Пока оставлю непроходящий тест, но в будущем, думаю, придется этот assert удалить...
-        self.assertRaises(CustomException, users.update, {"uid": uid}, {"name": "second"})
+        self.assertRaises(CustomException, users.update, {"uid": user1.uid}, {"name": "second"})
 
         # Возвращаем исходный тип исключения
         users.mapper.__class__.dublicate_record_exception = DublicateRecordException
@@ -523,12 +522,12 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(0, tags.count())
 
         # Создадим первого пользователя, у которого есть оба тега
-        first_user_id = users.insert({"name": "FirstUser", "tags": [tag1, tag2]})
+        first_user = users.insert({"name": "FirstUser", "tags": [tag1, tag2]})
         self.assertEqual(1, users.count())
         self.assertEqual(2, tags.count())
 
         # Создадим второго пользователя, у которого только один тег (из вух имеющихся)
-        second_user_id = users.insert({"name": "SecondUser", "tags": [tag2]})
+        second_user = users.insert({"name": "SecondUser", "tags": [tag2]})
         self.assertEqual(2, users.count())
         self.assertEqual(2, tags.count())
 
@@ -541,24 +540,24 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(3, tags.count())
 
         # Получим объект второго пользователя и добавим ему созданный тег (чтобы было в сумме два)
-        second_user = users.get_item({"uid": second_user_id})
+        second_user = users.get_item({"uid": second_user.uid})
         second_user.tags.append(tag3)
         second_user.save()
         self.assertEqual(2, users.count())
         self.assertEqual(3, tags.count())
 
         # Теперь с помощью операции уровня коллекции изменим список тегов у первого пользователя:
-        users.update({"tags": [tag1, tag3]}, {"uid": first_user_id})
+        users.update({"tags": [tag1, tag3]}, {"uid": first_user.uid})
         self.assertEqual(2, users.count())
         self.assertEqual(3, tags.count())
-        first_user = users.get_item({"uid": first_user_id})
+        first_user = users.get_item({"uid": first_user.uid})
         self.assertCountEqual(["FirstTag", "ThirdTag"], [tag.name for tag in first_user.tags])
 
         # Проверим можно ли очистить список
         # Заодно проверим работает ли update во множественном режиме:
         users.update({"tags": []})
-        first_user = users.get_item({"uid": first_user_id})
-        second_user = users.get_item({"uid": second_user_id})
+        first_user = users.get_item({"uid": first_user.uid})
+        second_user = users.get_item({"uid": second_user.uid})
         self.assertEqual([], first_user.tags)
         self.assertEqual([], second_user.tags)
 
@@ -665,18 +664,18 @@ class TableModelTest(unittest.TestCase):
         profile2.likes = 91
 
         self.assertEqual(0, profiles.count())
-        first_user_id = users.insert({"name": "FirstUser", "profile": profile1})
-        second_user_id = users.insert({"name": "SecondUser", "profile": profile2})
+        first_user = users.insert({"name": "FirstUser", "profile": profile1})
+        second_user = users.insert({"name": "SecondUser", "profile": profile2})
 
         self.assertIsNotNone(profile1.id)
         self.assertIsNotNone(profile2.id)
-        self.assertEqual(users.get_item({"uid": first_user_id}), profile1.user)
-        self.assertEqual(users.get_item({"uid": second_user_id}), profile2.user)
+        self.assertEqual(users.get_item({"uid": first_user.uid}), profile1.user)
+        self.assertEqual(users.get_item({"uid": second_user.uid}), profile2.user)
         self.assertEqual(2, users.count())
         self.assertEqual(2, profiles.count())
 
-        first_user = users.get_item({"uid": first_user_id})
-        second_user = users.get_item({"uid": second_user_id})
+        first_user = users.get_item({"uid": first_user.uid})
+        second_user = users.get_item({"uid": second_user.uid})
         self.assertEqual(profile1, first_user.profile)
         self.assertEqual(profile2, second_user.profile)
 
@@ -685,7 +684,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(None, first_user.profile)
         self.assertEqual(profile2, second_user.profile)
 
-        first_user = users.get_item({"uid": first_user_id})
+        first_user = users.get_item({"uid": first_user.uid})
         self.assertEqual(None, first_user.profile)
 
         # Вернем профиль первому пользователю:
@@ -792,24 +791,24 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(0, statuses.count())
 
         # Создадим первого пользователя, у которого есть оба статуса
-        first_user_id = users.insert({"name": "FirstUser", "statuses": [status1, status2]})
+        first_user = users.insert({"name": "FirstUser", "statuses": [status1, status2]})
 
         self.assertIsNotNone(status1.id)
         self.assertIsNotNone(status2.id)
-        self.assertEqual(users.get_item({"uid": first_user_id}), status1.user)
-        self.assertEqual(users.get_item({"uid": first_user_id}), status2.user)
+        self.assertEqual(users.get_item({"uid": first_user.uid}), status1.user)
+        self.assertEqual(users.get_item({"uid": first_user.uid}), status2.user)
         self.assertEqual(1, users.count())
         self.assertEqual(2, statuses.count())
 
         # Создадим второго пользователя, у которого только один статус (из двух имеющихся)
-        second_user_id = users.insert({"name": "SecondUser", "statuses": [status2]})
+        second_user = users.insert({"name": "SecondUser", "statuses": [status2]})
 
         self.assertIsNotNone(status1.id)
         self.assertIsNotNone(status2.id)
-        self.assertEqual(users.get_item({"uid": first_user_id}), status1.user)
-        self.assertCountEqual(users.get_item({"uid": first_user_id}).statuses, [status1])
-        self.assertEqual(users.get_item({"uid": second_user_id}), status2.user)
-        self.assertCountEqual(users.get_item({"uid": second_user_id}).statuses, [status2])
+        self.assertEqual(users.get_item({"uid": first_user.uid}), status1.user)
+        self.assertCountEqual(users.get_item({"uid": first_user.uid}).statuses, [status1])
+        self.assertEqual(users.get_item({"uid": second_user.uid}), status2.user)
+        self.assertCountEqual(users.get_item({"uid": second_user.uid}).statuses, [status2])
         self.assertEqual(2, users.count())
         self.assertEqual(2, statuses.count())
 
@@ -821,15 +820,15 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(3, statuses.count())
 
         # Создадим третьего пользователя, у которого только один статус (из имеющихся, уже сохраненных в базе)
-        third_user_id = users.insert({"name": "ThirdUser", "statuses": [status3]})
-        self.assertEqual(users.get_item({"uid": third_user_id}), status3.user)
-        self.assertEqual(users.get_item({"uid": third_user_id}).statuses, [status3])
+        third_user = users.insert({"name": "ThirdUser", "statuses": [status3]})
+        self.assertEqual(users.get_item({"uid": third_user.uid}), status3.user)
+        self.assertEqual(users.get_item({"uid": third_user.uid}).statuses, [status3])
         self.assertEqual(3, users.count())
         self.assertEqual(3, statuses.count())
 
         # Попробуем поменять наборы статусов налету
-        second_user = users.get_item({"uid": second_user_id})
-        third_user = users.get_item({"uid": third_user_id})
+        second_user = users.get_item({"uid": second_user.uid})
+        third_user = users.get_item({"uid": third_user.uid})
 
         self.assertEqual([status2], second_user.statuses)
         self.assertEqual([status3], third_user.statuses)
@@ -838,8 +837,8 @@ class TableModelTest(unittest.TestCase):
         second_user.statuses = tmp
         third_user.save()
         second_user.save()
-        second_user = users.get_item({"uid": second_user_id})
-        third_user = users.get_item({"uid": third_user_id})
+        second_user = users.get_item({"uid": second_user.uid})
+        third_user = users.get_item({"uid": third_user.uid})
         self.assertEqual(3, statuses.count())
         self.assertEqual([status3], second_user.statuses)
         self.assertEqual([status2], third_user.statuses)
@@ -848,21 +847,21 @@ class TableModelTest(unittest.TestCase):
         second_user.statuses.append(status2)
         second_user.save()
         self.assertCountEqual([status2, status3], second_user.statuses)
-        second_user = users.get_item({"uid": second_user_id})
+        second_user = users.get_item({"uid": second_user.uid})
         self.assertCountEqual([status2, status3], second_user.statuses)
 
         self.assertCountEqual([status2], third_user.statuses)   # Ибо эта модель еще не знает, что ее изменили
-        third_user = users.get_item({"uid": third_user_id})
+        third_user = users.get_item({"uid": third_user.uid})
         self.assertCountEqual([], third_user.statuses)          # Теперь все актуально...
         self.assertEqual(3, users.count())
         self.assertEqual(3, statuses.count())
 
         # Теперь с помощью операции уровня коллекции изменим список тегов у первого пользователя:
-        users.update({"statuses": [status1, status3]}, {"uid": third_user_id})
+        users.update({"statuses": [status1, status3]}, {"uid": third_user.uid})
         self.assertEqual(3, users.count())
         self.assertEqual(3, statuses.count())
-        third_user = users.get_item({"uid": third_user_id})
-        second_user = users.get_item({"uid": second_user_id})
+        third_user = users.get_item({"uid": third_user.uid})
+        second_user = users.get_item({"uid": second_user.uid})
         self.assertCountEqual([status1, status3], third_user.statuses)
         self.assertCountEqual([status2], second_user.statuses)
 
@@ -871,9 +870,9 @@ class TableModelTest(unittest.TestCase):
         users.update({"statuses": []})
         self.assertEqual(3, users.count())
         self.assertEqual(3, statuses.count())
-        first_user = users.get_item({"uid": first_user_id})
-        second_user = users.get_item({"uid": second_user_id})
-        third_user = users.get_item({"uid": third_user_id})
+        first_user = users.get_item({"uid": first_user.uid})
+        second_user = users.get_item({"uid": second_user.uid})
+        third_user = users.get_item({"uid": third_user.uid})
         self.assertEqual([], first_user.statuses)
         self.assertEqual([], third_user.statuses)
         self.assertEqual([], second_user.statuses)
@@ -958,18 +957,19 @@ class TableModelTest(unittest.TestCase):
             self.assertRaises(TableModelException, passport0.save)
 
         # Два других прикрепим к пользователям:
-        first_user_id = users.insert({"name": "FirstUser", "passport": passport1})
-        second_user_id = users.insert({"name": "SecondUser", "passport": passport2})
+        first_user = users.insert({"name": "FirstUser", "passport": passport1})
+        second_user = users.insert({"name": "SecondUser", "passport": passport2})
 
-        self.assertEqual(users.get_item({"uid": first_user_id}).passport, passport1)
-        self.assertEqual(users.get_item({"uid": second_user_id}).passport, passport2)
+        first_user = users.get_item({"uid": first_user.uid})
+        second_user = users.get_item({"uid": second_user.uid})
+
+        self.assertEqual(first_user.passport, passport1)
+        self.assertEqual(second_user.passport, passport2)
         self.assertEqual(2, users.count())
         if passports:
             self.assertEqual(3, passports.count())
             self.assertEqual(2, passports.count({"user": ("exists", True)}))
 
-        first_user = users.get_item({"uid": first_user_id})
-        second_user = users.get_item({"uid": second_user_id})
         self.assertEqual(passport1, first_user.passport)
         self.assertEqual(passport2, second_user.passport)
 
@@ -977,8 +977,7 @@ class TableModelTest(unittest.TestCase):
         first_user.save()
         self.assertEqual(None, first_user.passport)
         self.assertEqual(passport2, second_user.passport)
-
-        first_user = users.get_item({"uid": first_user_id})
+        first_user.refresh()
         self.assertEqual(None, first_user.passport)
 
         # Вернем паспорт первому пользователю:
@@ -1142,10 +1141,10 @@ class TableModelTest(unittest.TestCase):
         document2.number = 911456
 
         # Создадим первого пользователя, у которого есть оба паспорта
-        first_user_id = users.insert({"name": "FirstUser", "documents": [document1, document2]})
+        first_user = users.insert({"name": "FirstUser", "documents": [document1, document2]})
         self.assertCountEqual(
             [document1.number, document2.number],
-            [d.number for d in users.get_item({"uid": first_user_id}).documents]
+            [d.number for d in users.get_item({"uid": first_user.uid}).documents]
         )
 
         self.assertEqual(1, users.count())
@@ -1153,14 +1152,14 @@ class TableModelTest(unittest.TestCase):
             self.assertEqual(2, documents.count())
 
         # Создадим второго пользователя, у которого только один паспорт (из двух имеющихся)
-        second_user_id = users.insert({"name": "SecondUser", "documents": [document2]})
+        second_user = users.insert({"name": "SecondUser", "documents": [document2]})
 
         self.assertCountEqual(
-            [d.number for d in users.get_item({"uid": first_user_id}).documents],
+            [d.number for d in users.get_item({"uid": first_user.uid}).documents],
             [document1.number, document2.number]
         )
         self.assertCountEqual(
-            [d.number for d in users.get_item({"uid": second_user_id}).documents],
+            [d.number for d in users.get_item({"uid": second_user.uid}).documents],
             [document2.number]
         )
         self.assertEqual(2, users.count())
@@ -1173,9 +1172,9 @@ class TableModelTest(unittest.TestCase):
         document3.number = 642458
 
         # Создадим третьего пользователя, у которого только один паспорт
-        third_user_id = users.insert({"name": "ThirdUser", "documents": [document3]})
+        third_user = users.insert({"name": "ThirdUser", "documents": [document3]})
         self.assertCountEqual(
-            [d.number for d in users.get_item({"uid": third_user_id}).documents],
+            [d.number for d in users.get_item({"uid": third_user.uid}).documents],
             [document3.number]
         )
         self.assertEqual(3, users.count())
@@ -1183,8 +1182,8 @@ class TableModelTest(unittest.TestCase):
             self.assertEqual(4, documents.count())
 
         # Попробуем поменять наборы статусов налету
-        second_user = users.get_item({"uid": second_user_id})
-        third_user = users.get_item({"uid": third_user_id})
+        second_user = users.get_item({"uid": second_user.uid})
+        third_user = users.get_item({"uid": third_user.uid})
 
         self.assertEqual([document2.number], [d.number for d in second_user.documents])
         self.assertEqual([document3.number], [d.number for d in third_user.documents])
@@ -1196,8 +1195,8 @@ class TableModelTest(unittest.TestCase):
             self.assertEqual(4, documents.count())
         self.assertEqual([document3.number], [d.number for d in second_user.documents])
         self.assertEqual([document2.number], [d.number for d in third_user.documents])
-        second_user = users.get_item({"uid": second_user_id})
-        third_user = users.get_item({"uid": third_user_id})
+        second_user = users.get_item({"uid": second_user.uid})
+        third_user = users.get_item({"uid": third_user.uid})
         self.assertEqual([document3.number], [d.number for d in second_user.documents])
         self.assertEqual([document2.number], [d.number for d in third_user.documents])
 
@@ -1205,23 +1204,23 @@ class TableModelTest(unittest.TestCase):
         second_user.documents.append(document2)
         second_user.save()
         self.assertCountEqual([document2.number, document3.number], [d.number for d in second_user.documents])
-        second_user = users.get_item({"uid": second_user_id})
+        second_user = users.get_item({"uid": second_user.uid})
         self.assertCountEqual([document2.number, document3.number], [d.number for d in second_user.documents])
 
         self.assertCountEqual([document2.number], [d.number for d in third_user.documents])
-        third_user = users.get_item({"uid": third_user_id})
+        third_user = users.get_item({"uid": third_user.uid})
         self.assertCountEqual([document2.number], [d.number for d in third_user.documents])
         self.assertEqual(3, users.count())
         if documents:
             self.assertEqual(5, documents.count())
 
         # Теперь с помощью операции уровня коллекции изменим список тегов у первого пользователя:
-        users.update({"documents": [document1, document3]}, {"uid": third_user_id})
+        users.update({"documents": [document1, document3]}, {"uid": third_user.uid})
         self.assertEqual(3, users.count())
         if documents:
             self.assertEqual(6, documents.count())
-        third_user = users.get_item({"uid": third_user_id})
-        second_user = users.get_item({"uid": second_user_id})
+        third_user = users.get_item({"uid": third_user.uid})
+        second_user = users.get_item({"uid": second_user.uid})
         self.assertCountEqual([document1.number, document3.number], [d.number for d in third_user.documents])
         self.assertCountEqual([document2.number, document3.number], [d.number for d in second_user.documents])
 
@@ -1231,9 +1230,9 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(3, users.count())
         if documents:
             self.assertEqual(0, documents.count())
-        first_user = users.get_item({"uid": first_user_id})
-        second_user = users.get_item({"uid": second_user_id})
-        third_user = users.get_item({"uid": third_user_id})
+        first_user = users.get_item({"uid": first_user.uid})
+        second_user = users.get_item({"uid": second_user.uid})
+        third_user = users.get_item({"uid": third_user.uid})
         self.assertEqual([], first_user.documents)
         self.assertEqual([], third_user.documents)
         self.assertEqual([], second_user.documents)
@@ -1342,8 +1341,8 @@ class TableModelTest(unittest.TestCase):
         item = dbms_fw.get_new_noprimary_instance()
         item.name = "FirstName"
         item.value = 91
-        ret = item.save()
-        self.assertEqual("FirstName", ret)
+        item.save()
+        self.assertEqual("FirstName", item.get_primary_value())
         self.assertEqual(1, collection_without_primary.count())
 
         item.save()
@@ -1387,10 +1386,10 @@ class TableModelTest(unittest.TestCase):
         item = dbms_fw.get_new_noprimary_instance()
         item.name = "FirstName"
         item.value = 91
-        ret = item.save()
-        self.assertEqual({'name': 'FirstName', 'value': 91}, ret)
+        item.save()
+        self.assertEqual({'name': 'FirstName', 'value': 91}, item.get_primary_value())
+        self.assertEqual(1, collection_without_primary.count({"value": 91}))
         self.assertEqual(1, collection_without_primary.count())
-
         item.save()
         self.assertEqual(1, collection_without_primary.count({"value": 91}))
         item.value = 12
@@ -1619,13 +1618,13 @@ class TableModelTest(unittest.TestCase):
         multi_mapped_item.name = "first_item"
         multi_mapped_item.author = author
         multi_mapped_item.user = user
-        uid = multi_mapped_item.save()
+        multi_mapped_item.save()
 
         self.assertEqual(2, users.count())
         self.assertEqual(1, ausers.count())
         self.assertEqual(1, multi_mapped_items.count())
 
-        multi_mapped_item = multi_mapped_items.get_item({"id": uid})
+        multi_mapped_item = multi_mapped_items.get_item({"id": multi_mapped_item.id})
         self.assertEqual("user", multi_mapped_item.user.name)
         self.assertEqual("author", multi_mapped_item.author.name)
 
@@ -1633,8 +1632,8 @@ class TableModelTest(unittest.TestCase):
         multi_mapped_item2 = dbms_fw.get_new_multi_mapped_collection_item()
         multi_mapped_item2.name = "second_item"
         multi_mapped_item2.author = author
-        uid = multi_mapped_item2.save()
-        multi_mapped_item = multi_mapped_items.get_item({"id": uid})
+        multi_mapped_item2.save()
+        multi_mapped_item = multi_mapped_items.get_item({"id": multi_mapped_item2.id})
         self.assertEqual(None, multi_mapped_item.user)
         self.assertEqual("author", multi_mapped_item.author.name)
 

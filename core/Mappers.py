@@ -1366,8 +1366,7 @@ class SqlMapper(metaclass=ABCMeta):
         
         """
         if type(data) is list:
-            for it in data:
-                self.insert(it, new_item)
+            return [self.insert(it, new_item) for it in data]
         else:
             if isinstance(data, dict) and new_item:
                 model = new_item()
@@ -1388,6 +1387,7 @@ class SqlMapper(metaclass=ABCMeta):
             if new_item and self.primary.exists():
                 model.set_primary_value(last_record)
                 self.link_all_list_objects(lists_objects, model.load_from_array(model.get_data(), loaded_from_db=True))
+            return model
             return last_record
 
     def _insert_raw_dict(self, data: dict):
@@ -2120,11 +2120,11 @@ class FieldTypesConverter(object):
         ("DateTime", "String"): lambda v, mf, cache: v.strftime("%Y-%m-%d %H:%M:%S") if v else FNone(),
         ("DateTime", "Int"): lambda v, mf, cache: int(time.mktime(v.timetuple())) if v else FNone(),
         ("DateTime", "Date"): lambda v, mf, cache: date(v.year, v.month, v.day) if v else FNone(),
-        ("Link", "Int"): lambda v, mf, cache: v.save() if v else FNone(),
-        ("Link", "String"): lambda v, mf, cache: str(v.save()) if v else FNone(),
-        ("Link", "ObjectID"): lambda v, mf, cache: v.save() if v else FNone(),
+        ("Link", "Int"): lambda v, mf, cache: v.save().get_primary_value() if v else FNone(),
+        ("Link", "String"): lambda v, mf, cache: str(v.save().get_primary_value()) if v else FNone(),
+        ("Link", "ObjectID"): lambda v, mf, cache: v.save().get_primary_value() if v else FNone(),
         ("List", "String"): lambda v, mf, cache: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
-        ("List", "ObjectID"): lambda v, mf, cache: [it.save() for it in v] if v is not None else [],
+        ("List", "ObjectID"): lambda v, mf, cache: [it.save().get_primary_value() for it in v] if v is not None else [],
         ("EmbeddedLink", "EmbeddedDocument"): lambda v, mf, cache: FieldTypesConverter.embedded(mf, v),
         ("EmbeddedDocument", "EmbeddedLink"): lambda v, mf, cache: FieldTypesConverter.from_embedded(mf, v),
         ("EmbeddedList", "EmbeddedDocument"): lambda v, mf, cache:
