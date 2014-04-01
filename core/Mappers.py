@@ -96,10 +96,13 @@ class Primary(object):
         @raise TableMapperException: Если переданные данные не соответствуют формату первичного ключа
 
         """
-        key_val = self.grab_value_from(data)
-        if type(key_val) is not dict:
-            key_val = {self.name(): key_val}
-        return key_val
+        res = key_data = self.grab_value_from(data)
+        if type(key_data) is not dict:
+            res = {self.name(): key_data}
+        mf = self.mapper.get_property(self.name())
+        if self.mapper.is_rel(mf):
+            res = {"%s.%s" % (self.name(), mf.get_items_collection_mapper().primary.name()): key_data}
+        return res
 
 
 class FieldTypes(object):

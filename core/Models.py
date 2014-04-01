@@ -214,6 +214,9 @@ class RecordModel(object):
 
     def refresh(self):
         """ Обновляет состояние модели в соответствии с состоянием в БД """
+        if self.mapper.primary.exists() is False:
+            raise TableModelException("there is no primary key for this model, so method refresh() is not allowed")
+
         self.load_from_array(self.get_new_collection().get_item(
             self.mapper.primary.eq_condition(self.get_actual_primary_value())
         ).get_data(), loaded_from_db=True)
