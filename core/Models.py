@@ -3,6 +3,7 @@
 
 import hashlib
 from abc import ABCMeta, abstractmethod
+from copy import deepcopy
 from mapex.core.Exceptions import TableModelException
 
 
@@ -157,6 +158,7 @@ class RecordModel(object):
         self._collection = None
         self.md5_data = {}
         self.md5 = None
+        self.origin = None
         if self.__class__.mapper is None:
             raise TableModelException("No mapper for %s model" % self)
         # noinspection PyCallingNonCallable
@@ -197,6 +199,7 @@ class RecordModel(object):
             res = self._collection.insert(data_for_insert)
             self.__dict__ = res.__dict__
             self.md5 = self.calc_sum()
+            self.origin = deepcopy(self)
             self.set_primary_value(self.get_actual_primary_value())
             return self
         else:
@@ -205,6 +208,7 @@ class RecordModel(object):
                 return self
             self.md5 = self.calc_sum()  # пересчет md5 должен происходить до Update, чтобы избежать рекурсии
             self._collection.update(data_for_insert, self.mapper.primary.eq_condition(self.get_old_primary_value()))
+            self.origin = deepcopy(self)
             self.set_primary_value(self.get_actual_primary_value())
             return self
 

@@ -1951,12 +1951,12 @@ class RecordModelTest(unittest.TestCase):
         user = dbms_fw.get_new_user_instance()
         user.name = "Андрей"
         user.age = 12
-        user_id = user.save()
+        user.save()
         self.assertEqual(1, users.count())
 
         user2 = dbms_fw.get_new_user_instance()
         initial_name = user2.__dict__.get("name")
-        user2.load_by_primary(user_id)
+        user2.load_by_primary(user.uid)
         name_after_loading = user2.__dict__.get("name")
         self.assertEqual(initial_name, name_after_loading)
 
@@ -1966,6 +1966,21 @@ class RecordModelTest(unittest.TestCase):
         self.assertEqual("Андрей", name_after_access)
         self.assertEqual(12, count_after_access)
 
+    @for_all_dbms
+    def test_origin(self, dbms_fw):
+        """ Проверим функционал сохранения последней сохраненной в БД копии объекта (origin) """
+        users = dbms_fw.get_new_users_collection_instance()
+        self.assertEqual(0, users.count())
+        user = dbms_fw.get_new_user_instance()
+        user.name = "Андрей"
+        user.age = 12
+        user.save()
+        self.assertEqual(1, users.count())
+
+        user.name = "Иннокентий"
+        self.assertEqual("Андрей", user.origin.name)
+        user.save()
+        self.assertEqual("Иннокентий", user.origin.name)
 
 if __name__ == "__main__":
     unittest.main()
