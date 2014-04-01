@@ -3,7 +3,6 @@
 
 import hashlib
 from abc import ABCMeta, abstractmethod
-from copy import deepcopy
 from mapex.core.Exceptions import TableModelException
 
 
@@ -147,6 +146,11 @@ class TableModel(object):
         return items
 
 
+class OriginModel(object):
+    def __init__(self, data):
+        self.__dict__ = data
+
+
 class RecordModel(object):
     """ Класс создания моделей записей в таблицах БД """
     mapper = None
@@ -175,6 +179,7 @@ class RecordModel(object):
                 self.__dict__[property_name] = self.mapper.get_property(property_name).get_default_value()
             self.md5_data = {}
             self.md5 = self.calc_sum()
+            self.origin = OriginModel(self.get_data())
 
     # noinspection PyMethodMayBeStatic
     def validate(self):
@@ -199,7 +204,7 @@ class RecordModel(object):
             res = self._collection.insert(data_for_insert)
             self.__dict__ = res.__dict__
             self.md5 = self.calc_sum()
-            self.origin = deepcopy(self)
+            self.origin = OriginModel(self.get_data())
             self.set_primary_value(self.get_actual_primary_value())
             return self
         else:
@@ -208,7 +213,7 @@ class RecordModel(object):
                 return self
             self.md5 = self.calc_sum()  # пересчет md5 должен происходить до Update, чтобы избежать рекурсии
             self._collection.update(data_for_insert, self.mapper.primary.eq_condition(self.get_old_primary_value()))
-            self.origin = deepcopy(self)
+            self.origin = OriginModel(self.get_data())
             self.set_primary_value(self.get_actual_primary_value())
             return self
 
@@ -254,6 +259,7 @@ class RecordModel(object):
             self.__setattr__(key, data[key])
         if loaded_from_db:
             self.md5 = self.calc_sum()
+            self.origin = OriginModel(data)
         return self
 
     def normal_load(self):

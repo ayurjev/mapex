@@ -1982,5 +1982,8 @@ class RecordModelTest(unittest.TestCase):
         user.save()
         self.assertEqual("Иннокентий", user.origin.name)
 
+        user = users.get_item({"name": "Иннокентий"})
+        self.assertEqual(user.name, user.origin.name)
+
 if __name__ == "__main__":
     unittest.main()
