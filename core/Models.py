@@ -462,6 +462,10 @@ class EmbeddedObject(object, metaclass=ABCMeta):
         @return: Тип значения, которое будует храниться в БД в качестве идентификатора данной модели
         """
 
+    def __eq__(self, other):
+        if isinstance(other, EmbeddedObject):
+            return self.get_value() == other.get_value()
+
 
 class EmbeddedObjectFactory(object, metaclass=ABCMeta):
 
