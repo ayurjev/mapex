@@ -1246,6 +1246,9 @@ class SqlMapper(metaclass=ABCMeta):
     def is_real_embedded(self, mf: FieldTypes.BaseField) -> bool:
         return isinstance(self.prop_wrap(mf), FieldTypes.NoSqlEmbeddedDocument)
 
+    def is_embedded_object(self, mf: FieldTypes.BaseField) -> bool:
+        return isinstance(self.prop_wrap(mf), FieldTypes.EmbeddedObject)
+
     @staticmethod
     def is_base_value(value) -> bool:
         return isinstance(value, FieldValues.BaseValue)

@@ -227,7 +227,6 @@ class RecordModel(object):
         """ Обновляет состояние модели в соответствии с состоянием в БД """
         if self.mapper.primary.exists() is False:
             raise TableModelException("there is no primary key for this model, so method refresh() is not allowed")
-
         self.load_from_array(self.get_new_collection().get_item(
             self.mapper.primary.eq_condition(self.get_actual_primary_value())
         ).get_data(), loaded_from_db=True)
@@ -245,6 +244,12 @@ class RecordModel(object):
             raise TableModelException(
                 "there is no primary key defined for that model type, so load_by_primary() is not allowed"
             )
+
+        if not self.mapper.primary.compound:
+            primary_mf = self.mapper.get_property(self.mapper.primary.name())
+            if self.mapper.is_embedded_object(primary_mf):
+                primary = primary_mf.model(primary)
+
         self.set_primary_value(primary)
         self._lazy_load = (lambda: self.cache_load(cache)) if cache else (lambda: self.normal_load())
         return self
