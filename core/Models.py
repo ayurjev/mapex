@@ -512,7 +512,7 @@ class TableModelCache(object):
         if model_cache:
             if type(model_cache) is not dict:
                 self._cache[model_type] = self._cache[model_type](model_type)
-                return self._cache[model_type].get(primary_id)
+                return self._cache[model_type].get(primary_id.get_value() if isinstance(primary_id, EmbeddedObject) else primary_id)
             return model_cache.get(primary_id)
 
     def cache(self, rows):
@@ -535,7 +535,7 @@ class TableModelCache(object):
                 if None != row.get(field_name):
                     if self._mapper.is_link(field_names_for_cache[field_name]["mapper_field"]):
                         cache[field_names_for_cache[field_name]["mapper"]].append(
-                            row[field_name].get_actual_primary_value()
+                            row[field_name].get_actual_primary_value().get_value() if isinstance(row[field_name].get_actual_primary_value(), EmbeddedObject) else row[field_name].get_actual_primary_value()
                         )
                     elif self._mapper.is_reversed_link(field_names_for_cache[field_name]["mapper_field"]):
                         cache[field_names_for_cache[field_name]["mapper"]].append(
@@ -548,9 +548,9 @@ class TableModelCache(object):
         def _get_mapper_cache(m):
             """ Собирает кэш маппера из внешней переменной cache """
             mapper_cache = {}
-            for line in m.get_rows([], {m.primary.name(): ("in", cache[m])}, cache=self):
-                key = line[m.primary.name()]
-                mapper_cache[key.get_actual_primary_value() if isinstance(key, RecordModel) else key] = line
+            for item in m.get_new_collection().get_items({m.primary.name(): ("in", cache[m])}):
+                key = item.get_actual_primary_value()
+                mapper_cache[key.get_value() if isinstance(key, EmbeddedObject) else key] = item.get_data()
             return mapper_cache
 
         for mapper in cache:
