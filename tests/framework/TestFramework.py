@@ -82,6 +82,13 @@ class DbMock(object, metaclass=ABCMeta):
         """ Возвращает новый экземпляр коллекции пользователей с границами """
 
     @abstractmethod
+    def get_new_houses_collection_instance(self):
+        """ Возвращает новый экземпляр коллекции домов пользователя """
+
+    def get_houses_embedded_link(self):
+        """ Возвращает экземпляр EmbeddedLink из usersTable на housesTable """
+
+    @abstractmethod
     def get_new_account_instance(self):
         """ Возвращает новый экземпляр класса аккаунта пользователя """
 
@@ -215,6 +222,7 @@ class SqlDbMock(DbMock):
         SqlDocumentsNotAiMapper.db = self.db
         SqlNoPrimaryMapper.db = self.db
         SqlMultiMappedCollectionMapper.db = self.db
+        SqlHousesMaper.db = self.db
 
     def down(self):
         """ Уничтожает созданные в процессе тестирования таблицы базы данных """
@@ -231,6 +239,7 @@ class SqlDbMock(DbMock):
         SqlDocumentsNotAiMapper.kill_instance()
         SqlNoPrimaryMapper.kill_instance()
         SqlMultiMappedCollectionMapper.kill_instance()
+        SqlHousesMaper.kill_instance()
 
     def get_new_user_instance(self, data=None, loaded_from_db=False):
         """ Возвращает новый экземпляр класса пользователя """
@@ -239,6 +248,13 @@ class SqlDbMock(DbMock):
     def get_new_users_collection_instance(self, boundaries=None):
         """ Возвращает новый экземпляр коллекции пользователей """
         return SqlUsers(boundaries)
+
+    def get_new_houses_collection_instance(self):
+        """ Возвращает новый экземпляр коллекции домов пользователя """
+        return SqlHouses()
+
+    def get_houses_embedded_link(self):
+        return SqlUsersMapper().embedded_link("houses", SqlHouses)
 
     def get_new_users_collection_instance_with_boundaries(self):
         """ Возвращает новый экземпляр коллекции пользователей с границами """
@@ -362,6 +378,7 @@ class NoSqlDbMock(DbMock):
         NoSqlDocumentsMapper.db = self.db
         NoSqlDocumentsNotAiMapper.db = self.db
         NoSqlMultiMappedCollectionMapper.db = self.db
+        NoSqlHousesMaper.db = self.db
 
     def down(self):
         """ Уничтожает созданные в процессе тестирования таблицы базы данных """
@@ -386,6 +403,7 @@ class NoSqlDbMock(DbMock):
         NoSqlDocumentsNotAiMapper.kill_instance()
         NoSqlNoPrimaryMapper.kill_instance()
         NoSqlMultiMappedCollectionMapper.kill_instance()
+        NoSqlHousesMaper.kill_instance()
 
     def get_new_user_instance(self, data=None, loaded_from_db=False):
         """ Возвращает новый экземпляр класса пользователя """
@@ -394,6 +412,12 @@ class NoSqlDbMock(DbMock):
     def get_new_users_collection_instance(self, boundaries=None):
         """ Возвращает новый экземпляр коллекции пользователей """
         return NoSqlUsers(boundaries)
+
+    def get_new_houses_collection_instance(self):
+        return NoSqlHouses()
+
+    def get_houses_embedded_link(self):
+        return NoSqlUsersMapper().embedded_link("houses", "houses", NoSqlHouses)
 
     def get_new_users_collection_instance_with_boundaries(self):
         """ Возвращает новый экземпляр коллекции пользователей с границами """
@@ -723,6 +747,42 @@ class NoSqlUserWithBoundaries(NoSqlUser):
     mapper = NoSqlUsersMapperWithBoundaries
 
 
+class SqlHousesMaper(SqlMapper):
+    def bind(self):
+        self.set_new_item(SqlHouse)
+        self.set_new_collection(SqlHouses)
+        self.set_collection_name("housesTable")
+        self.set_map([
+            self.int("owner", "userID"),
+            self.str("address", "address"),
+        ])
+
+
+class SqlHouse(RecordModel):
+    mapper = SqlHousesMaper
+
+
+class SqlHouses(TableModel):
+    mapper = SqlHousesMaper
+
+
+class NoSqlHousesMaper(NoSqlMapper):
+    def bind(self):
+        self.set_new_item(NoSqlHouse)
+        self.set_new_collection(NoSqlHouses)
+        self.set_collection_name("housesTable")
+        self.set_map([
+            self.object_id("owner", "_id"),
+            self.str("address", "address"),
+        ])
+
+
+class NoSqlHouse(RecordModel):
+    mapper = NoSqlHousesMaper
+
+
+class NoSqlHouses(TableModel):
+    mapper = NoSqlHousesMaper
 
 ############################################ Коллекция аккаунтов (Связь 1-к-м) ########################################
 # noinspection PyDocstring
