@@ -788,9 +788,24 @@ class FieldTypes(object):
         сконфигурированным без указания таблицы отношений, поэтому этот класс наследует классу List
 
         """
-        pass
+        def __init__(self, mapper, mapper_field_name, **kwargs):
+            """
+            @param mapper: Маппер основной таблицы
+            @type mapper: Mapper
 
-    class SqlEmbeddedLink(SqlReversedLink):
+            @param mapper_field_name: Имя поля маппера
+            @type mapper_field_name: str
+
+            @param joined_collection: Тип привязанной коллекции
+            @type joined_collection: TableModel
+            """
+            super().__init__(mapper, mapper_field_name, **kwargs)
+
+            items_rel_field = self.items_collection_mapper.get_property_that_is_link_for(mapper)
+            if self.items_collection_mapper.primary.name() == items_rel_field.get_name():
+                raise TableMapperException("It is disallowed to create ReversedLink on primary key \"%s.%s\"" % (self.items_collection_mapper.table_name, items_rel_field.get_name()))
+
+    class SqlEmbeddedLink(BaseReversedLink, SqlListWithoutRelationsTable):
         def clear_dependencies_from(self, main_records_ids: list):
             """
             Очищает зависимость присоединенных записей, от тех записей основной таблицы, которые были удалены и
@@ -866,6 +881,22 @@ class FieldTypes(object):
 
     class NoSqlReversedLink(BaseReversedLink, NoSqlReversedList):
         ident = "ReversedLink"
+
+        def __init__(self, mapper, mapper_field_name, **kwargs):
+            """
+            @param mapper: Маппер основной таблицы
+            @type mapper: Mapper
+
+            @param mapper_field_name: Имя поля маппера
+            @type mapper_field_name: str
+
+            @param joined_collection: Тип привязанной коллекции
+            @type joined_collection: TableModel
+            """
+            super().__init__(mapper, mapper_field_name, **kwargs)
+            items_rel_field = self.items_collection_mapper.get_property_that_is_link_for(mapper)
+            if self.items_collection_mapper.primary.name() == items_rel_field.get_name():
+                raise TableMapperException("It is disallowed to create ReversedLink on primary key \"%s.%s\"" % (self.items_collection_mapper.table_name, items_rel_field.get_name()))
 
     class NoSqlEmbeddedDocument(NoSqlRelationField):
         ident = "EmbeddedDocument"

@@ -76,3 +76,8 @@ CREATE TABLE IF NOT EXISTS "multiMappedTable" (
     "authorID" integer,
     "userID" integer
 );
+
+CREATE TABLE IF NOT EXISTS "housesTable" (
+    "userID" serial primary key,
+    "address" varchar(32)
+);

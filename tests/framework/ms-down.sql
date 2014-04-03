@@ -10,3 +10,4 @@ IF OBJECT_ID('passportsTable', 'Table') IS NOT NULL DROP TABLE "passportsTable";
 IF OBJECT_ID('documentsTable', 'Table') IS NOT NULL DROP TABLE "documentsTable";
 IF OBJECT_ID('documentsWithoutAutoincrementTable', 'Table') IS NOT NULL DROP TABLE "documentsWithoutAutoincrementTable";
 IF OBJECT_ID('multiMappedTable', 'Table') IS NOT NULL DROP TABLE "multiMappedTable";
+IF OBJECT_ID('housesTable', 'Table') IS NOT NULL DROP TABLE "housesTable";

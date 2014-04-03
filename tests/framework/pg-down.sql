@@ -10,3 +10,4 @@ DROP TABLE IF EXISTS "passportsTable";
 DROP TABLE IF EXISTS "documentsTable";
 DROP TABLE IF EXISTS "documentsWithoutAutoincrementTable";
 DROP TABLE IF EXISTS "multiMappedTable";
+DROP TABLE IF EXISTS "housesTable";

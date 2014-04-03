@@ -9,7 +9,7 @@ from datetime import date
 
 from mapex.tests.framework.TestFramework import for_all_dbms, CustomProperty, CustomPropertyFactory, \
     CustomPropertyPositive, CustomPropertyNegative
-from mapex.core.Exceptions import TableModelException
+from mapex.core.Exceptions import TableModelException, TableMapperException
 
 
 class TableModelTest(unittest.TestCase):
@@ -632,6 +632,22 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(3, tags.count())                   # Коллекция тегов не затронута
         if users_tags_collection:                               # Для тех, кто реализует списки через таблицы отношений:
             self.assertEqual(2, users_tags_collection.count())  # 2 записи отношений - одна удалена с пользователем
+
+    @for_all_dbms
+    def test_query_with_reversed_link_on_primary_key(self, dbms_fw):
+        """ Нельзя делать ReversedLink на первичный ключ другой модели. Но можно делать EmbeddedLink """
+        users = dbms_fw.get_new_users_collection_instance()
+        houses = dbms_fw.get_new_houses_collection_instance()
+
+        houses.mapper.set_field(houses.mapper.link("owner", houses.mapper.primary.name(), collection=users.__class__))
+        houses.mapper.set_primary("owner")
+
+        # Создание EmbeddedLink на первичный ключ разрешено
+        users.mapper.set_field(dbms_fw.get_houses_embedded_link())
+
+        # Создание RevesedLink на первичный ключ вызывает исключение
+        self.assertRaises(TableMapperException, users.mapper.reversed_link, "houses", houses.__class__)
+
 
     @for_all_dbms
     def test_query_with_reversed_links(self, dbms_fw):
