@@ -550,7 +550,13 @@ class TableModelCache(object):
             mapper_cache = {}
             for item in m.get_new_collection().get_items({m.primary.name(): ("in", cache[m])}):
                 key = item.get_actual_primary_value()
-                mapper_cache[key.get_value() if isinstance(key, EmbeddedObject) else key] = item.get_data()
+                if isinstance(key, EmbeddedObject):
+                    primary_value = key.get_value()
+                elif isinstance(key, RecordModel):
+                    primary_value = key.get_actual_primary_value()
+                else:
+                    primary_value = key
+                mapper_cache[primary_value] = item.get_data()
             return mapper_cache
 
         for mapper in cache:

@@ -90,6 +90,6 @@ CREATE TABLE "multiMappedTable" (
 
 IF OBJECT_ID('housesTable', 'Table') IS NULL
 CREATE TABLE "housesTable" (
-  "userID" BIGINT PRIMARY KEY IDENTITY,
+  "userID" BIGINT PRIMARY KEY,
   "address" NVARCHAR(32)
 );
