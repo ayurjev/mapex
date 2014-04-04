@@ -639,15 +639,23 @@ class TableModelTest(unittest.TestCase):
         users = dbms_fw.get_new_users_collection_instance()
         houses = dbms_fw.get_new_houses_collection_instance()
 
-        houses.mapper.set_field(houses.mapper.link("owner", houses.mapper.primary.name(), collection=users.__class__))
+        houses.mapper.set_field(houses.mapper.link("owner", houses.mapper.primary.db_name(), collection=users.__class__))
         houses.mapper.set_primary("owner")
+
+        # Создание RevesedLink на первичный ключ вызывает исключение
+        self.assertRaises(TableMapperException, users.mapper.reversed_link, "house", houses.__class__)
 
         # Создание EmbeddedLink на первичный ключ разрешено
         users.mapper.set_field(dbms_fw.get_houses_embedded_link())
 
-        # Создание RevesedLink на первичный ключ вызывает исключение
-        self.assertRaises(TableMapperException, users.mapper.reversed_link, "houses", houses.__class__)
+        user = users.get_new_item()
+        user.name = "Вася"
+        user.house = houses.get_new_item()
+        user.house.address = "ул. Пушкина"
+        user.save()
+        user.refresh()
 
+        self.assertEqual("ул. Пушкина", user.house.address)
 
     @for_all_dbms
     def test_query_with_reversed_links(self, dbms_fw):
