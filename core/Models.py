@@ -76,7 +76,29 @@ class TableModel(object):
         Осуществляет вставку данных в коллекцию
         :param data:    Данные для вставки в коллекцию
         """
-        return self.mapper.insert(self.check_incoming_data(data), lambda: self.get_new_item())
+        new_item = lambda: self.get_new_item()
+        data = self.check_incoming_data(data)
+        if type(data) is list:
+            return [self.insert(it) for it in data]
+
+        if isinstance(data, dict):
+            model = new_item()
+            model.load_from_array(data)
+            model_data = data
+        elif isinstance(data, RecordModel):
+            model_data = data.get_data_for_write_operation()
+            model = data
+        else:
+            raise TableModelException("Insert failed: unknown item format")
+
+        flat_data, lists_objects = self.mapper.split_data_by_relation_type(model_data)
+        last_record = self.mapper.insert(flat_data)
+        if self.mapper.primary.exists():
+            model.set_primary_value(last_record)
+            self.mapper.link_all_list_objects(
+                lists_objects, model.load_from_array(model.get_data(), loaded_from_db=True)
+            )
+        return model
 
     def delete(self, conditions=None):
         """

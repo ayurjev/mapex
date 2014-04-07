@@ -1384,55 +1384,25 @@ class SqlMapper(metaclass=ABCMeta):
         conditions = self.translate_and_convert(conditions)
         return self.db.count_query(self.table_name, conditions, self.get_joined_tables(conditions))
 
-    def insert(self, data: list or dict, new_item: RecordModel.__class__=None):
+    def insert(self, data: list or dict):
         """
         Выполняет вставку новой записи в таблицу
         Для вставки одной записи параметр data должен быть словарем, для вставки нескольких - списком словарей
         @param data: Данные для вставки
         @type data: list or dict
-        @param new_item: Экземпляр класса модели, соответствующей основной добавляемой записи
-        @type new_item: RecordModel.__class__
         @return: Значение первичного ключа для добавленной записи
         
         """
         if type(data) is list:
-            return [self.insert(it, new_item) for it in data]
-        else:
-            if isinstance(data, dict) and new_item:
-                model = new_item()
-                model.load_from_array(data)
-                data_dict = data
-            elif isinstance(data, dict):
-                model = None
-                data_dict = data
-            elif isinstance(data, RecordModel):
-                model = data
-                data_dict = data.get_data_for_write_operation()
-            else:
-                raise TableMapperException("Insert failed: unknown item format")
+            return [self.insert(it) for it in data]
 
-            flat_data, lists_objects = self.split_data_by_relation_type(data_dict)
-            last_record = self._insert_raw_dict(flat_data)
-
-            if new_item and self.primary.exists():
-                model.set_primary_value(last_record)
-                self.link_all_list_objects(lists_objects, model.load_from_array(model.get_data(), loaded_from_db=True))
-            return model
-
-    def _insert_raw_dict(self, data: dict):
-        """
-        Выполняет вставку новой записи в таблицу,
-        используя данные из переданного словаря и возвращает id вставленной записи.
-        Работает не на уровне моделей - самая низкоуровневая вставка на уровне маппера
-        @param data:
-        @return:
-        """
-        if data == {}:
+        if not isinstance(data, dict):
+            raise TableMapperException("Insert failed: unknown item format")
+        elif data == {}:
             raise TableModelException("Can't insert an empty record")
+
         try:
-            last_record = self.db.insert_query(
-                self.table_name, self.translate_and_convert(data), self.primary
-            )
+            last_record = self.db.insert_query(self.table_name, self.translate_and_convert(data), self.primary)
         except DublicateRecordException as err:
             raise self.__class__.dublicate_record_exception(err)
         return self.primary.grab_value_from(
