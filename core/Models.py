@@ -200,11 +200,9 @@ class RecordModel(object):
             raise TableModelException("there is no primary key for this model, so method save() is not allowed")
         self.validate()
         data_for_insert = self.get_data_for_write_operation()
-        print(data_for_insert)
         if self._loaded_from_db is False:
             res = self._collection.insert(data_for_insert)
             self.__dict__ = res.__dict__
-            print(res.__dict__)
             self.md5 = self.calc_sum()
             self.origin = OriginModel(self.get_data())
             self.set_primary_value(self.get_actual_primary_value())

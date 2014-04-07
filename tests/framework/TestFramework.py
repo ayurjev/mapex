@@ -254,7 +254,7 @@ class SqlDbMock(DbMock):
         return SqlHouses()
 
     def get_houses_embedded_link(self):
-        return SqlUsersMapper().embedded_link("houses", SqlHouses)
+        return SqlUsersMapper().embedded_link("house", SqlHouses)
 
     def get_new_users_collection_instance_with_boundaries(self):
         """ Возвращает новый экземпляр коллекции пользователей с границами """
@@ -417,7 +417,7 @@ class NoSqlDbMock(DbMock):
         return NoSqlHouses()
 
     def get_houses_embedded_link(self):
-        return NoSqlUsersMapper().embedded_link("houses", "houses", NoSqlHouses)
+        return NoSqlUsersMapper().embedded_link("house", "house", NoSqlHouses)
 
     def get_new_users_collection_instance_with_boundaries(self):
         """ Возвращает новый экземпляр коллекции пользователей с границами """
