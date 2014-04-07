@@ -4,6 +4,7 @@
 import hashlib
 from abc import ABCMeta, abstractmethod
 from mapex.core.Exceptions import TableModelException
+from copy import deepcopy
 
 
 class TableModel(object):
@@ -157,7 +158,6 @@ class RecordModel(object):
 
     def __init__(self, data=None, loaded_from_db=False):
         self._lazy_load = None
-        self._mapper_fields = []
         self._loaded_from_db = False
         self._collection = None
         self.md5_data = {}
@@ -166,20 +166,20 @@ class RecordModel(object):
         if self.__class__.mapper is None:
             raise TableModelException("No mapper for %s model" % self)
         # noinspection PyCallingNonCallable
-        self.set_mapper(self.__class__.mapper())
-        if data:
-            self.load_from_array(data.get_data() if isinstance(data, RecordModel) else data, loaded_from_db)
+        self.set_mapper(self.__class__.mapper(), data, loaded_from_db)
 
-    def set_mapper(self, mapper):
+    def set_mapper(self, mapper, data=None, loaded_from_db=False):
         if mapper:
             self.mapper = mapper
             self._collection = self.get_new_collection()
-            for property_name in self.mapper.get_properties():
-                self._mapper_fields.append(property_name)
-                self.__dict__[property_name] = self.mapper.get_property(property_name).get_default_value()
-            self.md5_data = {}
+            current_data = {
+                property_name: self.mapper.get_property(property_name).get_default_value()
+                for property_name in self.mapper.get_properties()
+            }
+            self.load_from_array(current_data)
             self.md5 = self.calc_sum()
-            self.origin = OriginModel(self.get_data())
+            if data:
+                self.load_from_array(data.get_data() if isinstance(data, RecordModel) else data, loaded_from_db)
 
     # noinspection PyMethodMayBeStatic
     def validate(self):
@@ -200,9 +200,11 @@ class RecordModel(object):
             raise TableModelException("there is no primary key for this model, so method save() is not allowed")
         self.validate()
         data_for_insert = self.get_data_for_write_operation()
+        print(data_for_insert)
         if self._loaded_from_db is False:
             res = self._collection.insert(data_for_insert)
             self.__dict__ = res.__dict__
+            print(res.__dict__)
             self.md5 = self.calc_sum()
             self.origin = OriginModel(self.get_data())
             self.set_primary_value(self.get_actual_primary_value())
@@ -251,7 +253,7 @@ class RecordModel(object):
                 primary = primary_mf.model(primary)
 
         self.set_primary_value(primary)
-        self._lazy_load = (lambda: self.cache_load(cache)) if cache else (lambda: self.normal_load())
+        self._lazy_load = lambda: self.cache_load(cache) if cache else lambda: self.normal_load()
         return self
 
     def load_from_array(self, data, loaded_from_db=False):
@@ -351,7 +353,7 @@ class RecordModel(object):
         self.exec_lazy_loading()
         mapper_properties = self.mapper.get_properties()
         properties = list(set(mapper_properties) & set(properties)) if properties else mapper_properties
-        return {property_name: self.__dict__[property_name] for property_name in properties}
+        return {property_name: self.__dict__.get(property_name) for property_name in properties}
 
     def stringify(self, properties: list=None, stringify_depth: tuple=None, additional_data: dict=None) -> dict:
         """

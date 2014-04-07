@@ -1418,7 +1418,6 @@ class SqlMapper(metaclass=ABCMeta):
                 model.set_primary_value(last_record)
                 self.link_all_list_objects(lists_objects, model.load_from_array(model.get_data(), loaded_from_db=True))
             return model
-            return last_record
 
     def _insert_raw_dict(self, data: dict):
         """
