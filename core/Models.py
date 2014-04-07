@@ -188,20 +188,21 @@ class RecordModel(object):
         if self.__class__.mapper is None:
             raise TableModelException("No mapper for %s model" % self)
         # noinspection PyCallingNonCallable
-        self.set_mapper(self.__class__.mapper(), data, loaded_from_db)
+        self.set_mapper(self.__class__.mapper())
+        if data:
+            self.load_from_array(data.get_data() if isinstance(data, RecordModel) else data, loaded_from_db)
 
-    def set_mapper(self, mapper, data=None, loaded_from_db=False):
+    def set_mapper(self, mapper):
         if mapper:
             self.mapper = mapper
             self._collection = self.get_new_collection()
-            current_data = {
+            default_data = {
                 property_name: self.mapper.get_property(property_name).get_default_value()
                 for property_name in self.mapper.get_properties()
             }
-            self.load_from_array(current_data)
+            default_data.update(self.__dict__)
+            self.__dict__ = default_data
             self.md5 = self.calc_sum()
-            if data:
-                self.load_from_array(data.get_data() if isinstance(data, RecordModel) else data, loaded_from_db)
 
     # noinspection PyMethodMayBeStatic
     def validate(self):
@@ -386,7 +387,7 @@ class RecordModel(object):
         @type additional_data: dict
         @return: Подготовленное к использованию в шаблонизаторе представление модели
         @rtype : dict
-        
+
         """
         data = {}
         stringify_depth, stringify_level_max = stringify_depth if stringify_depth else (0, 1)
@@ -435,7 +436,7 @@ class RecordModel(object):
             if (
                     self.mapper.is_base_value(all_data[key]) is False or
                     self.md5_data.get(key) != hashlib.md5(str(all_data[key]).encode()).hexdigest() or
-                    all_data[key].changed
+                    (self.mapper.is_base_value(all_data[key]) is True and all_data[key].changed)
             ):
                 data_for_insert[key] = all_data[key]
         return data_for_insert
