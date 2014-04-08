@@ -2307,3 +2307,26 @@ class FieldTypesConverter(object):
             (mf.get_value_type_in_mapper_terms(v.get_value_type()).ident, target_type)
         )
         return target_lambda(v.get_value(), mf, cache)
+
+
+# noinspection PyPep8Naming
+def MapperMock(real_mapper):
+    """
+    Возвращает мок для переданного маппера
+    @param real_mapper: Настоящий маппер
+    @return: Мок маппера
+    """
+
+    from unittest.mock import Mock
+    collection = real_mapper.get_new_collection()
+    item = real_mapper.get_new_item()
+    mapper_mock = Mock(spec=SqlMapper)
+    mapper_mock.get_properties.return_value = real_mapper.get_properties()
+    mapper_mock.split_data_by_relation_type.return_value = {}, {}
+    mapper_mock.primary = Mock(exists=lambda: True)
+    item.set_mapper(mapper_mock)
+    collection.mapper = mapper_mock
+    mapper_mock.get_new_collection.return_value = collection
+    mapper_mock.get_new_item.return_value = item
+    mapper_mock.insert.return_value = item
+    return mapper_mock
