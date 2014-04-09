@@ -2323,6 +2323,7 @@ def MapperMock(real_mapper):
     item = real_mapper.get_new_item()
     mapper_mock = Mock(spec=SqlMapper)
     mapper_mock.get_properties.return_value = real_mapper.get_properties()
+    mapper_mock.boundaries = {}
     mapper_mock.split_data_by_relation_type.return_value = {}, {}
     mapper_mock.primary = Mock(exists=lambda: True)
     item.set_mapper(mapper_mock)
