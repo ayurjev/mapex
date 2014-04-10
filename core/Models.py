@@ -462,8 +462,14 @@ class RecordModel(object):
     def __getattribute__(self, name):
         """ При любом обращении к полям модели необходимо инициализировать модель """
         mapper = object.__getattribute__(self, "__dict__").get("mapper")
-        if mapper and name in mapper.get_properties():
+        # Список полей первичного ключа
+        pk_list = [] if not mapper or not mapper.primary.exists() else (
+            mapper.primary.name() if mapper.primary.compound else [mapper.primary.name()]
+        )
+
+        if mapper and name in mapper.get_properties() and name not in pk_list:
             self.exec_lazy_loading()
+
         return object.__getattribute__(self, name)
 
     def __eq__(self, other):
