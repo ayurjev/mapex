@@ -2339,7 +2339,9 @@ def MapperMock(real_mapper):
     mapper_mock.get_rows.return_value = [{}]
     mapper_mock.factory_method.return_value = item
     mapper_mock.split_data_by_relation_type.return_value = {}, {}
-    mapper_mock.primary = Mock(exists=lambda: True)
+    mapper_mock.primary = Mock(exists=lambda: True, compound=False)
+    mapper_mock.primary.name.return_value = real_mapper.primary.name()
+    mapper_mock.primary.grab_value_from = real_mapper.primary.grab_value_from
     item.set_mapper(mapper_mock)
     collection.mapper = mapper_mock
     mapper_mock.get_new_collection.return_value = collection

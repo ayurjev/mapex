@@ -228,6 +228,7 @@ class RecordModel(object):
             self.__dict__ = res.__dict__
             self.md5 = self.calc_sum()
             self.origin = OriginModel(self.get_data())
+            print(1)
             self.set_primary_value(self.get_actual_primary_value())
             return self
         else:
