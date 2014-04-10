@@ -436,7 +436,7 @@ class RecordModel(object):
             if (
                     self.mapper.is_base_value(all_data[key]) is False or
                     self.md5_data.get(key) != hashlib.md5(str(all_data[key]).encode()).hexdigest() or
-                    (self.mapper.is_base_value(all_data[key]) is True and all_data[key].changed)
+                    (self.mapper.is_list_value(all_data[key]) is True and all_data[key].changed)
             ):
                 data_for_insert[key] = all_data[key]
         return data_for_insert

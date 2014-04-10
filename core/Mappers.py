@@ -1293,6 +1293,10 @@ class SqlMapper(metaclass=ABCMeta):
         return isinstance(value, FieldValues.BaseValue)
 
     @staticmethod
+    def is_list_value(value) -> bool:
+        return isinstance(value, FieldValues.ListValue)
+
+    @staticmethod
     def get_base_none():
         return FieldValues.NoneValue()
 
@@ -2076,6 +2080,12 @@ class FieldValues(object):
         def __init__(self):
             super().__init__()
             self.changed = False
+
+        def __getattribute__(self, item):
+            raise AttributeError("'NoneType' object has no attribute '%s'" % item)
+
+        def __setattribute__(self, item, value):
+            raise AttributeError("'NoneType' object has no attribute '%s'" % item)
 
         def __eq__(self, other):
             return other is None or isinstance(other, FieldValues.NoneValue)
