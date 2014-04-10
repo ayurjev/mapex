@@ -8,7 +8,7 @@ import unittest
 from datetime import date
 
 from mapex.tests.framework.TestFramework import for_all_dbms, CustomProperty, CustomPropertyFactory, \
-    CustomPropertyPositive, CustomPropertyNegative
+    CustomPropertyPositive, CustomPropertyNegative, DbMock
 from mapex.core.Exceptions import TableModelException, TableMapperException
 
 
@@ -20,7 +20,7 @@ class TableModelTest(unittest.TestCase):
         self.maxDiff = None
 
     @for_all_dbms
-    def test_count_insert_delete_update(self, dbms_fw):
+    def test_count_insert_delete_update(self, dbms_fw: DbMock):
         """ Проверим базовые методы работы с моделью как с коллекцией """
         users = dbms_fw.get_new_users_collection_instance()
         self.assertEqual(0, users.count())
@@ -46,7 +46,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(1, users.count({"name": "NewValue"}))
 
     @for_all_dbms
-    def test_advanced_insert_behavior(self, dbms_fw):
+    def test_advanced_insert_behavior(self, dbms_fw: DbMock):
         """ Проверим также всю возможную логику при вставке данных """
         # Во первых коллекция принимает либо словарь с данными, соответствующими модели, либо корректную модель
         # либо список словарей с данными, соответствующими модели, либо список корректных моделей
@@ -94,7 +94,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(3, users.count())
 
     @for_all_dbms
-    def test_dbms_exceptions(self, dbms_fw):
+    def test_dbms_exceptions(self, dbms_fw: DbMock):
         """ Проверим обработку исключений, генерируемых адаптерами. Они должны заменяться на исключения mapex """
 
         ##################################### DublicateRecord ###################################################
@@ -130,7 +130,7 @@ class TableModelTest(unittest.TestCase):
         users.mapper.__class__.dublicate_record_exception = DublicateRecordException
 
     @for_all_dbms
-    def test_get_property_list(self, dbms_fw):
+    def test_get_property_list(self, dbms_fw: DbMock):
         """ Проверим способ получения свойств для объектов, хранящихся в модели """
         users = dbms_fw.get_new_users_collection_instance()
         users.insert([
@@ -152,7 +152,7 @@ class TableModelTest(unittest.TestCase):
         )
 
     @for_all_dbms
-    def test_get_items(self, dbms_fw):
+    def test_get_items(self, dbms_fw: DbMock):
         """ Проверим метод получения моделей из коллекции """
         users = dbms_fw.get_new_users_collection_instance()
         item = users.get_item({"age": 1})
@@ -174,7 +174,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(2, len(items))
 
     @for_all_dbms
-    def test_params(self, dbms_fw):
+    def test_params(self, dbms_fw: DbMock):
         """ Проверим сортировку и ограничение выборки """
         users = dbms_fw.get_new_users_collection_instance()
         users.insert({"name": "FirstItem", "age": 1})
@@ -194,7 +194,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual("SecondItem", res[0].name)
 
     @for_all_dbms
-    def test_collections_boundaries(self, dbms_fw):
+    def test_collections_boundaries(self, dbms_fw: DbMock):
         """ Проверим возможность создания коллекций с жесткими границами в пределах одной, большой коллекции """
         users = dbms_fw.get_new_users_collection_instance()
         ausers = dbms_fw.get_new_users_collection_instance({"name": ("match", "a*")})
@@ -252,7 +252,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(2, users.count())
 
     @for_all_dbms
-    def test_mapper_boundaries(self, dbms_fw):
+    def test_mapper_boundaries(self, dbms_fw: DbMock):
         """
         Проверим возможность создания мапперов с предопределенными границами, которые нельзя переопределять в моделях
         """
@@ -273,7 +273,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(2, ausers.count())
 
     @for_all_dbms
-    def test_mapper_as_a_factory(self, dbms_fw):
+    def test_mapper_as_a_factory(self, dbms_fw: DbMock):
         """ Проверим, что можно использовать коллекции TableModel как фабрики инстансов разного типа """
         users = dbms_fw.get_new_users_collection_instance()
         self.assertEqual(0, users.count())
@@ -314,7 +314,7 @@ class TableModelTest(unittest.TestCase):
         users.mapper.factory_method = default_factory_method
 
     @for_all_dbms
-    def test_custom_datatypes(self, dbms_fw):
+    def test_custom_datatypes(self, dbms_fw: DbMock):
         """
         Проверим возможность маппинга поля базы данных на кастомный класс, который не маппится ни на какую таблицу
         """
@@ -379,7 +379,7 @@ class TableModelTest(unittest.TestCase):
         users.mapper._analyze_map()
 
     @for_all_dbms
-    def test_query_with_links(self, dbms_fw):
+    def test_query_with_links(self, dbms_fw: DbMock):
         """ Проверим возможность запросов к коллекции с условиями, включающими обращения к полям типа Link """
         users = dbms_fw.get_new_users_collection_instance()
         accounts = dbms_fw.get_new_accounts_collection_instance()
@@ -495,7 +495,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(4, accounts.count())
 
     @for_all_dbms
-    def test_query_with_lists(self, dbms_fw):
+    def test_query_with_lists(self, dbms_fw: DbMock):
         """ Проверим возможность запросов к коллекции с условиями, включающими обращения к полям типа List """
         users = dbms_fw.get_new_users_collection_instance()
         tags = dbms_fw.get_new_tags_collection_instance()
@@ -642,7 +642,7 @@ class TableModelTest(unittest.TestCase):
             self.assertEqual(2, users_tags_collection.count())  # 2 записи отношений - одна удалена с пользователем
 
     @for_all_dbms
-    def test_query_with_reversed_link_on_primary_key(self, dbms_fw):
+    def test_query_with_reversed_link_on_primary_key(self, dbms_fw: DbMock):
         """ Нельзя делать ReversedLink на первичный ключ другой модели. Но можно делать EmbeddedLink """
         users = dbms_fw.get_new_users_collection_instance()
         houses = dbms_fw.get_new_houses_collection_instance()
@@ -668,7 +668,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual("ул. Пушкина", user.house.address)
 
     @for_all_dbms
-    def test_query_with_reversed_links(self, dbms_fw):
+    def test_query_with_reversed_links(self, dbms_fw: DbMock):
         """ Проверим тим связи, когда в основном маппера нет ссылки на другую таблицу,
         но у какой-либо записи в другой таблице есть ссылка на запись в основной таблице
         """
@@ -790,7 +790,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(1, profiles.count({"user": ("exists", True)}))     # Но у одной из записей не указан юзер
 
     @for_all_dbms
-    def test_query_with_reversed_lists(self, dbms_fw):
+    def test_query_with_reversed_lists(self, dbms_fw: DbMock):
         """ Проверим возможность работы с привязанным списком объектов, реализованным без таблицы отношений """
         users = dbms_fw.get_new_users_collection_instance()
         statuses = dbms_fw.get_new_statuses_collection_instance()
@@ -957,7 +957,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(2, statuses.count({"user": ("exists", True)}))     # Но у одной из записей не указан юзер
 
     @for_all_dbms
-    def test_query_with_embeded_links(self, dbms_fw):
+    def test_query_with_embeded_links(self, dbms_fw: DbMock):
         """ Вложенный документ """
         users = dbms_fw.get_new_users_collection_instance()
         passports = dbms_fw.get_new_passports_collection_instance()
@@ -1087,7 +1087,7 @@ class TableModelTest(unittest.TestCase):
             self.assertEqual(1, passports.count({"user": ("exists", True)}))     # Только у одной из записей указан юзер
 
     @for_all_dbms
-    def test_embedded_lists_with_not_autoincremented_primary_key(self, dbms_fw):
+    def test_embedded_lists_with_not_autoincremented_primary_key(self, dbms_fw: DbMock):
         """ Mapex не сможет переступить ограничения базы данных и скопировать список из одной модели в другую
             если первичный ключ не автоинкрементный
         """
@@ -1136,7 +1136,7 @@ class TableModelTest(unittest.TestCase):
             self.assertCountEqual([], [d.number for d in user2.documents_not_ai])
 
     @for_all_dbms
-    def test_query_with_embedded_lists(self, dbms_fw):
+    def test_query_with_embedded_lists(self, dbms_fw: DbMock):
         """ Проверим возможность работы с встроенным списком объектов """
         users = dbms_fw.get_new_users_collection_instance()
         documents = dbms_fw.get_new_documents_collection_instance()
@@ -1323,7 +1323,7 @@ class TableModelTest(unittest.TestCase):
             self.assertEqual(2, documents.count())                           # Стало на один паспорт меньше
 
     @for_all_dbms
-    def test_working_with_table_without_primary_crud(self, dbms_fw):
+    def test_working_with_table_without_primary_crud(self, dbms_fw: DbMock):
         """ Проверим основные особенности работы с таблицами без первичного ключа """
         collection_without_primary = dbms_fw.get_new_noprimary_collection_instance()
         self.assertEqual(0, collection_without_primary.count())
@@ -1363,7 +1363,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(second_item.name, "SecondName")
 
     @for_all_dbms
-    def test_working_with_defined_primary_in_mapper(self, dbms_fw):
+    def test_working_with_defined_primary_in_mapper(self, dbms_fw: DbMock):
         """
         Проверим возможность указания первичного ключа для таблиц,
         ксли он не указан в БД или в случае необходимости переопределения
@@ -1411,7 +1411,7 @@ class TableModelTest(unittest.TestCase):
         collection_without_primary.mapper.set_primary(None)
 
     @for_all_dbms
-    def test_working_with_compound_primary_in_mapper(self, dbms_fw):
+    def test_working_with_compound_primary_in_mapper(self, dbms_fw: DbMock):
         """ Проверим возможность указания первичного ключа для таблиц в виде составного ключа """
         collection_without_primary = dbms_fw.get_new_noprimary_collection_instance()
         collection_without_primary.mapper.set_primary(["name", "value"])
@@ -1459,7 +1459,7 @@ class TableModelTest(unittest.TestCase):
         collection_without_primary.mapper.set_primary(None)
 
     @for_all_dbms
-    def test_working_with_table_without_primary_as_secondary_table(self, dbms_fw):
+    def test_working_with_table_without_primary_as_secondary_table(self, dbms_fw: DbMock):
         """ Проверим основные особенности работы с таблицами без первичного ключа в качестве присоединенных таблиц """
         users = dbms_fw.get_new_users_collection_instance()
         collection_without_primary = dbms_fw.get_new_noprimary_collection_instance()
@@ -1517,7 +1517,7 @@ class TableModelTest(unittest.TestCase):
         )
 
     @for_all_dbms
-    def test_working_with_table_without_primary_as_secondary_table_joined_as_list(self, dbms_fw):
+    def test_working_with_table_without_primary_as_secondary_table_joined_as_list(self, dbms_fw: DbMock):
         """ Проверим особенности работы с таблицами без первичного ключа в качестве присоединенных м-к-м таблиц """
         users = dbms_fw.get_new_users_collection_instance()
         collection_without_primary = dbms_fw.get_new_noprimary_collection_instance()
@@ -1576,7 +1576,7 @@ class TableModelTest(unittest.TestCase):
         )
 
     @for_all_dbms
-    def test_working_with_table_without_primary_as_secondary_table_joined_as_list_with_compound_key(self, dbms_fw):
+    def test_working_with_table_without_primary_as_secondary_table_joined_as_list_with_compound_key(self, dbms_fw: DbMock):
         """ Проверим особенности работы с таблицами без первичного ключа в качестве присоединенных м-к-м таблиц """
         users = dbms_fw.get_new_users_collection_instance()
         collection_without_primary = dbms_fw.get_new_noprimary_collection_instance()
@@ -1622,7 +1622,7 @@ class TableModelTest(unittest.TestCase):
         )
 
     @for_all_dbms
-    def test_multi_mapped_collections(self, dbms_fw):
+    def test_multi_mapped_collections(self, dbms_fw: DbMock):
         """ Проверим что мапперы, имеющие могут иметь несколько типов отношений с одним и тем же внешним маппером """
         multi_mapped_items = dbms_fw.get_new_multi_mapped_collection_instance()
         users = dbms_fw.get_new_users_collection_instance()
@@ -1677,7 +1677,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(0, multi_mapped_items.count())
 
     @for_all_dbms
-    def test_performance_things_on_getting_items(self, dbms_fw):
+    def test_performance_things_on_getting_items(self, dbms_fw: DbMock):
         """ Проверим основные особенности получения элементов коллекции с точки зрения производительности """
         users = dbms_fw.get_new_users_collection_instance()
         tags = dbms_fw.get_new_tags_collection_instance()
@@ -1778,7 +1778,7 @@ class RecordModelTest(unittest.TestCase):
         self.maxDiff = None
 
     @for_all_dbms
-    def test_load_by_constructor(self, dbms_fw):
+    def test_load_by_constructor(self, dbms_fw: DbMock):
         """ Для инициализации модели можно передать словарь с данными в конструктор """
         users = dbms_fw.get_new_users_collection_instance()
         self.assertEqual(0, users.count())
@@ -1798,7 +1798,7 @@ class RecordModelTest(unittest.TestCase):
         self.assertEqual(0, users.count())
 
     @for_all_dbms
-    def test_get_data_and_stringify(self, dbms_fw):
+    def test_get_data_and_stringify(self, dbms_fw: DbMock):
         """
         Проверим метод формирования словаря для передачи мапперу
         Какие бы не были определены аттрибуты у объекта, в маппер должны идти только те, которые определены у маппера
@@ -1904,7 +1904,7 @@ class RecordModelTest(unittest.TestCase):
         )
 
     @for_all_dbms
-    def test_save(self, dbms_fw):
+    def test_save(self, dbms_fw: DbMock):
         """
         Проверим работу метода save()
         Он должен работать в двух режимах:
@@ -1941,7 +1941,7 @@ class RecordModelTest(unittest.TestCase):
         self.assertEqual(2, users.count())
 
     @for_all_dbms
-    def test_remove(self, dbms_fw):
+    def test_remove(self, dbms_fw: DbMock):
         """ Проверим работу метода удаления объекта """
         users = dbms_fw.get_new_users_collection_instance()
         self.assertEqual(0, users.count())
@@ -1956,7 +1956,7 @@ class RecordModelTest(unittest.TestCase):
         self.assertEqual(0, users.count())
 
     @for_all_dbms
-    def test_validate(self, dbms_fw):
+    def test_validate(self, dbms_fw: DbMock):
         """
         Проверим работу валидации объектов перед сохранением в базу
         В настройках модели User должно быть предусмотрено, что свойство count не должно быть равно 42
@@ -1973,7 +1973,7 @@ class RecordModelTest(unittest.TestCase):
         self.assertEqual(0, users.count())
 
     @for_all_dbms
-    def test_load_by_primary(self, dbms_fw):
+    def test_load_by_primary(self, dbms_fw: DbMock):
         """
         Проверим корректность работы метода загрузки по первичному ключу
         Суть его работы в том, что после непосрдественного метода должна происходить отложенная инициализация объекта,
@@ -2001,7 +2001,7 @@ class RecordModelTest(unittest.TestCase):
         self.assertEqual(12, count_after_access)
 
     @for_all_dbms
-    def test_origin(self, dbms_fw):
+    def test_origin(self, dbms_fw: DbMock):
         """ Проверим функционал сохранения последней сохраненной в БД копии объекта (origin) """
         users = dbms_fw.get_new_users_collection_instance()
         self.assertEqual(0, users.count())
