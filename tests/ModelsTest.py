@@ -429,6 +429,14 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(found_user.name, "SecondUser")
         self.assertEqual(found_user.account.phone, "911")
 
+        # Это ни на что не повлияет (РЕГРЕССИОННЫЙ ТЕСТ - СОСТОЯНИЕ БАЗЫ НЕ ИЗМЕНЯЕТСЯ)
+        account2.phone = "000"
+        self.assertEqual(0, accounts.count({"phone": "000"}))
+        found_user2 = users.get_item({"account": account2})
+        self.assertEqual(found_user2.name, "SecondUser")
+        self.assertEqual(found_user2.account.phone, "911")
+        self.assertEqual(0, accounts.count({"phone": "000"}))
+
         # Теперь попробуем получить данные аккаунта из коллекции пользователей:
         self.assertCountEqual(
             ["first@email.ru", "second@email.ru", "third@email.ru"],
@@ -639,7 +647,9 @@ class TableModelTest(unittest.TestCase):
         users = dbms_fw.get_new_users_collection_instance()
         houses = dbms_fw.get_new_houses_collection_instance()
 
-        houses.mapper.set_field(houses.mapper.link("owner", houses.mapper.primary.db_name(), collection=users.__class__))
+        houses.mapper.set_field(
+            houses.mapper.link("owner", houses.mapper.primary.db_name(), collection=users.__class__)
+        )
         houses.mapper.set_primary("owner")
 
         # Создание RevesedLink на первичный ключ вызывает исключение

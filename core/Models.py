@@ -274,7 +274,7 @@ class RecordModel(object):
                 primary = primary_mf.model(primary)
 
         self.set_primary_value(primary)
-        self._lazy_load = lambda: self.cache_load(cache) if cache else lambda: self.normal_load()
+        self._lazy_load = (lambda: self.cache_load(cache)) if cache else (lambda: self.normal_load())
         return self
 
     def load_from_array(self, data, loaded_from_db=False):
@@ -530,6 +530,7 @@ class TableModelCache(object):
     def __init__(self, mapper):
         self._mapper = mapper
         self._cache = {}
+        self._ids_cache = {}
 
     def get(self, model_type, primary_id):
         """
@@ -551,14 +552,12 @@ class TableModelCache(object):
         """
         # Сперва получим имена итересующих нас полей (Кэшируются только данные для полей Link и List)
         cache = {}
-        res_cache = {}
         field_names_for_cache = {}
         for field_name in self._mapper.get_properties():
             mf = self._mapper.get_property(field_name)
             if mf and self._mapper.is_rel(mf):
                 field_names_for_cache[field_name] = {"mapper": mf.get_items_collection_mapper(), "mapper_field": mf}
                 cache[mf.get_items_collection_mapper()] = []
-                res_cache[mf.get_items_collection_mapper()] = {}
         for row in rows:
             for field_name in field_names_for_cache.keys():
                 if None != row.get(field_name):
@@ -574,20 +573,21 @@ class TableModelCache(object):
                         for obj in row[field_name]:
                             cache[field_names_for_cache[field_name]["mapper"]].append(obj.get_actual_primary_value())
 
-        def _get_mapper_cache(m):
-            """ Собирает кэш маппера из внешней переменной cache """
-            mapper_cache = {}
-            for item in m.get_new_collection().get_items({m.primary.name(): ("in", cache[m])}):
-                key = item.get_actual_primary_value()
-                if isinstance(key, EmbeddedObject):
-                    primary_value = key.get_value()
-                elif isinstance(key, RecordModel):
-                    primary_value = key.get_actual_primary_value()
-                else:
-                    primary_value = key
-                mapper_cache[primary_value] = item.get_data()
-            return mapper_cache
-
         for mapper in cache:
             if len(cache[mapper]) > 0:
-                self._cache[mapper] = _get_mapper_cache
+                self._ids_cache[mapper] = cache[mapper]
+                self._cache[mapper] = self._get_mapper_cache
+
+    def _get_mapper_cache(self, m):
+        """ Собирает кэш маппера из внешней переменной cache """
+        mapper_cache = {}
+        for item in m.get_new_collection().get_items({m.primary.name(): ("in", self._ids_cache[m])}):
+            key = item.get_actual_primary_value()
+            if isinstance(key, EmbeddedObject):
+                primary_value = key.get_value()
+            elif isinstance(key, RecordModel):
+                primary_value = key.get_actual_primary_value()
+            else:
+                primary_value = key
+            mapper_cache[primary_value] = item.get_data()
+        return mapper_cache

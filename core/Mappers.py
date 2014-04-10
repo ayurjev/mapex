@@ -198,7 +198,7 @@ class FieldTypes(object):
                     )
                 )
 
-        def convert(self, value, direction, cache):
+        def convert(self, value, direction, cache, save_unsaved):
             """
             Конвертирует значение от формата маппера к формату базы данных или наоборот в зависимости от direction
             @param value: Значение для конвертации
@@ -210,7 +210,7 @@ class FieldTypes(object):
             # noinspection PyDocstring
             def try_convert(s, d):
                 try:
-                    return FieldTypesConverter.converters[(s, d)](value, self, cache)
+                    return FieldTypesConverter.converters[(s, d)](value, self, cache, save_unsaved)
                 except KeyError:
                     raise TableMapperException("\ncan't convert value %s from %s to %s" % (value, s, d))
 
@@ -803,7 +803,11 @@ class FieldTypes(object):
 
             items_rel_field = self.items_collection_mapper.get_property_that_is_link_for(mapper)
             if self.items_collection_mapper.primary.name() == items_rel_field.get_name():
-                raise TableMapperException("It is disallowed to create ReversedLink on primary key \"%s.%s\"" % (self.items_collection_mapper.table_name, items_rel_field.get_name()))
+                raise TableMapperException(
+                    "It is disallowed to create ReversedLink on primary key \"%s.%s\"" % (
+                        self.items_collection_mapper.table_name, items_rel_field.get_name()
+                    )
+                )
 
     class SqlEmbeddedLink(BaseReversedLink, SqlListWithoutRelationsTable):
         def clear_dependencies_from(self, main_records_ids: list):
@@ -896,7 +900,11 @@ class FieldTypes(object):
             super().__init__(mapper, mapper_field_name, **kwargs)
             items_rel_field = self.items_collection_mapper.get_property_that_is_link_for(mapper)
             if self.items_collection_mapper.primary.name() == items_rel_field.get_name():
-                raise TableMapperException("It is disallowed to create ReversedLink on primary key \"%s.%s\"" % (self.items_collection_mapper.table_name, items_rel_field.get_name()))
+                raise TableMapperException(
+                    "It is disallowed to create ReversedLink on primary key \"%s.%s\"" % (
+                        self.items_collection_mapper.table_name, items_rel_field.get_name()
+                    )
+                )
 
     class NoSqlEmbeddedDocument(NoSqlRelationField):
         ident = "EmbeddedDocument"
@@ -1305,7 +1313,7 @@ class SqlMapper(metaclass=ABCMeta):
         fields = self.translate_and_convert(fields) \
             if fields not in [[], None] else list(self._reversed_map.keys())
 
-        conditions = self.translate_and_convert(conditions)
+        conditions = self.translate_and_convert(conditions, save_unsaved=False)
         params = self.convert_params(params) if params else {}
         joined_tables = self.get_joined_tables(conditions, fields, params.get("order"))
 
@@ -1381,7 +1389,7 @@ class SqlMapper(metaclass=ABCMeta):
         @return: Количество строк, соответствующих условиям подсчета
         @rtype : int
         """
-        conditions = self.translate_and_convert(conditions)
+        conditions = self.translate_and_convert(conditions, save_unsaved=False)
         return self.db.count_query(self.table_name, conditions, self.get_joined_tables(conditions))
 
     def insert(self, data: list or dict):
@@ -1432,7 +1440,7 @@ class SqlMapper(metaclass=ABCMeta):
 
         # Сохраняем записи в основной таблице
         if flat_data != {}:
-            converted_conditions = self.translate_and_convert(conditions)
+            converted_conditions = self.translate_and_convert(conditions, save_unsaved=False)
             try:
                 self.db.update_query(
                     self.table_name, self.translate_and_convert(flat_data), converted_conditions,
@@ -1477,11 +1485,13 @@ class SqlMapper(metaclass=ABCMeta):
                 self.unlink_objects(changed_records_ids)
                 self.db.delete_query(
                     self.table_name,
-                    self.translate_and_convert({self.primary.name(): ("in", changed_records_ids)}), {}
+                    self.translate_and_convert(
+                        {self.primary.name(): ("in", changed_records_ids)}, save_unsaved=False)
+                    , {}
                 )
                 return changed_records_ids
         else:
-            conditions = self.translate_and_convert(conditions)
+            conditions = self.translate_and_convert(conditions, save_unsaved=False)
             self.db.delete_query(self.table_name, conditions, self.get_joined_tables(conditions))
 
     def split_data_by_relation_type(self, data: dict) -> (dict, dict):
@@ -1524,7 +1534,7 @@ class SqlMapper(metaclass=ABCMeta):
                 mapper_field.clear_dependencies_from(changed_records_ids)
 
     ##################################################################################################################
-    def translate_and_convert(self, value, direction: str="mapper2database", cache=None):
+    def translate_and_convert(self, value, direction: str="mapper2database", cache=None, save_unsaved=True):
         """
         Осуществляет непосредственное конвертирование данных из формата маппера в формат бд и наоборот
         @param value: Объект для конвертации (может быть простым значением, списком, словарем)
@@ -1534,19 +1544,19 @@ class SqlMapper(metaclass=ABCMeta):
         @return: Конвертированный объект
         """
         if type(value) is list:
-            return [self.translate_and_convert(newvalue, direction, cache) for newvalue in value]
+            return [self.translate_and_convert(newvalue, direction, cache, save_unsaved) for newvalue in value]
         elif type(value) is dict:
             converted = {}
             for field in value:
                 if field in ["or", "and"]:
-                    converted[field] = self.translate_and_convert(value[field], direction, cache)
+                    converted[field] = self.translate_and_convert(value[field], direction, cache, save_unsaved)
                 else:
-                    translted_field = self.translate_and_convert(field, direction, cache)
+                    translted_field = self.translate_and_convert(field, direction, cache, save_unsaved)
                     if type(value[field]) is tuple:
                         converted[translted_field] = value[field]
                     else:
                         mapper_field = self.get_mapper_field(field, direction)
-                        converted[translted_field] = mapper_field.convert(value[field], direction, cache)
+                        converted[translted_field] = mapper_field.convert(value[field], direction, cache, save_unsaved)
             return converted
         elif type(value) is str:
             return self.translate(value, direction)
@@ -1750,7 +1760,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
             reversed_collections = list(set(reversed_collections) & set(main_collection_fields))
 
         # Разбиваем условия выборки на группы в соответствии с коллекцией:
-        collection_conditions = {"self": self.translate_and_convert(conditions)}
+        collection_conditions = {"self": self.translate_and_convert(conditions, save_unsaved=False)}
         if conditions:
             for key in conditions:
                 if key.find(".") > -1 and self.is_rel(self.get_property(key.split(".")[0])):
@@ -1791,7 +1801,9 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
             main_record_key = linked_mapper.get_property_that_is_link_for(self)
             rev_collection_condtions = {main_record_key.get_db_name(): {"$in": rows_primaries}}
             if collection_conditions.get(prop):
-                rev_collection_condtions.update(linked_mapper.translate_and_convert(collection_conditions.get(prop)))
+                rev_collection_condtions.update(
+                    linked_mapper.translate_and_convert(collection_conditions.get(prop), save_unsaved=False)
+                )
             requested_fields = ["_id", main_record_key.get_db_name()]
             data = linked_mapper.db.select_query(linked_mapper.table_name, requested_fields, rev_collection_condtions)
             for reversed_model in data:
@@ -1964,7 +1976,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
                 new_conditions[key] = conditions[key]
         return new_conditions
 
-    def translate_and_convert(self, value, direction: str="mapper2database", cache=None):
+    def translate_and_convert(self, value, direction: str="mapper2database", cache=None, save_unsaved=True):
         """
         Осуществляет непосредственное конвертирование данных из формата маппера в формат бд и наоборот
         @param value: Объект для конвертации (может быть простым значением, списком, словарем)
@@ -1977,10 +1989,10 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
             return value
         if type(value) is dict:
             value = self.convert_conditions_to_one_collection(value)
-            value = super().translate_and_convert(value, direction, cache)
+            value = super().translate_and_convert(value, direction, cache, save_unsaved)
             value = self.to_mongo_conditions_format(value)
         else:
-            value = super().translate_and_convert(value, direction, cache)
+            value = super().translate_and_convert(value, direction, cache, save_unsaved)
         return value
 
     @staticmethod
@@ -2089,79 +2101,79 @@ class FieldTypesConverter(object):
     """ Конвертер значений разных типов полей маппера """
 
     converters = {
-        ("Int", "Int"): lambda v, mf, cache: int(v) if None != v else FNone(),
-        ("Int", "String"): lambda v, mf, cache: str(v) if v else FNone(),
-        ("Int", "Date"): lambda v, mf, cache: date.fromtimestamp(v) if v else FNone(),
-        ("Int", "DateTime"): lambda v, mf, cache: datetime.fromtimestamp(v) if v else FNone(),
-        ("Int", "Time"): lambda v, mf, cache: FieldTypesConverter.int2time(v) if v else FNone(),
-        ("Int", "Bool"): lambda v, mf, cache: v != 0,
-        ("Int", "Link"): lambda v, mf, cache: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
-        ("String", "String"): lambda v, mf, cache: v.strip() if v else FNone(),
-        ("String", "Int"): lambda v, mf, cache: int(v.strip()) if v else FNone(),
-        ("String", "Float"): lambda v, mf, cache: float(v.strip()) if v else FNone(),
-        ("String", "Date"): lambda v, mf, cache: FieldTypesConverter.str2date(v) if v else FNone(),
-        ("String", "Time"): lambda v, mf, cache: FieldTypesConverter.str2time(v) if v else FNone(),
-        ("String", "DateTime"): lambda v, mf, cache: FieldTypesConverter.str2datetime(v) if v else FNone(),
-        ('String', 'Link'): lambda v, mf, cache: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
-        ("String", "List"): lambda v, mf, cache: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
-        ("String", "ReversedLink"): lambda v, mf, cache:  FieldTypesConverter.to_reversed_link(mf, v, cache),
-        ("Float", "Float"): lambda v, mf, cache: v if v else FNone(),
-        ("Float", "String"): lambda v, mf, cache: str(v) if v else FNone(),
-        ("Bool", "Bool"): lambda v, mf, cache: v if v else FNone(),
-        ("Bool", "Int"): lambda v, mf, cache: 1 if v else 0,
-        ("Date", "Date"): lambda v, mf, cache: v,
-        ("Date", "Int"): lambda v, mf, cache: int(time.mktime(v.timetuple())) if v else FNone(),
-        ("Date", "String"): lambda v, mf, cache: v.isoformat() if v else FNone(),
-        ("Date", "DateTime"): lambda v, mf, cache: datetime(v.year, v.month, v.day) if v else FNone(),
-        ("Time", "Time"): lambda v, mf, cache: v,
-        ("Time", "Int"): lambda v, mf, cache: (v.hour * 3600 + v.minute*60 + v.second) if v else FNone(),
-        ("Time", "String"): lambda v, mf, cache: v.strftime("%H:%M:%S") if v else FNone(),
-        ("DateTime", "DateTime"): lambda v, mf, cache: v if v else FNone(),
-        ("DateTime", "String"): lambda v, mf, cache: v.strftime("%Y-%m-%d %H:%M:%S") if v else FNone(),
-        ("DateTime", "Int"): lambda v, mf, cache: int(time.mktime(v.timetuple())) if v else FNone(),
-        ("DateTime", "Date"): lambda v, mf, cache: date(v.year, v.month, v.day) if v else FNone(),
-        ("Link", "Int"): lambda v, mf, cache: v.save().get_primary_value() if v else FNone(),
-        ("Link", "String"): lambda v, mf, cache: str(v.save().get_primary_value()) if v else FNone(),
-        ("Link", "ObjectID"): lambda v, mf, cache: v.save().get_primary_value() if v else FNone(),
-        ("List", "String"): lambda v, mf, cache: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
-        ("List", "ObjectID"): lambda v, mf, cache: [it.save().get_primary_value() for it in v] if v is not None else [],
-        ("EmbeddedLink", "EmbeddedDocument"): lambda v, mf, cache: FieldTypesConverter.embedded(mf, v),
-        ("EmbeddedDocument", "EmbeddedLink"): lambda v, mf, cache: FieldTypesConverter.from_embedded(mf, v),
-        ("EmbeddedList", "EmbeddedDocument"): lambda v, mf, cache:
+        ("Int", "Int"): lambda v, mf, cache, s: int(v) if None != v else FNone(),
+        ("Int", "String"): lambda v, mf, cache, s: str(v) if v else FNone(),
+        ("Int", "Date"): lambda v, mf, cache, s: date.fromtimestamp(v) if v else FNone(),
+        ("Int", "DateTime"): lambda v, mf, cache, s: datetime.fromtimestamp(v) if v else FNone(),
+        ("Int", "Time"): lambda v, mf, cache, s: FieldTypesConverter.int2time(v) if v else FNone(),
+        ("Int", "Bool"): lambda v, mf, cache, s: v != 0,
+        ("Int", "Link"): lambda v, mf, cache, s: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
+        ("String", "String"): lambda v, mf, cache, s: v.strip() if v else FNone(),
+        ("String", "Int"): lambda v, mf, cache, s: int(v.strip()) if v else FNone(),
+        ("String", "Float"): lambda v, mf, cache, s: float(v.strip()) if v else FNone(),
+        ("String", "Date"): lambda v, mf, cache, s: FieldTypesConverter.str2date(v) if v else FNone(),
+        ("String", "Time"): lambda v, mf, cache, s: FieldTypesConverter.str2time(v) if v else FNone(),
+        ("String", "DateTime"): lambda v, mf, cache, s: FieldTypesConverter.str2datetime(v) if v else FNone(),
+        ('String', 'Link'): lambda v, mf, cache, s: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
+        ("String", "List"): lambda v, mf, cache, s: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
+        ("String", "ReversedLink"): lambda v, mf, cache, s:  FieldTypesConverter.to_reversed_link(mf, v, cache),
+        ("Float", "Float"): lambda v, mf, cache, s: v if v else FNone(),
+        ("Float", "String"): lambda v, mf, cache, s: str(v) if v else FNone(),
+        ("Bool", "Bool"): lambda v, mf, cache, s: v if v else FNone(),
+        ("Bool", "Int"): lambda v, mf, cache, s: 1 if v else 0,
+        ("Date", "Date"): lambda v, mf, cache, s: v,
+        ("Date", "Int"): lambda v, mf, cache, s: int(time.mktime(v.timetuple())) if v else FNone(),
+        ("Date", "String"): lambda v, mf, cache, s: v.isoformat() if v else FNone(),
+        ("Date", "DateTime"): lambda v, mf, cache, s: datetime(v.year, v.month, v.day) if v else FNone(),
+        ("Time", "Time"): lambda v, mf, cache, s: v,
+        ("Time", "Int"): lambda v, mf, cache, s: (v.hour * 3600 + v.minute*60 + v.second) if v else FNone(),
+        ("Time", "String"): lambda v, mf, cache, s: v.strftime("%H:%M:%S") if v else FNone(),
+        ("DateTime", "DateTime"): lambda v, mf, cache, s: v if v else FNone(),
+        ("DateTime", "String"): lambda v, mf, cache, s: v.strftime("%Y-%m-%d %H:%M:%S") if v else FNone(),
+        ("DateTime", "Int"): lambda v, mf, cache, s: int(time.mktime(v.timetuple())) if v else FNone(),
+        ("DateTime", "Date"): lambda v, mf, cache, s: date(v.year, v.month, v.day) if v else FNone(),
+        ("Link", "Int"): lambda v, mf, cache, s: (v.save().get_primary_value() if s else v.get_primary_value()) if v else FNone(),
+        ("Link", "String"): lambda v, mf, cache, s: str((v.save().get_primary_value() if s else v.get_primary_value())) if v else FNone(),
+        ("Link", "ObjectID"): lambda v, mf, cache, s: (v.save().get_primary_value() if s else v.get_primary_value()) if v else FNone(),
+        ("List", "String"): lambda v, mf, cache, s: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
+        ("List", "ObjectID"): lambda v, mf, cache, s: [(it.save().get_primary_value() if s else it.get_primary_value()) for it in v] if v is not None else [],
+        ("EmbeddedLink", "EmbeddedDocument"): lambda v, mf, cache, s: FieldTypesConverter.embedded(mf, v),
+        ("EmbeddedDocument", "EmbeddedLink"): lambda v, mf, cache, s: FieldTypesConverter.from_embedded(mf, v),
+        ("EmbeddedList", "EmbeddedDocument"): lambda v, mf, cache, s:
         [FieldTypesConverter.embedded(mf, i) for i in v] if v else [],
-        ("EmbeddedDocument", "EmbeddedList"): lambda v, mf, cache:
+        ("EmbeddedDocument", "EmbeddedList"): lambda v, mf, cache, s:
         [FieldTypesConverter.from_embedded(mf, i) for i in v] if v else [],
-        ("ObjectID", "List"): lambda v, mf, cache: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
-        ("ObjectID", "Link"): lambda v, mf, cache: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
-        ("ObjectID", "ReversedLink"): lambda v, mf, cache: FieldTypesConverter.to_reversed_link(mf, v, cache),
-        ("ObjectID", "ObjectID"): lambda v, mf, cache: v,
-        ("Unknown", "String"): lambda v, mf, cache: str(v),
-        ("Int", "Repr"): lambda v, mf, cache: str(v),
-        ("String", "Repr"): lambda v, mf, cache: str(v),
-        ("Float", "Repr"): lambda v, mf, cache: str(v),
-        ("Bool", "Repr"): lambda v, mf, cache: str(v),
-        ("Date", "Repr"): lambda v, mf, cache: str(v),
-        ("Time", "Repr"): lambda v, mf, cache: str(v),
-        ("DateTime", "Repr"): lambda v, mf, cache: str(v),
-        ("DateTime", "Repr"): lambda v, mf, cache: str(v),
-        ("Link", "Repr"): lambda v, mf, cache: str(v),
-        ("List", "Repr"): lambda v, mf, cache: str(v),
-        ("EmbeddedLink", "Repr"): lambda v, mf, cache: str(v),
-        ("EmbeddedDocument", "Repr"): lambda v, mf, cache: str(v),
-        ("EmbeddedList", "Repr"): lambda v, mf, cache: str(v),
-        ("ObjectID", "Repr"): lambda v, mf, cache: str(v),
-        ("Unknown", "Repr"): lambda v, mf, cache: str(v),
-        ("EmbeddedObject", "Int"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Int"),
-        ("EmbeddedObject", "String"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "String"),
-        ("EmbeddedObject", "Float"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Float"),
-        ("EmbeddedObject", "Bool"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Bool"),
-        ("EmbeddedObject", "Date"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Date"),
-        ("EmbeddedObject", "Time"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "Time"),
-        ("EmbeddedObject", "DateTime"): lambda v, mf, cache: FieldTypesConverter.custom_types(v, mf, cache, "DateTime"),
+        ("ObjectID", "List"): lambda v, mf, cache, s: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
+        ("ObjectID", "Link"): lambda v, mf, cache, s: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
+        ("ObjectID", "ReversedLink"): lambda v, mf, cache, s: FieldTypesConverter.to_reversed_link(mf, v, cache),
+        ("ObjectID", "ObjectID"): lambda v, mf, cache, s: v,
+        ("Unknown", "String"): lambda v, mf, cache, s: str(v),
+        ("Int", "Repr"): lambda v, mf, cache, s: str(v),
+        ("String", "Repr"): lambda v, mf, cache, s: str(v),
+        ("Float", "Repr"): lambda v, mf, cache, s: str(v),
+        ("Bool", "Repr"): lambda v, mf, cache, s: str(v),
+        ("Date", "Repr"): lambda v, mf, cache, s: str(v),
+        ("Time", "Repr"): lambda v, mf, cache, s: str(v),
+        ("DateTime", "Repr"): lambda v, mf, cache, s: str(v),
+        ("DateTime", "Repr"): lambda v, mf, cache, s: str(v),
+        ("Link", "Repr"): lambda v, mf, cache, s: str(v),
+        ("List", "Repr"): lambda v, mf, cache, s: str(v),
+        ("EmbeddedLink", "Repr"): lambda v, mf, cache, s: str(v),
+        ("EmbeddedDocument", "Repr"): lambda v, mf, cache, s: str(v),
+        ("EmbeddedList", "Repr"): lambda v, mf, cache, s: str(v),
+        ("ObjectID", "Repr"): lambda v, mf, cache, s: str(v),
+        ("Unknown", "Repr"): lambda v, mf, cache, s: str(v),
+        ("EmbeddedObject", "Int"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Int"),
+        ("EmbeddedObject", "String"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "String"),
+        ("EmbeddedObject", "Float"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Float"),
+        ("EmbeddedObject", "Bool"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Bool"),
+        ("EmbeddedObject", "Date"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Date"),
+        ("EmbeddedObject", "Time"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Time"),
+        ("EmbeddedObject", "DateTime"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "DateTime"),
         ("EmbeddedObject", "EmbeddedObject"):
-        lambda v, mf, cache: None if not v else v.get_value() if isinstance(v, EmbeddedObject) else mf.model(v),
-        ("Int", "EmbeddedObject"): lambda v, mf, cache: mf.model(v) if v else None,
-        ("String", "EmbeddedObject"): lambda v, mf, cache: mf.model(v) if v else None
+        lambda v, mf, cache, s: None if not v else v.get_value() if isinstance(v, EmbeddedObject) else mf.model(v),
+        ("Int", "EmbeddedObject"): lambda v, mf, cache, s: mf.model(v) if v else None,
+        ("String", "EmbeddedObject"): lambda v, mf, cache, s: mf.model(v) if v else None
     }
 
     @staticmethod
@@ -2301,13 +2313,13 @@ class FieldTypesConverter(object):
         ) if v else FNone()
 
     @staticmethod
-    def custom_types(v, mf, cache, target_type):
+    def custom_types(v, mf, cache, s, target_type):
         if not v:
             return None
         target_lambda = FieldTypesConverter.converters.get(
             (mf.get_value_type_in_mapper_terms(v.get_value_type()).ident, target_type)
         )
-        return target_lambda(v.get_value(), mf, cache)
+        return target_lambda(v.get_value(), mf, cache, s)
 
 
 # noinspection PyPep8Naming
