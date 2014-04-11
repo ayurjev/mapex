@@ -232,9 +232,10 @@ class RecordModel(object):
             return self
         else:
             # Если объект загружен из БД и его сумма не изменилась, то просто отдаем primary
-            if self.md5 == self.calc_sum():
+            current_calc_sum = self.calc_sum()
+            if self.md5 == current_calc_sum:
                 return self
-            self.md5 = self.calc_sum()  # пересчет md5 должен происходить до Update, чтобы избежать рекурсии
+            self.md5 = current_calc_sum  # пересчет md5 должен происходить до Update, чтобы избежать рекурсии
             self._collection.update(data_for_insert, self.mapper.primary.eq_condition(self.get_old_primary_value()))
             self.origin = OriginModel(self.get_data())
             self.set_primary_value(self.get_actual_primary_value())

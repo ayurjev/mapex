@@ -1440,6 +1440,12 @@ class SqlMapper(metaclass=ABCMeta):
         # Так как они могут быть что-то вроде IDENTITY полей и не подлежат изменениям даже на теже самые значения
         # TODO не отсекать поля составного первичного ключа
         if conditions:
+            if self.primary.exists() and not self.primary.compound:
+                primary_name = self.primary.name()
+                primary_in_conditions = conditions.get(primary_name)
+                primary_in_flat_data = flat_data.get(primary_name)
+                if isinstance(primary_in_conditions, RecordModel) and primary_in_conditions == primary_in_flat_data:
+                    primary_in_flat_data.save()
             flat_data = {key: flat_data[key] for key in flat_data if conditions.get(key, "&bzx") != flat_data[key]}
 
         # Сохраняем записи в основной таблице
