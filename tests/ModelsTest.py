@@ -1770,6 +1770,20 @@ class TableModelTest(unittest.TestCase):
         count += dbms_fw.get_queries_amount("loading_tags")
         self.assertEqual(count, connection.count_queries())             # Потрачено три запроса
 
+    @for_all_dbms
+    def test_calc_sum(self, dbms_fw: DbMock):
+        """ Рекурсивный просчёт хэша модели """
+        user = dbms_fw.get_new_user_instance()
+        user.name = "test"
+        self.assertNotEqual(user.md5, user.calc_sum())
+
+        user.account = dbms_fw.get_new_account_instance()
+        user.account.email = "test@google.com"
+        user.save()
+
+        user = dbms_fw.get_new_users_collection_instance().get_item({"name": user.name})
+        user.account.email = "test@yandex.ru"
+        self.assertNotEqual(user.md5, user.calc_sum())
 
 class RecordModelTest(unittest.TestCase):
     """ Модульные тесты для класса TableModel """
