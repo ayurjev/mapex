@@ -1785,6 +1785,7 @@ class TableModelTest(unittest.TestCase):
         user.account.email = "test@yandex.ru"
         self.assertNotEqual(user.md5, user.calc_sum())
 
+
 class RecordModelTest(unittest.TestCase):
     """ Модульные тесты для класса TableModel """
     def setUp(self):
