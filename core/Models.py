@@ -320,6 +320,10 @@ class RecordModel(object):
             res = lazy()
             return res
 
+    def is_loaded(self):
+        """ Проверяет что модель уже была загружена """
+        return self._lazy_load is False
+
     def set_primary_value(self, primary_value):
         """
         Устанавливает новое значение первичного ключа для текущей модели
@@ -441,16 +445,35 @@ class RecordModel(object):
                 data_for_insert[key] = all_data[key]
         return data_for_insert
 
-    def calc_sum(self) -> str:
+    @staticmethod
+    def calc_md5(item):
+        return hashlib.md5(str(item).encode()).hexdigest()
+
+    @classmethod
+    def calc_hash(cls, item, cash):
+        if isinstance(item, RecordModel) and item.is_loaded():
+            return item.calc_sum(cash)
+        elif isinstance(item, list) and any([model.is_loaded() for model in item]):
+            return cls.calc_md5([model.calc_sum(cash) for model in item if model.is_loaded()])
+        else:
+            return cls.calc_md5(item)
+
+    def calc_sum(self, cash=None) -> str:
         """
-        Считает хэш-сумму для модели
+        Считает рекурсивно хэш-сумму для модели
         @return: Хэш-сумма данных модели
         @rtype : str
-
         """
-        all_data = self.get_data()
-        self.md5_data = {key: hashlib.md5(str(all_data[key]).encode()).hexdigest() for key in all_data}
-        return hashlib.md5(str(self.get_data()).encode()).hexdigest()
+        if cash is None:
+            cash = {}
+
+        for key, value in self.get_data().items():
+            model = "%s.%s" % (self.__class__.__name__, key)
+            if not model in cash:
+                cash[model] = self.calc_hash(value, cash)
+            self.md5_data[key] = cash[model]
+
+        return self.calc_md5(self.md5_data)
 
     def __setattr__(self, name, val):
         """ При любом изменении полей модели необходимо инициализировать модель """
