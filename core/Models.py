@@ -76,16 +76,10 @@ class TableModel(object):
         Осуществляет вставку данных в коллекцию
         :param data:    Данные для вставки в коллекцию
         """
-        new_item = lambda: self.get_new_item()
         data = self.check_incoming_data(data)
         if type(data) is list:
             return [self.insert(it) for it in data]
-
-        if isinstance(data, dict):
-            model = new_item()
-            model.load_from_array(data)
-            model_data = data
-        elif isinstance(data, RecordModel):
+        if isinstance(data, RecordModel):
             model_data = data.get_data_for_write_operation()
             model = data
         else:
@@ -107,14 +101,48 @@ class TableModel(object):
         """
         return self.mapper.delete(self.mix_boundaries(conditions))
 
-    def update(self, data, conditions=None):
+    def update(self, data, conditions=None, model=None):
         """ Обновляет записи в коллекции
         :param data:        Данные для обновления записей
         :param conditions:  Условия обновления записей в коллекции
         """
-        return self.mapper.update(
-            data, self.mix_boundaries(conditions), lambda: self.get_new_item()
-        )
+        flat_data, lists_objects = self.mapper.split_data_by_relation_type(data)
+
+        # Отсекаем из массива изменений, то,
+        # что в неизменном виде присутствует в массиве условий (то есть не будет изменено)
+        # Это важно особенно, так как в flat_data не должны попадать те значения первичных ключей, которые не изменялись
+        # Так как они могут быть что-то вроде IDENTITY полей и не подлежат изменениям даже на теже самые значения
+        # TODO не отсекать поля составного первичного ключа
+        conditions = self.mix_boundaries(conditions)
+        if conditions:
+            if self.mapper.primary.exists() and not self.mapper.primary.compound:
+                primary_name = self.mapper.primary.name()
+                primary_in_conditions = conditions.get(primary_name)
+                primary_in_flat_data = flat_data.get(primary_name)
+                if isinstance(primary_in_conditions, RecordModel) and primary_in_conditions == primary_in_flat_data:
+                    primary_in_flat_data.save()
+            flat_data = {key: flat_data[key] for key in flat_data if conditions.get(key, "&bzx") != flat_data[key]}
+
+        # Сохраняем записи в основной таблице
+        changed_primaries = self.mapper.update(flat_data, conditions)
+        if len(changed_primaries) > 0:
+            if self.mapper.primary.compound:
+                items_to_update = [self.get_item(compound_primary) for compound_primary in changed_primaries]
+            else:
+                items_to_update = self.get_items({self.mapper.primary.name(): ("in", [changed_primary.get_primary_value() if isinstance(changed_primary, RecordModel) else changed_primary.get_value() if isinstance(changed_primary, EmbeddedObject) else changed_primary for changed_primary in changed_primaries])})
+            if lists_objects != {}:
+                if model:
+                    model.load_from_array(model.get_data(), loaded_from_db=True)
+                    print(items_to_update, [i.get_data()["documents"][0].get_data() for i in items_to_update])
+                    print([model], [i.get_data()["documents"][0].get_data() for i in [model]])
+                    print()
+                    self.mapper.link_all_list_objects(lists_objects, model)
+                else:
+                    for updated_item in items_to_update:
+                        self.mapper.link_all_list_objects(lists_objects, updated_item)
+            return items_to_update
+        else:
+            return []
 
     def get_property_list(self, property_name: str, conditions=None, params=None):
         """
@@ -224,7 +252,7 @@ class RecordModel(object):
         self.validate()
         data_for_insert = self.get_data_for_write_operation()
         if self._loaded_from_db is False:
-            res = self._collection.insert(data_for_insert)
+            res = self._collection.insert(self)
             self.__dict__ = res.__dict__
             self.md5 = self.calc_sum()
             self.origin = OriginModel(self.get_data())
@@ -236,7 +264,7 @@ class RecordModel(object):
             if self.md5 == current_calc_sum:
                 return self
             self.md5 = current_calc_sum  # пересчет md5 должен происходить до Update, чтобы избежать рекурсии
-            self._collection.update(data_for_insert, self.mapper.primary.eq_condition(self.get_old_primary_value()))
+            self._collection.update(data_for_insert, self.mapper.primary.eq_condition(self.get_old_primary_value()), model=self)
             self.origin = OriginModel(self.get_data())
             self.set_primary_value(self.get_actual_primary_value())
             return self
