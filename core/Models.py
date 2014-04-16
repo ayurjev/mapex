@@ -4,7 +4,7 @@
 import hashlib
 from abc import ABCMeta, abstractmethod
 from mapex.core.Exceptions import TableModelException
-from copy import deepcopy
+from collections import OrderedDict
 
 
 class TableModel(object):
@@ -182,7 +182,7 @@ class RecordModel(object):
         self._lazy_load = None
         self._loaded_from_db = False
         self._collection = None
-        self.md5_data = {}
+        self.md5_data = OrderedDict()
         self.md5 = None
         self.origin = None
         if self.__class__.mapper is None:
@@ -446,35 +446,38 @@ class RecordModel(object):
                 data_for_insert[key] = all_data[key]
         return data_for_insert
 
-    @staticmethod
-    def calc_md5(item):
-        return hashlib.md5(str(item).encode()).hexdigest()
 
-    @classmethod
-    def calc_hash(cls, item, cash):
-        if isinstance(item, RecordModel) and item.is_loaded():
-            return item.calc_sum(cash)
-        elif isinstance(item, list) and any([model.is_loaded() for model in item]):
-            return cls.calc_md5([model.calc_sum(cash) for model in item if model.is_loaded()])
-        else:
-            return cls.calc_md5(item)
-
-    def calc_sum(self, cash=None) -> str:
+    def calc_sum(self) -> str:
         """
         Считает рекурсивно хэш-сумму для модели
         @return: Хэш-сумма данных модели
         @rtype : str
         """
-        if cash is None:
-            cash = {}
+        def calc_md5(item):
+            """  """
+            return hashlib.md5(str(item).encode()).hexdigest()
 
-        for key, value in self.get_data().items():
-            model = "%s.%s" % (self.__class__.__name__, key)
-            if not model in cash:
-                cash[model] = self.calc_hash(value, cash)
-            self.md5_data[key] = cash[model]
+        def calc_hash(item):
+            if isinstance(item, RecordModel) and item.is_loaded():
+                return item.calc_sum()
+            elif isinstance(item, list):
+                models = [model for model in item if model.is_loaded()]
+                if len(models):
+                    mapper_properties = models[0].mapper.get_properties()
+                    if len(mapper_properties):
+                        # Для сортировки использую первое по порядку поле модели
+                        # После сортировки вновь превращаю models в список
+                        sort_field = mapper_properties[0]
+                        models = {str(model.__getattribute__(sort_field)): model for model in models}
+                        models = dict(sorted(models.items())).values()
+                    return calc_md5([model.calc_sum() for model in models])
+                else:
+                    return calc_md5(item)
+            else:
+                return calc_md5(item)
 
-        return self.calc_md5(self.md5_data)
+        self.md5_data = {key: calc_hash(value) for key, value in sorted(self.get_data().items())}
+        return calc_md5(self.md5_data)
 
     def __setattr__(self, name, val):
         """ При любом изменении полей модели необходимо инициализировать модель """
