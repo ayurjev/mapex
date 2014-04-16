@@ -1107,7 +1107,6 @@ class TableModelTest(unittest.TestCase):
 
             user1.save()
             user2.save()
-
             self.assertEqual(2, users.count())
 
             self.assertCountEqual([doc1.number, doc2.number], [d.number for d in user1.documents_not_ai])

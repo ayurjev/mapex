@@ -85,8 +85,12 @@ class TableModel(object):
         else:
             raise TableModelException("Insert failed: unknown item format")
 
+        model._loaded_from_db = True
+
         flat_data, lists_objects = self.mapper.split_data_by_relation_type(model_data)
         last_record = self.mapper.insert(flat_data)
+
+
         if self.mapper.primary.exists():
             model.set_primary_value(last_record)
             self.mapper.link_all_list_objects(
@@ -132,10 +136,6 @@ class TableModel(object):
                 items_to_update = self.get_items({self.mapper.primary.name(): ("in", [changed_primary.get_primary_value() if isinstance(changed_primary, RecordModel) else changed_primary.get_value() if isinstance(changed_primary, EmbeddedObject) else changed_primary for changed_primary in changed_primaries])})
             if lists_objects != {}:
                 if model:
-                    model.load_from_array(model.get_data(), loaded_from_db=True)
-                    print(items_to_update, [i.get_data()["documents"][0].get_data() for i in items_to_update])
-                    print([model], [i.get_data()["documents"][0].get_data() for i in [model]])
-                    print()
                     self.mapper.link_all_list_objects(lists_objects, model)
                 else:
                     for updated_item in items_to_update:
@@ -211,6 +211,7 @@ class RecordModel(object):
         self._loaded_from_db = False
         self._collection = None
         self.md5_data = OrderedDict()
+        self._updating = False
         self.md5 = None
         self.origin = None
         if self.__class__.mapper is None:
@@ -249,25 +250,49 @@ class RecordModel(object):
         """ Сохраняет текущее состояние модели в БД """
         if self.mapper.primary.exists() is False:
             raise TableModelException("there is no primary key for this model, so method save() is not allowed")
-        self.validate()
-        data_for_insert = self.get_data_for_write_operation()
+
         if self._loaded_from_db is False:
-            res = self._collection.insert(self)
-            self.__dict__ = res.__dict__
+            self.validate()
+            print(self, "INSERTING!")
             self.md5 = self.calc_sum()
+
+            res = self._collection.insert(self)
+
+            #self.__dict__ = res.__dict__
+
             self.origin = OriginModel(self.get_data())
             self.set_primary_value(self.get_actual_primary_value())
             return self
         else:
             # Если объект загружен из БД и его сумма не изменилась, то просто отдаем primary
+            print(self, "saving, lock = %s", str(self._updating))
+            if self._updating:
+                return self
             current_calc_sum = self.calc_sum()
             if self.md5 == current_calc_sum:
+                print(self, "saving end equal sum")
                 return self
+
+            print(self, "prevalidating")
+            self.validate()
             self.md5 = current_calc_sum  # пересчет md5 должен происходить до Update, чтобы избежать рекурсии
-            self._collection.update(data_for_insert, self.mapper.primary.eq_condition(self.get_old_primary_value()), model=self)
-            self.origin = OriginModel(self.get_data())
-            self.set_primary_value(self.get_actual_primary_value())
-            return self
+
+            # noinspection PyBroadException
+            try:
+                print(self, "setting lock")
+                self._updating = True
+                self._collection.update(
+                    self.get_data_for_write_operation(),
+                    self.mapper.primary.eq_condition(self.get_old_primary_value()),
+                    model=self
+                )
+                self.origin = OriginModel(self.get_data())
+                self.set_primary_value(self.get_actual_primary_value())
+            finally:
+                print(self, "removing lock")
+                self._updating = False
+
+        return self
 
     def remove(self):
         """ Удаляет объект из коллекции """

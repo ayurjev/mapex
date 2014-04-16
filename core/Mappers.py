@@ -585,7 +585,6 @@ class FieldTypes(object):
                 {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.get_actual_primary_value()}
             )
             for obj in filter(None, items):
-                print(obj, main_record_obj)
                 obj.__setattr__(main_record_key, main_record_obj)
                 obj.save()
 
@@ -1416,6 +1415,7 @@ class SqlMapper(metaclass=ABCMeta):
 
         try:
             last_record = self.db.insert_query(self.table_name, self.translate_and_convert(data), self.primary)
+
         except DublicateRecordException as err:
             raise self.__class__.dublicate_record_exception(err)
         return self.primary.grab_value_from(
