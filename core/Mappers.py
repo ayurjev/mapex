@@ -1415,13 +1415,14 @@ class SqlMapper(metaclass=ABCMeta):
 
         try:
             last_record = self.db.insert_query(self.table_name, self.translate_and_convert(data), self.primary)
+
         except DublicateRecordException as err:
             raise self.__class__.dublicate_record_exception(err)
         return self.primary.grab_value_from(
             last_record if self.primary.defined_by_user is False and last_record != 0 else data
         )
 
-    def update(self, data: dict, conditions: dict=None, new_item=None):
+    def update(self, data: dict, conditions: dict=None):
         """
         Выполняет обновление существующих в таблице записей
         @param data: Новые данные
@@ -1432,47 +1433,25 @@ class SqlMapper(metaclass=ABCMeta):
         @return: Значение первичного ключа для обновленной записи/записей
         
         """
-        flat_data, lists_objects = self.split_data_by_relation_type(data)
-
-        # Отсекаем из массива изменений, то,
-        # что в неизменном виде присутствует в массиве условий (то есть не будет изменено)
-        # Это важно особенно, так как в flat_data не должны попадать те значения первичных ключей, которые не изменялись
-        # Так как они могут быть что-то вроде IDENTITY полей и не подлежат изменениям даже на теже самые значения
-        # TODO не отсекать поля составного первичного ключа
-        if conditions:
-            if self.primary.exists() and not self.primary.compound:
-                primary_name = self.primary.name()
-                primary_in_conditions = conditions.get(primary_name)
-                primary_in_flat_data = flat_data.get(primary_name)
-                if isinstance(primary_in_conditions, RecordModel) and primary_in_conditions == primary_in_flat_data:
-                    primary_in_flat_data.save()
-            flat_data = {key: flat_data[key] for key in flat_data if conditions.get(key, "&bzx") != flat_data[key]}
-
-        # Сохраняем записи в основной таблице
-        if flat_data != {}:
+        if self.primary.exists():           # Если, конечно, первичный ключ определен
+            if self.primary.compound:       # Если он составной
+                changed_records_ids = [
+                    self.primary.grab_value_from(chid) for chid in self.get_rows(self.primary.name(), conditions)
+                ]
+            else:                           # Если он обычный
+                changed_records_ids = list(self.get_column(self.primary.name(), conditions))
+        else:
+            changed_records_ids = []
+        if data != {}:
             converted_conditions = self.translate_and_convert(conditions, save_unsaved=False)
             try:
                 self.db.update_query(
-                    self.table_name, self.translate_and_convert(flat_data), converted_conditions,
+                    self.table_name, self.translate_and_convert(data), converted_conditions,
                     self.get_joined_tables(converted_conditions), self.primary
                 )
             except DublicateRecordException as err:
                 raise self.__class__.dublicate_record_exception(err)
-        # Получаем id измененных записей и пересохраняем привязанные к ним объекты (если требуется)
-        if lists_objects != {}:
-            if self.primary.exists():           # Если, конечно, первичный ключ определен
-                if self.primary.compound:       # Если он составной
-                    changed_records_ids = [
-                        self.primary.grab_value_from(chid) for chid in self.get_rows([self.primary.name()], conditions)
-                    ]
-                else:                           # Если он обычный
-                    changed_records_ids = list(self.get_column(self.primary.name(), conditions))
-                if new_item:
-                    for main_record_id in changed_records_ids:
-                        self.link_all_list_objects(lists_objects, new_item().load_by_primary(main_record_id))
-                return changed_records_ids
-            else:
-                raise TableModelException("Updates can affect only main mapper's fields since there is no primary key")
+        return changed_records_ids
 
     def delete(self, conditions: dict=None):
         """

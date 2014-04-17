@@ -1107,7 +1107,6 @@ class TableModelTest(unittest.TestCase):
 
             user1.save()
             user2.save()
-
             self.assertEqual(2, users.count())
 
             self.assertCountEqual([doc1.number, doc2.number], [d.number for d in user1.documents_not_ai])
@@ -1223,7 +1222,9 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual([document3.number], [d.number for d in third_user.documents])
         third_user.documents, second_user.documents = list(second_user.documents), list(third_user.documents)
 
+        print('+++++++++')
         third_user.save()
+        print("=========")
         second_user.save()
         if documents:
             self.assertEqual(4, documents.count())
