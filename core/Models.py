@@ -205,11 +205,12 @@ class RecordModel(object):
     mapper = None
 
     def __init__(self, data=None, loaded_from_db=False):
-        self._lazy_load = None
+        self._lazy_load = False
         self._loaded_from_db = False
         self._collection = None
         self.md5_data = OrderedDict()
         self._updating = False
+        self.calcsumlock = False
         self.md5 = None
         self.origin = None
         if self.__class__.mapper is None:
@@ -322,6 +323,7 @@ class RecordModel(object):
 
         self.set_primary_value(primary)
         self._lazy_load = (lambda: self.cache_load(cache)) if cache else (lambda: self.normal_load())
+        self._loaded_from_db = True
         return self
 
     def load_from_array(self, data, loaded_from_db=False):
@@ -378,7 +380,7 @@ class RecordModel(object):
         @return: Установленное значение первичного ключа
 
         """
-        self._loaded_from_db = primary_value
+        #self._loaded_from_db = primary_value
         if type(primary_value) is dict:
             self.__dict__.update(primary_value)
         else:
@@ -411,7 +413,8 @@ class RecordModel(object):
         @return: Значение первичного ключа
 
         """
-        return self._loaded_from_db if type(self._loaded_from_db) is not bool else self.get_actual_primary_value()
+        return self.mapper.primary.grab_value_from(self.origin.__dict__) \
+            if self.origin else self.get_actual_primary_value()
 
     def get_data(self, properties: list=None) -> dict:
         """
@@ -492,13 +495,13 @@ class RecordModel(object):
                 data_for_insert[key] = all_data[key]
         return data_for_insert
 
-
     def calc_sum(self) -> str:
         """
         Считает рекурсивно хэш-сумму для модели
         @return: Хэш-сумма данных модели
         @rtype : str
         """
+
         def calc_md5(item):
             """  """
             return hashlib.md5(str(item).encode()).hexdigest()
@@ -522,7 +525,12 @@ class RecordModel(object):
             else:
                 return calc_md5(item)
 
-        self.md5_data = {key: calc_hash(value) for key, value in sorted(self.get_data().items())}
+        if not self.calcsumlock:
+            try:
+                self.calcsumlock = True
+                self.md5_data = {key: calc_hash(value) for key, value in sorted(self.get_data().items())}
+            finally:
+                self.calcsumlock = False
         return calc_md5(self.md5_data)
 
     def __setattr__(self, name, val):
