@@ -85,8 +85,6 @@ class TableModel(object):
         else:
             raise TableModelException("Insert failed: unknown item format")
 
-        model._loaded_from_db = True
-
         flat_data, lists_objects = self.mapper.split_data_by_relation_type(model_data)
         last_record = self.mapper.insert(flat_data)
 
@@ -253,45 +251,40 @@ class RecordModel(object):
 
         if self._loaded_from_db is False:
             self.validate()
-            print(self, "INSERTING!")
-            self.md5 = self.calc_sum()
-
-            res = self._collection.insert(self)
-
-            #self.__dict__ = res.__dict__
-
-            self.origin = OriginModel(self.get_data())
-            self.set_primary_value(self.get_actual_primary_value())
-            return self
+            try:
+                self._loaded_from_db = True
+                self.md5 = self.calc_sum()
+                self._collection.insert(self)
+                self.origin = OriginModel(self.get_data())
+                self.set_primary_value(self.get_actual_primary_value())
+                return self
+            except Exception as err:
+                self._loaded_from_db = False
+                raise err
         else:
-            # Если объект загружен из БД и его сумма не изменилась, то просто отдаем primary
-            print(self, "saving, lock = %s", str(self._updating))
+            # Если объект уже находится в состоянии сохранения, то выходим, чтобы разорвать рекурсию
             if self._updating:
                 return self
+
             current_calc_sum = self.calc_sum()
+            # Если объект загружен из БД и его сумма не изменилась, то просто отдаем primary
             if self.md5 == current_calc_sum:
-                print(self, "saving end equal sum")
                 return self
 
-            print(self, "prevalidating")
             self.validate()
-            self.md5 = current_calc_sum  # пересчет md5 должен происходить до Update, чтобы избежать рекурсии
-
             # noinspection PyBroadException
             try:
-                print(self, "setting lock")
                 self._updating = True
                 self._collection.update(
                     self.get_data_for_write_operation(),
                     self.mapper.primary.eq_condition(self.get_old_primary_value()),
                     model=self
                 )
+                self.md5 = current_calc_sum
                 self.origin = OriginModel(self.get_data())
                 self.set_primary_value(self.get_actual_primary_value())
             finally:
-                print(self, "removing lock")
                 self._updating = False
-
         return self
 
     def remove(self):
