@@ -84,10 +84,8 @@ class TableModel(object):
             model = data
         else:
             raise TableModelException("Insert failed: unknown item format")
-
         flat_data, lists_objects = self.mapper.split_data_by_relation_type(model_data)
         last_record = self.mapper.insert(flat_data)
-
 
         if self.mapper.primary.exists():
             model.set_primary_value(last_record)
@@ -109,7 +107,6 @@ class TableModel(object):
         :param conditions:  Условия обновления записей в коллекции
         """
         flat_data, lists_objects = self.mapper.split_data_by_relation_type(data)
-
         # Отсекаем из массива изменений, то,
         # что в неизменном виде присутствует в массиве условий (то есть не будет изменено)
         # Это важно особенно, так как в flat_data не должны попадать те значения первичных ключей, которые не изменялись
@@ -199,6 +196,14 @@ class OriginModel(object):
     def __init__(self, data):
         self.__dict__ = data
 
+    def get(self, key):
+        """
+        Возвращает значение из origin по имени ключа
+        @param key: Имя свойства
+        @return: Значения свойства в origin
+        """
+        return self.__dict__.get(key)
+
 
 class RecordModel(object):
     """ Класс создания моделей записей в таблицах БД """
@@ -207,12 +212,10 @@ class RecordModel(object):
     def __init__(self, data=None, loaded_from_db=False):
         self._lazy_load = False
         self._changed = True
+        self._cant_calc_changed = False
         self._loaded_from_db = False
         self._collection = None
-        self.md5_data = OrderedDict()
         self._updating = False
-        self.calcsumlock = False
-        self.md5 = None
         self.origin = None
         if self.__class__.mapper is None:
             raise TableModelException("No mapper for %s model" % self)
@@ -231,7 +234,6 @@ class RecordModel(object):
             }
             default_data.update(self.__dict__)
             self.__dict__ = default_data
-            self.md5 = self.calc_sum()
 
     # noinspection PyMethodMayBeStatic
     def validate(self):
@@ -250,12 +252,10 @@ class RecordModel(object):
         """ Сохраняет текущее состояние модели в БД """
         if self.mapper.primary.exists() is False:
             raise TableModelException("there is no primary key for this model, so method save() is not allowed")
-
         if self._loaded_from_db is False:
             self.validate()
             try:
                 self._loaded_from_db = True
-                self.md5 = self.calc_sum()
                 self._collection.insert(self)
                 self.origin = OriginModel(self.get_data())
                 self.set_primary_value(self.get_actual_primary_value())
@@ -267,15 +267,10 @@ class RecordModel(object):
         else:
             # Если объект уже находится в состоянии сохранения, то выходим, чтобы разорвать рекурсию
             if self._updating:
-                self._changed = False
                 return self
-
-            current_calc_sum = self.calc_sum()
             # Если объект загружен из БД и его сумма не изменилась, то просто отдаем primary
-            if self.md5 == current_calc_sum:
-                self._changed = False
+            if not self.is_changed():
                 return self
-
             self.validate()
             # noinspection PyBroadException
             try:
@@ -285,7 +280,6 @@ class RecordModel(object):
                     self.mapper.primary.eq_condition(self.get_old_primary_value()),
                     model=self
                 )
-                self.md5 = current_calc_sum
                 self.origin = OriginModel(self.get_data())
                 self.set_primary_value(self.get_actual_primary_value())
             finally:
@@ -339,8 +333,7 @@ class RecordModel(object):
         for key in data:
             self.__setattr__(key, data[key])
         if loaded_from_db:
-
-            self.md5 = self.calc_sum()
+            self._changed = False
             self.origin = OriginModel(data)
         return self
 
@@ -492,62 +485,22 @@ class RecordModel(object):
         data_for_insert = {}
         all_data = self.get_data()
         for key in all_data:
-            if (
-                    self.mapper.is_base_value(all_data[key]) is False or
-                    self.md5_data.get(key) != hashlib.md5(str(all_data[key]).encode()).hexdigest() or
-                    (self.mapper.is_list_value(all_data[key]) is True and all_data[key].changed)
-            ):
-                data_for_insert[key] = all_data[key]
+            val = all_data[key]
+            if isinstance(val, RecordModel):
+                data_for_insert[key] = val
+            elif self.mapper.is_list_value(val):
+                if val.changed:
+                    data_for_insert[key] = val
+            elif self.mapper.is_base_value(val) is False:
+                data_for_insert[key] = val
         return data_for_insert
 
     def is_changed(self):
         """ Возвращает признак того, изменялась ли модель с момента загрузки из базы данных или нет """
-        return any(filter(lambda it: isinstance(it, RecordModel) and it.is_changed(), [self.__dict__.get(property_name) for property_name in self.mapper.get_properties()])) or self._changed
-
-    def calc_sum(self, cache=None) -> str:
-        """
-        Считает рекурсивно хэш-сумму для модели
-        @return: Хэш-сумма данных модели
-        @rtype : str
-        """
-        if cache is None:
-            cache = {}
-
-        def calc_md5(item):
-            """  """
-            return hashlib.md5(str(item).encode()).hexdigest()
-
-        def calc_hash(item):
-            if isinstance(item, RecordModel) and item.is_loaded():
-                return item.calc_sum(cache)
-            elif isinstance(item, list):
-                models = [model for model in item if model.is_loaded()]
-                if len(models):
-                    mapper_properties = models[0].mapper.get_properties()
-                    if len(mapper_properties):
-                        # Для сортировки использую первое по порядку поле модели
-                        # После сортировки вновь превращаю models в список
-                        sort_field = mapper_properties[0]
-                        models = {str(model.__getattribute__(sort_field)): model for model in models}
-                        models = dict(sorted(models.items())).values()
-                    return calc_md5([model.calc_sum(cache) for model in models])
-                else:
-                    return calc_md5(item)
-            else:
-                return calc_md5(item)
-
-        if not cache.get(id(self)):
-            if not self.calcsumlock:
-                try:
-                    self.calcsumlock = True
-                    self.md5_data = OrderedDict()
-                    for key, value in sorted(self.get_data().items()):
-                        if id(value) not in cache:
-                            cache[id(value)] = calc_hash(value)
-                        self.md5_data[key] = cache[id(value)]
-                finally:
-                    self.calcsumlock = False
-        return calc_md5(self.md5_data)
+        self._cant_calc_changed = True
+        res = any(filter(lambda it: (isinstance(it, RecordModel) and not it._cant_calc_changed and it.is_changed()) or (self.mapper.is_list_value(it) and it.changed), [self.__dict__.get(property_name) for property_name in self.mapper.get_properties()])) or self._changed
+        self._cant_calc_changed = False
+        return res
 
     def __setattr__(self, name, val):
         """ При любом изменении полей модели необходимо инициализировать модель """
