@@ -2033,5 +2033,55 @@ class RecordModelTest(unittest.TestCase):
         user = users.get_item({"name": "Иннокентий"})
         self.assertEqual(user.name, user.origin.name)
 
+
+from tests.framework.TestFramework import AModel, BModel, CModel, ACollection, BCollection, CCollection
+from tests.framework.TestFramework import MyDbMock
+
+
+class RecordModelTestMySqlOnly(unittest.TestCase):
+    """ Некоторые тесты, которые не имеет смысла запускть для всех СУБД """
+    def setUp(self):
+        MyDbMock().up()
+        self.a_collection = ACollection()
+        self.b_collection = BCollection()
+        self.c_collection = CCollection()
+
+    def tearDown(self):
+        MyDbMock().down()
+
+    def test_changed(self, ):
+        """ Проверим, как фиксируются изменения моделей любых уровней вложенности """
+        c1 = CModel({"name": "C"})
+        b1 = BModel({"name": "B", "c": c1})
+        a1 = AModel({"name": "A", "b": b1})
+
+        self.assertTrue(c1.is_changed())
+        self.assertTrue(b1.is_changed())
+        self.assertTrue(a1.is_changed())
+        a1.save()
+        self.assertEqual(1, self.a_collection.count())
+        self.assertEqual(1, self.b_collection.count())
+        self.assertEqual(1, self.c_collection.count())
+        self.assertFalse(c1.is_changed())
+        self.assertFalse(b1.is_changed())
+        self.assertFalse(a1.is_changed())
+
+        c1.name = "C2"
+        self.assertTrue(c1.is_changed())
+        self.assertTrue(b1.is_changed())
+        self.assertTrue(a1.is_changed())
+        a1.save()
+        self.assertFalse(c1.is_changed())
+        self.assertFalse(b1.is_changed())
+        self.assertFalse(a1.is_changed())
+
+        c2 = CModel({"name": "C2"})
+        c2.save()
+        a1.b.c = c2
+        self.assertFalse(c2.is_changed())
+        self.assertTrue(b1.is_changed())
+        self.assertTrue(a1.is_changed())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -206,6 +206,7 @@ class RecordModel(object):
 
     def __init__(self, data=None, loaded_from_db=False):
         self._lazy_load = False
+        self._changed = True
         self._loaded_from_db = False
         self._collection = None
         self.md5_data = OrderedDict()
@@ -258,6 +259,7 @@ class RecordModel(object):
                 self._collection.insert(self)
                 self.origin = OriginModel(self.get_data())
                 self.set_primary_value(self.get_actual_primary_value())
+                self._changed = False
                 return self
             except Exception as err:
                 self._loaded_from_db = False
@@ -265,11 +267,13 @@ class RecordModel(object):
         else:
             # Если объект уже находится в состоянии сохранения, то выходим, чтобы разорвать рекурсию
             if self._updating:
+                self._changed = False
                 return self
 
             current_calc_sum = self.calc_sum()
             # Если объект загружен из БД и его сумма не изменилась, то просто отдаем primary
             if self.md5 == current_calc_sum:
+                self._changed = False
                 return self
 
             self.validate()
@@ -286,6 +290,7 @@ class RecordModel(object):
                 self.set_primary_value(self.get_actual_primary_value())
             finally:
                 self._updating = False
+        self._changed = False
         return self
 
     def remove(self):
@@ -298,9 +303,8 @@ class RecordModel(object):
         """ Обновляет состояние модели в соответствии с состоянием в БД """
         if self.mapper.primary.exists() is False:
             raise TableModelException("there is no primary key for this model, so method refresh() is not allowed")
-        self.load_from_array(self.get_new_collection().get_item(
-            self.mapper.primary.eq_condition(self.get_actual_primary_value())
-        ).get_data(), loaded_from_db=True)
+        actual_copy = self.get_new_collection().get_item(self.mapper.primary.eq_condition(self.get_primary_value()))
+        self.load_from_array(actual_copy.get_data(), loaded_from_db=True)
 
     def load_by_primary(self, primary, cache=None):
         """
@@ -335,6 +339,7 @@ class RecordModel(object):
         for key in data:
             self.__setattr__(key, data[key])
         if loaded_from_db:
+
             self.md5 = self.calc_sum()
             self.origin = OriginModel(data)
         return self
@@ -495,12 +500,18 @@ class RecordModel(object):
                 data_for_insert[key] = all_data[key]
         return data_for_insert
 
-    def calc_sum(self) -> str:
+    def is_changed(self):
+        """ Возвращает признак того, изменялась ли модель с момента загрузки из базы данных или нет """
+        return any(filter(lambda it: isinstance(it, RecordModel) and it.is_changed(), [self.__dict__.get(property_name) for property_name in self.mapper.get_properties()])) or self._changed
+
+    def calc_sum(self, cache=None) -> str:
         """
         Считает рекурсивно хэш-сумму для модели
         @return: Хэш-сумма данных модели
         @rtype : str
         """
+        if cache is None:
+            cache = {}
 
         def calc_md5(item):
             """  """
@@ -508,7 +519,7 @@ class RecordModel(object):
 
         def calc_hash(item):
             if isinstance(item, RecordModel) and item.is_loaded():
-                return item.calc_sum()
+                return item.calc_sum(cache)
             elif isinstance(item, list):
                 models = [model for model in item if model.is_loaded()]
                 if len(models):
@@ -519,24 +530,30 @@ class RecordModel(object):
                         sort_field = mapper_properties[0]
                         models = {str(model.__getattribute__(sort_field)): model for model in models}
                         models = dict(sorted(models.items())).values()
-                    return calc_md5([model.calc_sum() for model in models])
+                    return calc_md5([model.calc_sum(cache) for model in models])
                 else:
                     return calc_md5(item)
             else:
                 return calc_md5(item)
 
-        if not self.calcsumlock:
-            try:
-                self.calcsumlock = True
-                self.md5_data = {key: calc_hash(value) for key, value in sorted(self.get_data().items())}
-            finally:
-                self.calcsumlock = False
+        if not cache.get(id(self)):
+            if not self.calcsumlock:
+                try:
+                    self.calcsumlock = True
+                    self.md5_data = OrderedDict()
+                    for key, value in sorted(self.get_data().items()):
+                        if id(value) not in cache:
+                            cache[id(value)] = calc_hash(value)
+                        self.md5_data[key] = cache[id(value)]
+                finally:
+                    self.calcsumlock = False
         return calc_md5(self.md5_data)
 
     def __setattr__(self, name, val):
         """ При любом изменении полей модели необходимо инициализировать модель """
         mapper = object.__getattribute__(self, "__dict__").get("mapper")
         if mapper and name in mapper.get_properties():
+            self._changed = True
             self.exec_lazy_loading()
         object.__setattr__(self, name, val)
 

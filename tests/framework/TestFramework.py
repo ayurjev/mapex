@@ -1257,3 +1257,68 @@ class NoSqlMultiMappedCollection(TableModel):
 
 class NoSqlMultiMappedCollectionItem(RecordModel):
     mapper = NoSqlMultiMappedCollectionMapper
+
+
+class AMapper(SqlMapper):
+    db = MyDbMock().db
+
+    def bind(self):
+        self.set_collection_name("a")
+        self.set_new_item(AModel)
+        self.set_new_collection(ACollection)
+        self.set_map([
+            self.int("id", "id"),
+            self.link("b", "b", collection=BCollection),
+            self.str("name", "name")
+        ])
+
+
+class BMapper(SqlMapper):
+    db = MyDbMock().db
+
+    def bind(self):
+        self.set_collection_name("b")
+        self.set_new_item(BModel)
+        self.set_new_collection(BCollection)
+        self.set_map([
+            self.int("id", "id"),
+            self.link("c", "c", collection=CCollection),
+            self.str("name", "name")
+        ])
+
+
+class CMapper(SqlMapper):
+    db = MyDbMock().db
+
+    def bind(self):
+        self.set_collection_name("c")
+        self.set_new_item(CModel)
+        self.set_new_collection(CCollection)
+        self.set_map([
+            self.int("id", "id"),
+            self.str("name", "name")
+        ])
+
+
+class AModel(RecordModel):
+    mapper = AMapper
+
+
+class ACollection(TableModel):
+    mapper = AMapper
+
+
+class BModel(RecordModel):
+    mapper = BMapper
+
+
+class BCollection(TableModel):
+    mapper = BMapper
+
+
+class CModel(RecordModel):
+    mapper = CMapper
+
+
+class CCollection(TableModel):
+    mapper = CMapper
