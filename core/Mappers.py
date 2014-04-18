@@ -1563,7 +1563,11 @@ class SqlMapper(metaclass=ABCMeta):
         @rtype : str
 
         """
-        return self.get_mapper_field(name, direction, first=True).translate(name, direction)
+        field = self.get_mapper_field(name, direction, first=True)
+        if not field:
+            raise TableMapperException("Поле %s не определено в коллекции %s" % (name, self.get_new_collection().__class__))
+
+        return field.translate(name, direction)
 
     def get_mapper_field(self, field_name: str, direction: str, first: bool=False) -> FieldTypes.BaseField:
         """
