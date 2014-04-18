@@ -1228,6 +1228,7 @@ class SqlMapper(metaclass=ABCMeta):
         else:
             order_fields = []
         fields, conditions = fields if fields else [], conditions if conditions else {}
+        #TODO учитывать имена полей которые используются в списке OR и AND
         foreign_tables = list(set(filter(
             None,
             [field.split(".")[0] if field.find(".") > -1 else None for field in
