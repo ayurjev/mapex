@@ -1382,7 +1382,7 @@ class TableModelTest(unittest.TestCase):
         item.name = "FirstName"
         item.value = 91
         item.save()
-        self.assertEqual("FirstName", item.get_primary_value())
+        self.assertEqual("FirstName", item.primary.get_value())
         self.assertEqual(1, collection_without_primary.count())
 
         item.save()
@@ -1427,7 +1427,7 @@ class TableModelTest(unittest.TestCase):
         item.name = "FirstName"
         item.value = 91
         item.save()
-        self.assertEqual({'name': 'FirstName', 'value': 91}, item.get_primary_value())
+        self.assertEqual({'name': 'FirstName', 'value': 91}, item.primary.get_value())
         self.assertEqual(1, collection_without_primary.count({"value": 91}))
         self.assertEqual(1, collection_without_primary.count())
         item.save()

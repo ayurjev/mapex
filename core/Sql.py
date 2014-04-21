@@ -1106,7 +1106,7 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
         res = [item if item not in ["DELETE", "INSERT", "UPDATE"] else None for item in res]
         return res if None not in res else []
 
-    def delete_query(self, table_name, conditions, joined_tables):
+    def delete_query(self, table_name, conditions, joined_tables=None):
         """
         Выполняет запрос на удаление строк из таблицы в соответствии с уловиями
         :param table_name:      Имя таблицы
@@ -1117,7 +1117,7 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
         query = DeleteQuery(self.query_builder)
         query.set_table_name(table_name)
         query.set_conditions(conditions)
-        query.set_joined_tables(joined_tables)
+        query.set_joined_tables(joined_tables if joined_tables else {})
         return self.get_value(*query.build())
 
     def select_query(self, table_name, fields, conditions, params=None, joined_tables=None, adapter_method=None):

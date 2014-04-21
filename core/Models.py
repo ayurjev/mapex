@@ -1,10 +1,9 @@
 
 """ Модуль для работы с БД """
 
-import hashlib
 from abc import ABCMeta, abstractmethod
 from mapex.core.Exceptions import TableModelException
-from collections import OrderedDict
+from mapex.core.Common import TrackChangesValue, ValueInside
 
 
 class TableModel(object):
@@ -86,9 +85,8 @@ class TableModel(object):
             raise TableModelException("Insert failed: unknown item format")
         flat_data, lists_objects = self.mapper.split_data_by_relation_type(model_data)
         last_record = self.mapper.insert(flat_data)
-
         if self.mapper.primary.exists():
-            model.set_primary_value(last_record)
+            model.primary.set_value(last_record)
             self.mapper.link_all_list_objects(
                 lists_objects, model.load_from_array(model.get_data(), loaded_from_db=True)
             )
@@ -111,7 +109,6 @@ class TableModel(object):
         # что в неизменном виде присутствует в массиве условий (то есть не будет изменено)
         # Это важно особенно, так как в flat_data не должны попадать те значения первичных ключей, которые не изменялись
         # Так как они могут быть что-то вроде IDENTITY полей и не подлежат изменениям даже на теже самые значения
-        # TODO не отсекать поля составного первичного ключа
         conditions = self.mix_boundaries(conditions)
         if conditions:
             if self.mapper.primary.exists() and not self.mapper.primary.compound:
@@ -120,21 +117,22 @@ class TableModel(object):
                 primary_in_flat_data = flat_data.get(primary_name)
                 if isinstance(primary_in_conditions, RecordModel) and primary_in_conditions == primary_in_flat_data:
                     primary_in_flat_data.save()
-            flat_data = {key: flat_data[key] for key in flat_data if conditions.get(key, "&bzx") != flat_data[key]}
+                flat_data = {key: flat_data[key] for key in flat_data if conditions.get(key, "&bzx") != flat_data[key]}
 
         # Сохраняем записи в основной таблице
-        changed_primaries = self.mapper.update(flat_data, conditions)
-        if len(changed_primaries) > 0:
-            if self.mapper.primary.compound:
-                items_to_update = [self.get_item(compound_primary) for compound_primary in changed_primaries]
+        changed_models_pkeys = self.mapper.update(flat_data, conditions)
+        if len(changed_models_pkeys) > 0:
+            if model:
+                items_to_update = [model]
+            elif self.mapper.primary.compound:
+                items_to_update = [self.get_item(compound_primary) for compound_primary in changed_models_pkeys]
             else:
-                items_to_update = self.get_items({self.mapper.primary.name(): ("in", [changed_primary.get_primary_value() if isinstance(changed_primary, RecordModel) else changed_primary.get_value() if isinstance(changed_primary, EmbeddedObject) else changed_primary for changed_primary in changed_primaries])})
+                pkeys_raw = [pk.get_value() if isinstance(pk, ValueInside) else pk for pk in changed_models_pkeys]
+                items_to_update = self.get_items({self.mapper.primary.name(): ("in", pkeys_raw)})
+
             if lists_objects != {}:
-                if model:
-                    self.mapper.link_all_list_objects(lists_objects, model)
-                else:
-                    for updated_item in items_to_update:
-                        self.mapper.link_all_list_objects(lists_objects, updated_item)
+                for updated_item in items_to_update:
+                    self.mapper.link_all_list_objects(lists_objects, updated_item)
             return items_to_update
         else:
             return []
@@ -192,6 +190,58 @@ class TableModel(object):
         return items
 
 
+class Primary(object):
+    def __init__(self, model):
+        self.model = model
+        self.pk_list = None
+
+    def to_dict(self, origin=False):
+        return self.model.mapper.primary.eq_condition(self.origin if origin else self.value)
+
+    @property
+    def origin(self):
+        return self.model.mapper.primary.grab_value_from(self.model.origin.__dict__) \
+            if self.model.origin else self.get_value()
+
+    @property
+    def value(self):
+        return self.get_value()
+
+    def get_value(self):
+        return self.model.mapper.primary.grab_value_from(self.model.__dict__)
+
+    def set_value(self, value):
+        """
+        Устанавливает новое значение первичного ключа для текущей модели
+        @param value: Значение первичного ключа
+        @return: Установленное значение первичного ключа
+        """
+        if not self.model.mapper.primary.compound:
+            primary_mf = self.model.mapper.get_property(self.model.mapper.primary.name())
+            if self.model.mapper.is_embedded_object(primary_mf):
+                value = primary_mf.model(value) if not isinstance(value, EmbeddedObject) else value
+
+        if type(value) is dict:
+            self.model.__dict__.update(value)
+        else:
+            self.model.__dict__[self.model.mapper.primary.name()] = value
+        return value
+
+    def to_list(self):
+        if self.pk_list is None:
+            if not self.model.mapper or not self.model.mapper.primary.exists():
+                self.pk_list = []
+            elif self.model.mapper.primary.compound:
+                self.pk_list = self.model.mapper.primary.name()
+            else:
+                self.pk_list = [self.model.mapper.primary.name()]
+        return self.pk_list
+
+    def ensure_exists(self):
+        if self.model.mapper.primary.exists() is False:
+            raise TableModelException("there is no primary key for %s model" % self.model)
+
+
 class OriginModel(object):
     def __init__(self, data):
         self.__dict__ = data
@@ -205,16 +255,39 @@ class OriginModel(object):
         return self.__dict__.get(key)
 
 
-class RecordModel(object):
+class RecordModelLock(object):
+    flag = None
+
+    def __init__(self, model):
+        self.model = model
+
+    def __enter__(self):
+        self.model.__setattr__(self.flag, True)
+        return self
+
+    def __exit__(self, etype, value, traceback):
+        self.model.__setattr__(self.flag, False)
+
+
+class UpdateLock(RecordModelLock):
+    """ Лок для выполнения операции обновления модели """
+    flag = "_updating"
+
+
+class CalcChangesLock(RecordModelLock):
+    flag = "cant_calc_changed"
+
+
+class RecordModel(ValueInside, TrackChangesValue):
     """ Класс создания моделей записей в таблицах БД """
     mapper = None
 
     def __init__(self, data=None, loaded_from_db=False):
         self._lazy_load = False
         self._changed = True
-        self._cant_calc_changed = False
+        self.primary = Primary(self)
+        self.cant_calc_changed = False
         self._loaded_from_db = False
-        self._collection = None
         self._updating = False
         self.origin = None
         if self.__class__.mapper is None:
@@ -224,10 +297,12 @@ class RecordModel(object):
         if data:
             self.load_from_array(data.get_data() if isinstance(data, RecordModel) else data, loaded_from_db)
 
+    def get_value(self):
+        self.primary.get_value()
+
     def set_mapper(self, mapper):
         if mapper:
             self.mapper = mapper
-            self._collection = self.get_new_collection()
             default_data = {
                 property_name: self.mapper.get_property(property_name).get_default_value()
                 for property_name in self.mapper.get_properties()
@@ -250,55 +325,48 @@ class RecordModel(object):
 
     def save(self):
         """ Сохраняет текущее состояние модели в БД """
-        if self.mapper.primary.exists() is False:
-            raise TableModelException("there is no primary key for this model, so method save() is not allowed")
+        self.primary.ensure_exists()
         if self._loaded_from_db is False:
             self.validate()
             try:
                 self._loaded_from_db = True
-                self._collection.insert(self)
-                self.origin = OriginModel(self.get_data())
-                self.set_primary_value(self.get_actual_primary_value())
-                self._changed = False
+                self.get_new_collection().insert(self)
+                self.up_to_date()
                 return self
             except Exception as err:
                 self._loaded_from_db = False
                 raise err
         else:
-            # Если объект уже находится в состоянии сохранения, то выходим, чтобы разорвать рекурсию
-            if self._updating:
+            # Если объект уже находится в состоянии сохранения или объект не был изменен
+            # то выходим, чтобы разорвать рекурсию
+            if self._updating or not self.is_changed():
                 return self
-            # Если объект загружен из БД и его сумма не изменилась, то просто отдаем primary
-            if not self.is_changed():
-                return self
+
             self.validate()
-            # noinspection PyBroadException
-            try:
-                self._updating = True
-                self._collection.update(
-                    self.get_data_for_write_operation(),
-                    self.mapper.primary.eq_condition(self.get_old_primary_value()),
-                    model=self
-                )
-                self.origin = OriginModel(self.get_data())
-                self.set_primary_value(self.get_actual_primary_value())
-            finally:
-                self._updating = False
-        self._changed = False
+            with UpdateLock(self):
+                to_be_written = self.get_data_for_write_operation()
+                self.get_new_collection().update(to_be_written, self.primary.to_dict(origin=True), model=self)
+                self.up_to_date()
         return self
 
     def remove(self):
         """ Удаляет объект из коллекции """
-        if self.mapper.primary.exists() is False:
-            raise TableModelException("there is no primary key for this model, so method remove() is not allowed")
-        self._collection.delete(self.mapper.primary.eq_condition(self.get_old_primary_value()))
+        self.primary.ensure_exists()
+        self.get_new_collection().delete(self.primary.to_dict(origin=True))
 
     def refresh(self):
         """ Обновляет состояние модели в соответствии с состоянием в БД """
-        if self.mapper.primary.exists() is False:
-            raise TableModelException("there is no primary key for this model, so method refresh() is not allowed")
-        actual_copy = self.get_new_collection().get_item(self.mapper.primary.eq_condition(self.get_primary_value()))
+        self.primary.ensure_exists()
+        actual_copy = self.get_new_collection().get_item(self.primary.to_dict())
         self.load_from_array(actual_copy.get_data(), loaded_from_db=True)
+
+    def up_to_date(self):
+        """ Пересоздает объект Origin для модели """
+        self.origin = OriginModel(self.get_data())
+        self._changed = False
+
+    def mark_as_changed(self):
+        self._changed = True
 
     def load_by_primary(self, primary, cache=None):
         """
@@ -306,20 +374,11 @@ class RecordModel(object):
         Реально наполнения данными объекта не происходит, создается лишь заготовка для наполнения,
         которая будет выполнена при первом требовании
         :param primary:    Значение первичного ключа записи
-        :param cache:            Кэш
+        :param cache:      Кэш
         :return: self
         """
-        if self.mapper.primary.exists() is False:
-            raise TableModelException(
-                "there is no primary key defined for that model type, so load_by_primary() is not allowed"
-            )
-
-        if not self.mapper.primary.compound:
-            primary_mf = self.mapper.get_property(self.mapper.primary.name())
-            if self.mapper.is_embedded_object(primary_mf):
-                primary = primary_mf.model(primary)
-
-        self.set_primary_value(primary)
+        self.primary.ensure_exists()
+        self.primary.set_value(primary)
         self._lazy_load = (lambda: self.cache_load(cache)) if cache else (lambda: self.normal_load())
         self._loaded_from_db = True
         return self
@@ -329,12 +388,9 @@ class RecordModel(object):
         Инициализирует объект данными из словаря
         :param data:    Словарь с данными
         """
+        self.__dict__.update(data)
         self._loaded_from_db = loaded_from_db
-        for key in data:
-            self.__setattr__(key, data[key])
-        if loaded_from_db:
-            self._changed = False
-            self.origin = OriginModel(data)
+        self.up_to_date() if loaded_from_db else self.mark_as_changed()
         return self
 
     def normal_load(self):
@@ -344,7 +400,7 @@ class RecordModel(object):
         @rtype : RecordModel
 
         """
-        data = self.mapper.get_row([], self.mapper.primary.eq_condition(self.get_actual_primary_value()))
+        data = self.mapper.get_row([], self.primary.to_dict())
         return self.load_from_array(data, True) if data else None
 
     def cache_load(self, cache):
@@ -355,64 +411,13 @@ class RecordModel(object):
         @rtype : RecordModel
 
         """
-        data = cache.get(self.mapper, self.get_actual_primary_value())
+        data = cache.get(self.mapper, self.primary.value)
         return self.load_from_array(data, True) if data else None
 
     def exec_lazy_loading(self):
         """ Если объект проиницилиазирован отложенно - вызывает инициализацию """
-        lazy = self._lazy_load
-        if lazy:
-            self._lazy_load = False
-            # noinspection PyCallingNonCallable
-            res = lazy()
-            return res
-
-    def is_loaded(self):
-        """ Проверяет что модель уже была загружена """
-        return self._lazy_load is False
-
-    def set_primary_value(self, primary_value):
-        """
-        Устанавливает новое значение первичного ключа для текущей модели
-        @param primary_value: Значение первичного ключа
-        @return: Установленное значение первичного ключа
-
-        """
-        #self._loaded_from_db = primary_value
-        if type(primary_value) is dict:
-            self.__dict__.update(primary_value)
-        else:
-            self.__dict__[self.mapper.primary.name()] = primary_value
-        return primary_value
-
-    def unset_primary(self):
-        """ Стирает из модели значение первичного ключа """
-        actual_primary = self.get_actual_primary_value()
-        if type(actual_primary) is dict:
-            self.set_primary_value({key: self.mapper.get_base_none() for key in actual_primary})
-        else:
-            self.set_primary_value(self.mapper.get_base_none())
-
-    def get_actual_primary_value(self):
-        """
-        Возвращает текущее (актуальное) значение первичного ключа для модели
-        @return: Значение первичного ключа
-
-        """
-        return self.mapper.primary.grab_value_from(self.__dict__)
-
-    def get_primary_value(self):
-        """ Алиас для get_actual_primary_value() """
-        return self.get_actual_primary_value()
-
-    def get_old_primary_value(self):
-        """
-        Возвращает значение первичного ключа, которое было при изначальной загрузке модели, то есть то, что в есть в бд
-        @return: Значение первичного ключа
-
-        """
-        return self.mapper.primary.grab_value_from(self.origin.__dict__) \
-            if self.origin else self.get_actual_primary_value()
+        lazy, self._lazy_load = self._lazy_load, False
+        return lazy() if lazy else None
 
     def get_data(self, properties: list=None) -> dict:
         """
@@ -482,25 +487,24 @@ class RecordModel(object):
         @rtype : dict
 
         """
-        data_for_insert = {}
-        all_data = self.get_data()
-        for key in all_data:
-            val = all_data[key]
-            if isinstance(val, RecordModel):
-                data_for_insert[key] = val
-            elif self.mapper.is_list_value(val):
-                if val.changed:
-                    data_for_insert[key] = val
-            elif self.mapper.is_base_value(val) is False:
-                data_for_insert[key] = val
-        return data_for_insert
+        return {
+            key: val for key, val in self.get_data().items() if any([
+                isinstance(val, RecordModel),
+                self.mapper.is_list_value(val) and val.is_changed(),
+                not self.mapper.is_none_value(val)
+            ])
+        }
+
+    def values(self, filter_lambda=None):
+        for property_name in self.mapper.get_properties():
+            if not filter_lambda or (filter_lambda and filter_lambda(self.__dict__.get(property_name))):
+                yield self.__dict__.get(property_name)
 
     def is_changed(self):
         """ Возвращает признак того, изменялась ли модель с момента загрузки из базы данных или нет """
-        self._cant_calc_changed = True
-        res = any(filter(lambda it: (isinstance(it, RecordModel) and not it._cant_calc_changed and it.is_changed()) or (self.mapper.is_list_value(it) and it.changed), [self.__dict__.get(property_name) for property_name in self.mapper.get_properties()])) or self._changed
-        self._cant_calc_changed = False
-        return res
+        if not self.cant_calc_changed:
+            with CalcChangesLock(self):
+                return any(self.values(lambda v: isinstance(v, TrackChangesValue) and v.is_changed())) or self._changed
 
     def __setattr__(self, name, val):
         """ При любом изменении полей модели необходимо инициализировать модель """
@@ -514,13 +518,8 @@ class RecordModel(object):
         """ При любом обращении к полям модели необходимо инициализировать модель """
         mapper = object.__getattribute__(self, "__dict__").get("mapper")
         # Список полей первичного ключа
-        pk_list = [] if not mapper or not mapper.primary.exists() else (
-            mapper.primary.name() if mapper.primary.compound else [mapper.primary.name()]
-        )
-
-        if mapper and name in mapper.get_properties() and name not in pk_list:
+        if mapper and name in mapper.get_properties() and name not in self.primary.to_list():
             self.exec_lazy_loading()
-
         return object.__getattribute__(self, name)
 
     def __eq__(self, other):
@@ -531,14 +530,14 @@ class RecordModel(object):
 
         """
         if isinstance(other, RecordModel):
-            first = self.get_actual_primary_value()
-            second = other.get_actual_primary_value()
+            first = self.primary.get_value()
+            second = other.primary.get_value()
             return first == second if first and second else self.get_data() == other.get_data()
         else:
             return False
 
 
-class EmbeddedObject(object, metaclass=ABCMeta):
+class EmbeddedObject(ValueInside, metaclass=ABCMeta):
     """
     Класс для создания моделей, для которых в БД может храниться только одно значение,
     на основе которого должно происходить конструирование экземпляров класса этой модели
@@ -614,15 +613,15 @@ class TableModelCache(object):
                 if None != row.get(field_name):
                     if self._mapper.is_link(field_names_for_cache[field_name]["mapper_field"]):
                         cache[field_names_for_cache[field_name]["mapper"]].append(
-                            row[field_name].get_actual_primary_value().get_value() if isinstance(row[field_name].get_actual_primary_value(), EmbeddedObject) else row[field_name].get_actual_primary_value()
+                            row[field_name].primary.get_value().get_value() if isinstance(row[field_name].primary.get_value(), EmbeddedObject) else row[field_name].primary.get_value()
                         )
                     elif self._mapper.is_reversed_link(field_names_for_cache[field_name]["mapper_field"]):
                         cache[field_names_for_cache[field_name]["mapper"]].append(
-                            row[field_name].get_actual_primary_value()
+                            row[field_name].primary.get_value()
                         )
                     elif self._mapper.is_list(field_names_for_cache[field_name]["mapper_field"]):
                         for obj in row[field_name]:
-                            cache[field_names_for_cache[field_name]["mapper"]].append(obj.get_actual_primary_value())
+                            cache[field_names_for_cache[field_name]["mapper"]].append(obj.primary.get_value())
 
         for mapper in cache:
             if len(cache[mapper]) > 0:
@@ -633,11 +632,11 @@ class TableModelCache(object):
         """ Собирает кэш маппера из внешней переменной cache """
         mapper_cache = {}
         for item in m.get_new_collection().get_items({m.primary.name(): ("in", self._ids_cache[m])}):
-            key = item.get_actual_primary_value()
+            key = item.primary.get_value()
             if isinstance(key, EmbeddedObject):
                 primary_value = key.get_value()
             elif isinstance(key, RecordModel):
-                primary_value = key.get_actual_primary_value()
+                primary_value = key.primary.get_value()
             else:
                 primary_value = key
             mapper_cache[primary_value] = item.get_data()
