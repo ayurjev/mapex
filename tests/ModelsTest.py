@@ -499,6 +499,7 @@ class TableModelTest(unittest.TestCase):
         """ Проверим возможность запросов к коллекции с условиями, включающими обращения к полям типа List """
         users = dbms_fw.get_new_users_collection_instance()
         tags = dbms_fw.get_new_tags_collection_instance()
+        accounts = dbms_fw.get_new_accounts_collection_instance()
 
          # Поле tags маппера объявлено типом List.
          # В него нельзя писать ничего кроме списков экземпляров класса dbms_fw.get_new_tag_instance().__class__
@@ -833,6 +834,11 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(users.get_item({"uid": first_user.uid}), status2.user)
         self.assertEqual(1, users.count())
         self.assertEqual(2, statuses.count())
+
+        status1.refresh()
+        status2.refresh()
+        self.assertEqual(users.get_item({"uid": first_user.uid}), status1.user)
+        self.assertEqual(users.get_item({"uid": first_user.uid}), status2.user)
 
         # Создадим второго пользователя, у которого только один статус (из двух имеющихся)
         second_user = users.insert({"name": "SecondUser", "statuses": [status2]})
@@ -1236,6 +1242,7 @@ class TableModelTest(unittest.TestCase):
         # Добавим второй статус второму пользователю
         second_user.documents.append(document2)
         second_user.save()
+
         self.assertCountEqual([document2.number, document3.number], [d.number for d in second_user.documents])
         second_user = users.get_item({"uid": second_user.uid})
         self.assertCountEqual([document2.number, document3.number], [d.number for d in second_user.documents])
@@ -1769,21 +1776,6 @@ class TableModelTest(unittest.TestCase):
         count += dbms_fw.get_queries_amount("loading_tags")
         self.assertEqual(count, connection.count_queries())             # Потрачено три запроса
 
-    @for_all_dbms
-    def test_calc_sum(self, dbms_fw: DbMock):
-        """ Рекурсивный просчёт хэша модели """
-        user = dbms_fw.get_new_user_instance()
-        user.name = "test"
-        self.assertNotEqual(user.md5, user.calc_sum())
-
-        user.account = dbms_fw.get_new_account_instance()
-        user.account.email = "test@google.com"
-        user.save()
-
-        user = dbms_fw.get_new_users_collection_instance().get_item({"name": user.name})
-        user.account.email = "test@yandex.ru"
-        self.assertNotEqual(user.md5, user.calc_sum())
-
 
 class RecordModelTest(unittest.TestCase):
     """ Модульные тесты для класса TableModel """
@@ -2032,6 +2024,56 @@ class RecordModelTest(unittest.TestCase):
 
         user = users.get_item({"name": "Иннокентий"})
         self.assertEqual(user.name, user.origin.name)
+
+
+from tests.framework.TestFramework import AModel, BModel, CModel, ACollection, BCollection, CCollection
+from tests.framework.TestFramework import MyDbMock
+
+
+class RecordModelTestMySqlOnly(unittest.TestCase):
+    """ Некоторые тесты, которые не имеет смысла запускть для всех СУБД """
+    def setUp(self):
+        MyDbMock().up()
+        self.a_collection = ACollection()
+        self.b_collection = BCollection()
+        self.c_collection = CCollection()
+
+    def tearDown(self):
+        MyDbMock().down()
+
+    def test_changed(self, ):
+        """ Проверим, как фиксируются изменения моделей любых уровней вложенности """
+        c1 = CModel({"name": "C"})
+        b1 = BModel({"name": "B", "c": c1})
+        a1 = AModel({"name": "A", "b": b1})
+
+        self.assertTrue(c1.is_changed())
+        self.assertTrue(b1.is_changed())
+        self.assertTrue(a1.is_changed())
+        a1.save()
+        self.assertEqual(1, self.a_collection.count())
+        self.assertEqual(1, self.b_collection.count())
+        self.assertEqual(1, self.c_collection.count())
+        self.assertFalse(c1.is_changed())
+        self.assertFalse(b1.is_changed())
+        self.assertFalse(a1.is_changed())
+
+        c1.name = "C2"
+        self.assertTrue(c1.is_changed())
+        self.assertTrue(b1.is_changed())
+        self.assertTrue(a1.is_changed())
+        a1.save()
+        self.assertFalse(a1.is_changed())
+        self.assertFalse(c1.is_changed())
+        self.assertFalse(b1.is_changed())
+
+        c2 = CModel({"name": "C2"})
+        c2.save()
+        a1.b.c = c2
+        self.assertFalse(c2.is_changed())
+        self.assertTrue(b1.is_changed())
+        self.assertTrue(a1.is_changed())
+
 
 if __name__ == "__main__":
     unittest.main()

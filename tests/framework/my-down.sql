@@ -11,3 +11,6 @@ DROP TABLE IF EXISTS `documentsTable`;
 DROP TABLE IF EXISTS `documentsWithoutAutoincrementTable`;
 DROP TABLE IF EXISTS `multiMappedTable`;
 DROP TABLE IF EXISTS `housesTable`;
+DROP TABLE IF EXISTS `a`;
+DROP TABLE IF EXISTS `b`;
+DROP TABLE IF EXISTS `c`;

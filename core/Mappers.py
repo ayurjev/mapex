@@ -1867,7 +1867,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
                     row = self.translate_and_convert(row, "database2mapper", cache)
                     for subcollection in row:
                         if self.is_real_embedded(self.get_property(subcollection)):
-                            if type(row[subcollection]) is not list:
+                            if not isinstance(row[subcollection], list):
                                 row[subcollection] = [row[subcollection]]
                             for item in row[subcollection]:
                                 if self.document_match(item, subcollection, collection_conditions):
@@ -2142,7 +2142,7 @@ class FieldTypesConverter(object):
         ("EmbeddedList", "EmbeddedDocument"): lambda v, mf, cache, s:
         [FieldTypesConverter.embedded(mf, i) for i in v] if v else [],
         ("EmbeddedDocument", "EmbeddedList"): lambda v, mf, cache, s:
-        [FieldTypesConverter.from_embedded(mf, i) for i in v] if v else [],
+        FieldValues.ListValue([FieldTypesConverter.from_embedded(mf, i) for i in v] if v else []),
         ("ObjectID", "List"): lambda v, mf, cache, s: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
         ("ObjectID", "Link"): lambda v, mf, cache, s: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
         ("ObjectID", "ReversedLink"): lambda v, mf, cache, s: FieldTypesConverter.to_reversed_link(mf, v, cache),
