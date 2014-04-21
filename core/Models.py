@@ -208,7 +208,8 @@ class Primary(object):
         return self.get_value()
 
     def get_value(self):
-        return self.model.mapper.primary.grab_value_from(self.model.__dict__)
+        value = self.model.mapper.primary.grab_value_from(self.model.__dict__)
+        return value
 
     def set_value(self, value):
         """
@@ -298,7 +299,7 @@ class RecordModel(ValueInside, TrackChangesValue):
             self.load_from_array(data.get_data() if isinstance(data, RecordModel) else data, loaded_from_db)
 
     def get_value(self):
-        self.primary.get_value()
+        return self.primary.get_value()
 
     def set_mapper(self, mapper):
         if mapper:
@@ -357,8 +358,7 @@ class RecordModel(ValueInside, TrackChangesValue):
     def refresh(self):
         """ Обновляет состояние модели в соответствии с состоянием в БД """
         self.primary.ensure_exists()
-        actual_copy = self.get_new_collection().get_item(self.primary.to_dict())
-        self.load_from_array(actual_copy.get_data(), loaded_from_db=True)
+        self.mapper.refresh(self)
 
     def up_to_date(self):
         """ Пересоздает объект Origin для модели """
@@ -588,11 +588,12 @@ class TableModelCache(object):
         :param model_type:   Тип модели
         :param primary_id:   Значение первичного ключа
         """
+        primary_id = primary_id.get_value() if isinstance(primary_id, ValueInside) else primary_id
         model_cache = self._cache.get(model_type)
         if model_cache:
             if type(model_cache) is not dict:
                 self._cache[model_type] = self._cache[model_type](model_type)
-                return self._cache[model_type].get(primary_id.get_value() if isinstance(primary_id, EmbeddedObject) else primary_id)
+                return self._cache[model_type].get(primary_id)
             return model_cache.get(primary_id)
 
     def cache(self, rows):

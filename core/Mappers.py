@@ -1388,6 +1388,15 @@ class SqlMapper(metaclass=ABCMeta):
         for row in self.generate_rows(fields, conditions, params, cache):
             yield row
 
+    def refresh(self, model):
+        """ Обновляет данные в модели свежими
+        @param model: Модель для обновления
+        @return: Обновленная модель
+        """
+        actual_copy = self.get_new_collection().get_item(model.primary.to_dict())
+        model.load_from_array(actual_copy.get_data(), loaded_from_db=True)
+        return model
+
     def count(self, conditions: dict=None) -> int:
         """
         Выполняем подсчет записей в коллекции по условию
@@ -2341,4 +2350,5 @@ def MapperMock(real_mapper):
     mapper_mock.get_new_collection.return_value = collection
     mapper_mock.get_new_item.return_value = item
     mapper_mock.insert.return_value = item
+    mapper_mock.refresh = lambda model: model
     return mapper_mock

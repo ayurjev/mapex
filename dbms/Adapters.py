@@ -214,7 +214,7 @@ class MsSqlDbAdapter(Adapter):
         """
         import pyodbc
         # noinspection PyUnresolvedReferences
-        self.dublicate_record_exception = pyodbc.IntegrgrityError
+        self.dublicate_record_exception = pyodbc.IntegrityError
         # noinspection PyUnresolvedReferences
         return pyodbc.connect(
             'DSN=egServer70;DATABASE='+connection_data[4]+';UID='+connection_data[2]+';PWD='+connection_data[3]
