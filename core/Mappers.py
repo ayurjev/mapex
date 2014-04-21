@@ -10,7 +10,13 @@ from mapex.core.Exceptions import TableModelException, TableMapperException, Dub
 from mapex.core.Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
 
 
-class Primary(object):
+class ValueInside(object, metaclass=ABCMeta):
+    @abstractmethod
+    def get_value(self):
+        """ Возвращает значение, хранящееся в объекте """
+
+
+class Primary(ValueInside):
     """ Класс для представления первичных ключей мапперов """
     def __init__(self, mapper, name_in_db: str=None, name_in_mapper: str=None):
         """
@@ -24,6 +30,7 @@ class Primary(object):
         self.db_primary_key = None
         self.primary = None
         self.mapper = mapper
+        self.model = None
         self.compound = False
         if name_in_db:
             self.db_primary_key = name_in_db
@@ -101,6 +108,16 @@ class Primary(object):
             if type(res) is not dict:
                 res = {self.name(): res}
         return res
+
+    def set_model(self, model):
+        """ Устанавливает ссылку на модель, для которой необходимо хранить первичный ключ
+        @param model: Модель, для которой необходимо хранить первичный ключ
+        """
+        self.model = model
+
+    def get_value(self):
+        """ Возвращает значение первичного ключа """
+        return self.grab_value_from(self.model.__dict__)
 
 
 class FieldTypes(object):
@@ -582,7 +599,7 @@ class FieldTypes(object):
             main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
             self.items_collection_mapper.update(
                 {"%s" % main_record_key: None},
-                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.get_actual_primary_value()}
+                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.primary.get_value()}
             )
             for obj in filter(None, items):
                 obj.__setattr__(main_record_key, main_record_obj)
@@ -638,7 +655,7 @@ class FieldTypes(object):
             else:
                 self.items_collection_mapper.update(
                     {"%s" % main_record_key: None},
-                    {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record.get_actual_primary_value()}
+                    {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record.primary.get_value()}
                 )
 
     class NoSqlRelationField(RelationField, NoSqlBaseField):
@@ -717,7 +734,7 @@ class FieldTypes(object):
             main_record_key = self.rel_mapper.get_property_that_is_link_for(self.mapper).get_name()
             second_record_key = self.rel_mapper.get_property_that_is_link_for(self.items_collection_mapper).get_name()
             self.rel_mapper.delete(
-                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.get_actual_primary_value()}
+                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.primary.get_value()}
             )
             self.rel_mapper.insert([{main_record_key: main_record_obj, second_record_key: obj} for obj in items])
 
@@ -836,11 +853,11 @@ class FieldTypes(object):
             """
             main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
             self.items_collection_mapper.delete(
-                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.get_actual_primary_value()}
+                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.primary.get_value()}
             )
             for obj in filter(None, items):
                 if self.items_collection_mapper.primary.autoincremented:
-                    obj.unset_primary()
+                    obj.set_primary_value(FieldValues.NoneValue())
                 item_data = obj.get_data_for_write_operation()
                 item_data[main_record_key] = main_record_obj
                 copy = obj.get_new_collection().get_new_item()
@@ -1466,7 +1483,7 @@ class SqlMapper(metaclass=ABCMeta):
             changed_records_ids = list(
                 [
                     i.get_value() if isinstance(i, EmbeddedObject) else
-                    i.get_actual_primary_value() if isinstance(i, RecordModel) else
+                    i.primary.get_value() if isinstance(i, RecordModel) else
                     i
                     for i in self.get_column(self.primary.name(), conditions)
                 ]
@@ -2132,11 +2149,11 @@ class FieldTypesConverter(object):
         ("DateTime", "String"): lambda v, mf, cache, s: v.strftime("%Y-%m-%d %H:%M:%S") if v else FNone(),
         ("DateTime", "Int"): lambda v, mf, cache, s: int(time.mktime(v.timetuple())) if v else FNone(),
         ("DateTime", "Date"): lambda v, mf, cache, s: date(v.year, v.month, v.day) if v else FNone(),
-        ("Link", "Int"): lambda v, mf, cache, s: (v.save().get_primary_value() if s else v.get_primary_value()) if v else FNone(),
-        ("Link", "String"): lambda v, mf, cache, s: str((v.save().get_primary_value() if s else v.get_primary_value())) if v else FNone(),
-        ("Link", "ObjectID"): lambda v, mf, cache, s: (v.save().get_primary_value() if s else v.get_primary_value()) if v else FNone(),
+        ("Link", "Int"): lambda v, mf, cache, s: (v.save().primary.get_value() if s else v.primary.get_value()) if v else FNone(),
+        ("Link", "String"): lambda v, mf, cache, s: str((v.save().primary.get_value() if s else v.primary.get_value())) if v else FNone(),
+        ("Link", "ObjectID"): lambda v, mf, cache, s: (v.save().primary.get_value() if s else v.primary.get_value()) if v else FNone(),
         ("List", "String"): lambda v, mf, cache, s: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
-        ("List", "ObjectID"): lambda v, mf, cache, s: [(it.save().get_primary_value() if s else it.get_primary_value()) for it in v] if v is not None else [],
+        ("List", "ObjectID"): lambda v, mf, cache, s: [(it.save().primary.get_value() if s else it.primary.get_value()) for it in v] if v is not None else [],
         ("EmbeddedLink", "EmbeddedDocument"): lambda v, mf, cache, s: FieldTypesConverter.embedded(mf, v),
         ("EmbeddedDocument", "EmbeddedLink"): lambda v, mf, cache, s: FieldTypesConverter.from_embedded(mf, v),
         ("EmbeddedList", "EmbeddedDocument"): lambda v, mf, cache, s:
