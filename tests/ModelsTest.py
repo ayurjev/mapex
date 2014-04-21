@@ -840,15 +840,12 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(users.get_item({"uid": first_user.uid}), status1.user)
         self.assertEqual(users.get_item({"uid": first_user.uid}), status2.user)
 
-        print(users.get_item({"uid": first_user.uid}).statuses)
-
         # Создадим второго пользователя, у которого только один статус (из двух имеющихся)
         second_user = users.insert({"name": "SecondUser", "statuses": [status2]})
 
         self.assertIsNotNone(status1.id)
         self.assertIsNotNone(status2.id)
         self.assertEqual(users.get_item({"uid": first_user.uid}), status1.user)
-        print(users.get_item({"uid": first_user.uid}).statuses)
         self.assertCountEqual(users.get_item({"uid": first_user.uid}).statuses, [status1])
         self.assertEqual(users.get_item({"uid": second_user.uid}), status2.user)
         self.assertCountEqual(users.get_item({"uid": second_user.uid}).statuses, [status2])
@@ -900,11 +897,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(3, statuses.count())
 
         # Теперь с помощью операции уровня коллекции изменим список тегов у первого пользователя:
-        print()
-        print()
         users.update({"statuses": [status1, status3]}, {"uid": third_user.uid})
-        print()
-        print()
         self.assertEqual(3, users.count())
         self.assertEqual(3, statuses.count())
         third_user = users.get_item({"uid": third_user.uid})
@@ -1249,10 +1242,9 @@ class TableModelTest(unittest.TestCase):
         # Добавим второй статус второму пользователю
         second_user.documents.append(document2)
         second_user.save()
-        
+
         self.assertCountEqual([document2.number, document3.number], [d.number for d in second_user.documents])
         second_user = users.get_item({"uid": second_user.uid})
-        print(second_user.documents)
         self.assertCountEqual([document2.number, document3.number], [d.number for d in second_user.documents])
 
         self.assertCountEqual([document2.number], [d.number for d in third_user.documents])
@@ -1783,21 +1775,6 @@ class TableModelTest(unittest.TestCase):
             self.assertTrue(len(tags_names) > 0)
         count += dbms_fw.get_queries_amount("loading_tags")
         self.assertEqual(count, connection.count_queries())             # Потрачено три запроса
-
-    @for_all_dbms
-    def test_calc_sum(self, dbms_fw: DbMock):
-        """ Рекурсивный просчёт хэша модели """
-        user = dbms_fw.get_new_user_instance()
-        user.name = "test"
-        self.assertNotEqual(user.md5, user.calc_sum())
-
-        user.account = dbms_fw.get_new_account_instance()
-        user.account.email = "test@google.com"
-        user.save()
-
-        user = dbms_fw.get_new_users_collection_instance().get_item({"name": user.name})
-        user.account.email = "test@yandex.ru"
-        self.assertNotEqual(user.md5, user.calc_sum())
 
 
 class RecordModelTest(unittest.TestCase):
