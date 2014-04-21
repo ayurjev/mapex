@@ -8,12 +8,7 @@ from collections import defaultdict
 
 from mapex.core.Exceptions import TableModelException, TableMapperException, DublicateRecordException
 from mapex.core.Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
-
-
-class ValueInside(object, metaclass=ABCMeta):
-    @abstractmethod
-    def get_value(self):
-        """ Возвращает значение, хранящееся в объекте """
+from mapex.core.Common import TrackChangesValue, ValueInside
 
 
 class Primary(ValueInside):
@@ -108,16 +103,6 @@ class Primary(ValueInside):
             if type(res) is not dict:
                 res = {self.name(): res}
         return res
-
-    def set_model(self, model):
-        """ Устанавливает ссылку на модель, для которой необходимо хранить первичный ключ
-        @param model: Модель, для которой необходимо хранить первичный ключ
-        """
-        self.model = model
-
-    def get_value(self):
-        """ Возвращает значение первичного ключа """
-        return self.grab_value_from(self.model.__dict__)
 
 
 class FieldTypes(object):
@@ -857,7 +842,7 @@ class FieldTypes(object):
             )
             for obj in filter(None, items):
                 if self.items_collection_mapper.primary.autoincremented:
-                    obj.set_primary_value(FieldValues.NoneValue())
+                    obj.primary.set_value(FieldValues.NoneValue())
                 item_data = obj.get_data_for_write_operation()
                 item_data[main_record_key] = main_record_obj
                 copy = obj.get_new_collection().get_new_item()
@@ -1307,7 +1292,7 @@ class SqlMapper(metaclass=ABCMeta):
         return isinstance(self.prop_wrap(mf), FieldTypes.EmbeddedObject)
 
     @staticmethod
-    def is_base_value(value) -> bool:
+    def is_none_value(value) -> bool:
         return isinstance(value, FieldValues.BaseValue)
 
     @staticmethod
@@ -1433,7 +1418,6 @@ class SqlMapper(metaclass=ABCMeta):
 
         try:
             last_record = self.db.insert_query(self.table_name, self.translate_and_convert(data), self.primary)
-
         except DublicateRecordException as err:
             raise self.__class__.dublicate_record_exception(err)
         return self.primary.grab_value_from(
@@ -1480,21 +1464,15 @@ class SqlMapper(metaclass=ABCMeta):
 
         """
         if self.primary.exists() and self.primary.compound is False:           # Если, конечно, первичный ключ определен
-            changed_records_ids = list(
-                [
-                    i.get_value() if isinstance(i, EmbeddedObject) else
-                    i.primary.get_value() if isinstance(i, RecordModel) else
-                    i
-                    for i in self.get_column(self.primary.name(), conditions)
-                ]
-            )
+            changed_records_ids = [
+                i.get_value() if isinstance(i, ValueInside) else i
+                for i in self.get_column(self.primary.name(), conditions)
+            ]
             if len(changed_records_ids) > 0:
                 self.unlink_objects(changed_records_ids)
                 self.db.delete_query(
                     self.table_name,
-                    self.translate_and_convert(
-                        {self.primary.name(): ("in", changed_records_ids)}, save_unsaved=False)
-                    , {}
+                    self.translate_and_convert({self.primary.name(): ("in", changed_records_ids)}, save_unsaved=False)
                 )
                 return changed_records_ids
         else:
@@ -2041,18 +2019,19 @@ class FieldValues(object):
 
     class BaseValue(object):
         """ Базовый класс для всех возможных типов значений свойств моделей """
-        def __init__(self):
-            self.changed = False
 
     # noinspection PyDocstring
-    class ListValue(BaseValue, list):
+    class ListValue(BaseValue, list, TrackChangesValue):
         """ Специальный класс для замены обычных списков - возвращается при создании списков объектов моделей """
 
         def __init__(self, iterable=None):
             if iterable is None:
                 iterable = []
             list.__init__(self, iterable)
-            super().__init__()
+            self.changed = False
+
+        def is_changed(self):
+            return self.changed
 
         def insert(self, i, v):
             super().insert(i, v)

@@ -214,7 +214,7 @@ class MsSqlDbAdapter(Adapter):
         """
         import pyodbc
         # noinspection PyUnresolvedReferences
-        self.dublicate_record_exception = pyodbc.IntegrityError
+        self.dublicate_record_exception = pyodbc.IntegrgrityError
         # noinspection PyUnresolvedReferences
         return pyodbc.connect(
             'DSN=egServer70;DATABASE='+connection_data[4]+';UID='+connection_data[2]+';PWD='+connection_data[3]
@@ -376,7 +376,7 @@ class MongoDbAdapter(AdapterLogger):
             sort=[self.fix_sorting(params.get("order"))] if params and params.get("order") else None
         )
 
-    def delete_query(self, collection_name: str, conditions: dict, joined_tables):
+    def delete_query(self, collection_name: str, conditions: dict, joined_tables=None):
         """
         Выполняет запрос на удаление записей из коллекции
         @param collection_name: Имя коллекции
