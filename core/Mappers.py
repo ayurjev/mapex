@@ -982,6 +982,7 @@ class SqlMapper(metaclass=ABCMeta):
             self._properties = {}
             self._joined = OrderedDict()
             self._reversed_map = {}
+            self.is_mock = False
             self.binded = False
             self.bind()                     # Запускаем процесс инициализации маппера
             self.binded = True
@@ -2351,4 +2352,5 @@ def MapperMock(real_mapper):
     mapper_mock.get_new_item.return_value = item
     mapper_mock.insert.return_value = item
     mapper_mock.refresh = lambda model: model
+    mapper_mock.is_mock = True
     return mapper_mock

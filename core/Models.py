@@ -326,6 +326,10 @@ class RecordModel(ValueInside, TrackChangesValue):
 
     def save(self):
         """ Сохраняет текущее состояние модели в БД """
+        if self.mapper.is_mock:
+            self.up_to_date()
+            return self
+
         self.primary.ensure_exists()
         if self._loaded_from_db is False:
             self.validate()
