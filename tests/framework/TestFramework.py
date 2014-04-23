@@ -222,7 +222,7 @@ class SqlDbMock(DbMock):
         SqlDocumentsNotAiMapper.db = self.db
         SqlNoPrimaryMapper.db = self.db
         SqlMultiMappedCollectionMapper.db = self.db
-        SqlHousesMaper.db = self.db
+        SqlHousesMapper.db = self.db
 
     def down(self):
         """ Уничтожает созданные в процессе тестирования таблицы базы данных """
@@ -239,7 +239,7 @@ class SqlDbMock(DbMock):
         SqlDocumentsNotAiMapper.kill_instance()
         SqlNoPrimaryMapper.kill_instance()
         SqlMultiMappedCollectionMapper.kill_instance()
-        SqlHousesMaper.kill_instance()
+        SqlHousesMapper.kill_instance()
 
     def get_new_user_instance(self, data=None, loaded_from_db=False):
         """ Возвращает новый экземпляр класса пользователя """
@@ -747,7 +747,7 @@ class NoSqlUserWithBoundaries(NoSqlUser):
     mapper = NoSqlUsersMapperWithBoundaries
 
 
-class SqlHousesMaper(SqlMapper):
+class SqlHousesMapper(SqlMapper):
     def bind(self):
         self.set_new_item(SqlHouse)
         self.set_new_collection(SqlHouses)
@@ -759,11 +759,11 @@ class SqlHousesMaper(SqlMapper):
 
 
 class SqlHouse(RecordModel):
-    mapper = SqlHousesMaper
+    mapper = SqlHousesMapper
 
 
 class SqlHouses(TableModel):
-    mapper = SqlHousesMaper
+    mapper = SqlHousesMapper
 
 
 class NoSqlHousesMaper(NoSqlMapper):

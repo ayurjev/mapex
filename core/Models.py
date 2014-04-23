@@ -207,8 +207,11 @@ class Primary(object):
     def value(self):
         return self.get_value()
 
-    def get_value(self):
+    def get_value(self, deep=False):
         value = self.model.mapper.primary.grab_value_from(self.model.__dict__)
+        if deep:
+            if isinstance(value, ValueInside):
+                value = value.get_value()
         return value
 
     def set_value(self, value):
@@ -221,6 +224,8 @@ class Primary(object):
             primary_mf = self.model.mapper.get_property(self.model.mapper.primary.name())
             if self.model.mapper.is_embedded_object(primary_mf):
                 value = primary_mf.model(value) if not isinstance(value, EmbeddedObject) else value
+            if self.model.mapper.is_rel(primary_mf) and not isinstance(value, RecordModel):
+                value = primary_mf.get_new_item().load_by_primary(value)
 
         if type(value) is dict:
             self.model.__dict__.update(value)
@@ -298,8 +303,8 @@ class RecordModel(ValueInside, TrackChangesValue):
         if data:
             self.load_from_array(data.get_data() if isinstance(data, RecordModel) else data, loaded_from_db)
 
-    def get_value(self):
-        return self.primary.get_value()
+    def get_value(self, deep=False):
+        return self.primary.get_value(deep)
 
     def set_mapper(self, mapper):
         if mapper:
@@ -616,17 +621,11 @@ class TableModelCache(object):
         for row in rows:
             for field_name in field_names_for_cache.keys():
                 if None != row.get(field_name):
-                    if self._mapper.is_link(field_names_for_cache[field_name]["mapper_field"]):
-                        cache[field_names_for_cache[field_name]["mapper"]].append(
-                            row[field_name].primary.get_value().get_value() if isinstance(row[field_name].primary.get_value(), EmbeddedObject) else row[field_name].primary.get_value()
-                        )
-                    elif self._mapper.is_reversed_link(field_names_for_cache[field_name]["mapper_field"]):
-                        cache[field_names_for_cache[field_name]["mapper"]].append(
-                            row[field_name].primary.get_value()
-                        )
+                    if isinstance(row[field_name], ValueInside):
+                        cache[field_names_for_cache[field_name]["mapper"]].append(row[field_name].get_value(deep=True))
                     elif self._mapper.is_list(field_names_for_cache[field_name]["mapper_field"]):
                         for obj in row[field_name]:
-                            cache[field_names_for_cache[field_name]["mapper"]].append(obj.primary.get_value())
+                            cache[field_names_for_cache[field_name]["mapper"]].append(obj.primary.get_value(deep=True))
 
         for mapper in cache:
             if len(cache[mapper]) > 0:
@@ -638,11 +637,7 @@ class TableModelCache(object):
         mapper_cache = {}
         for item in m.get_new_collection().get_items({m.primary.name(): ("in", self._ids_cache[m])}):
             key = item.primary.get_value()
-            if isinstance(key, EmbeddedObject):
-                primary_value = key.get_value()
-            elif isinstance(key, RecordModel):
-                primary_value = key.primary.get_value()
-            else:
-                primary_value = key
-            mapper_cache[primary_value] = item.get_data()
+            if isinstance(key, ValueInside):
+                key = key.get_value()
+            mapper_cache[key] = item.get_data()
         return mapper_cache

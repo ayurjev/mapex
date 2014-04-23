@@ -669,6 +669,37 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual("ул. Пушкина", user.house.address)
 
     @for_all_dbms
+    def test_instantiating_a_model_on_primary_key_when_loading_by_primary(self, dbms_fw: DbMock):
+        """ Загрузка модели по id работает корректно даже если первичным ключом является другая модель """
+        users = dbms_fw.get_new_users_collection_instance()
+        houses = dbms_fw.get_new_houses_collection_instance()
+
+        houses.mapper.set_field(
+            houses.mapper.link("owner", houses.mapper.primary.db_name(), collection=users.__class__)
+        )
+        houses.mapper.set_primary("owner")
+
+        user = dbms_fw.get_new_user_instance({"name": "Вася"})
+        user.save()
+        self.assertEqual(1, users.count())
+
+        house = dbms_fw.get_new_houses_collection_instance().get_new_item()
+        house.owner = user
+        house.address = "Советский союз"
+        house.save()
+
+        new_house = dbms_fw.get_new_houses_collection_instance().get_new_item()
+        new_house.load_by_primary(house.owner)
+        self.assertTrue(isinstance(new_house.owner, user.__class__))
+        self.assertEqual("Советский союз", new_house.address)
+
+        # Даже если load_by_primary идет не по модели а по id этой модели:
+        new_house2 = dbms_fw.get_new_houses_collection_instance().get_new_item()
+        new_house2.load_by_primary(house.owner.uid)
+        self.assertTrue(isinstance(new_house2.owner, user.__class__))
+        self.assertEqual("Советский союз", new_house2.address)
+
+    @for_all_dbms
     def test_query_with_reversed_links(self, dbms_fw: DbMock):
         """ Проверим тим связи, когда в основном маппера нет ссылки на другую таблицу,
         но у какой-либо записи в другой таблице есть ссылка на запись в основной таблице
