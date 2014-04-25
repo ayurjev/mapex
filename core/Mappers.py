@@ -1304,6 +1304,10 @@ class SqlMapper(metaclass=ABCMeta):
     def get_base_none():
         return FieldValues.NoneValue()
 
+    @staticmethod
+    def convert_to_list_value(items):
+        return FieldValues.ListValue([it for it in items])
+
     ############################################ CRUD ###############################################################
 
     def generate_rows(self, fields: list=None, conditions: dict=None, params: dict=None, cache=None):
@@ -2353,4 +2357,6 @@ def MapperMock(real_mapper):
     mapper_mock.insert.return_value = item
     mapper_mock.refresh = lambda model: model
     mapper_mock.is_mock = True
+    mapper_mock.get_base_none.return_value = FieldValues.NoneValue()
+    mapper_mock.convert_to_list_value = lambda l: FieldValues.ListValue(l)
     return mapper_mock

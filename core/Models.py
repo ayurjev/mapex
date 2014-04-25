@@ -15,6 +15,7 @@ class TableModel(object):
             raise TableModelException("No mapper for %s model" % self)
         # noinspection PyCallingNonCallable
         self.object_boundaries = boundaries
+        # noinspection PyCallingNonCallable
         self.mapper = self.__class__.mapper()
 
     def get_new_item(self):
@@ -371,6 +372,11 @@ class RecordModel(ValueInside, TrackChangesValue):
 
     def up_to_date(self):
         """ Пересоздает объект Origin для модели """
+        for property_name in self.mapper.get_properties():
+            if self.mapper.is_list(property_name) and type(self.__dict__.get(property_name)) is list:
+                self.__dict__[property_name] = self.mapper.convert_to_list_value(self.__dict__[property_name])
+            elif self.__dict__[property_name] is None:
+                self.__dict__[property_name] = self.mapper.get_base_none()
         self.origin = OriginModel(self.get_data())
         self._changed = False
 
@@ -397,7 +403,8 @@ class RecordModel(ValueInside, TrackChangesValue):
         Инициализирует объект данными из словаря
         :param data:    Словарь с данными
         """
-        self.__dict__.update(data)
+        for key in data:
+            self.__setattr__(key, data[key])
         self._loaded_from_db = loaded_from_db
         self.up_to_date() if loaded_from_db else self.mark_as_changed()
         return self
