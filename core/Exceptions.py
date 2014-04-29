@@ -25,3 +25,8 @@ class TableModelException(Exception):
 class RecordModelException(Exception):
     """ Класс исключений, связанных с ошибками работы модели """
     pass
+
+
+class TooManyConnectionsError(Exception):
+    """ Исключение говорит о превышении лимита соединений с базой данных """
+    pass
