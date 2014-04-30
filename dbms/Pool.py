@@ -21,8 +21,6 @@ class Pool(object):
         self._raise_exception = True
 
         self._local = local()
-        self._local.connections = []
-        self._local.connection = None
 
         if preopen_connections:
             self._preopen_connections()
@@ -39,16 +37,16 @@ class Pool(object):
     @property
     def connection(self):
         """ Свойство хранит соединение с базой данных которое оно получило из пула """
-        if self._local.connection is None:
+        if not hasattr(self._local, "connection"):
             self._local.connection = self._get_connection()
         return self._local.connection
 
     @connection.deleter
     def connection(self):
         """ Возвращает соединение в пул """
-        if self._local.connection is not None:
+        if hasattr(self._local, "connection"):
             self._free_connection(self._local.connection)
-            self._local.connection = None
+            del self._local.connection
 
     def _get_connection(self):
         """ Пытается получить соединение из пула """
@@ -59,11 +57,7 @@ class Pool(object):
             try:
                 return self._open_connection()
             except:
-                #TODO добавить возможность редактировать свойство класса. Исключение нужно чтобы проходили тесты
-                if self._raise_exception:
-                    raise TooManyConnectionsError
-                else:
-                    return self._pool.get()
+                return self._pool.get()
 
     def _free_connection(self, connection):
         """ Возвращает соединение в пул либо закрывает его если в пуле нет места """
@@ -79,6 +73,9 @@ class Pool(object):
 
     def __enter__(self):
         """ На входе получает из пула новое соединение и запоминает в локальном списке """
+        if not hasattr(self._local, "connections"):
+            self._local.connections = []
+
         self._local.connections.append(self._get_connection())
         return self._local.connections[-1]
 
@@ -88,10 +85,10 @@ class Pool(object):
 
     def __del__(self):
         """ Пул закрывает все занятые соединения """
-        if self._local.connection:
+        if hasattr(self._local, "connection"):
             self._local.connection.close()
 
-        if self._local.connections:
+        if hasattr(self._local, "connections"):
             for connection in self._local.connections:
                 connection.close()
 
@@ -100,8 +97,3 @@ class Pool(object):
                 self._pool.get_nowait().close()
             except Empty:
                 break
-
-
-class TooManyConnectionsError(Exception):
-    """ Превышено ограничение количества соединений с базой данных """
-    pass
