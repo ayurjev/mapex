@@ -1,19 +1,23 @@
 from mysql import connector as mysql_connector
 from unittest import TestCase
-from mapex.dbms.Pool import Pool
-from mapex.core.Exceptions import TooManyConnectionsError
+from mapex.dbms.Pool import Pool, TooManyConnectionsError
 
 
 class PoolTestCase(TestCase):
-    def setUp(self):
-        dsn = {"user": "unittests", "host": "127.0.0.1", "port": "3306", "database": "test", "autocommit": True}
-        self.pool = Pool(connector=mysql_connector, dsn=dsn, min_connections=2)
+    dsn = {"user": "unittests", "host": "127.0.0.1", "port": "3306", "database": "test", "autocommit": True}
+    pool = Pool(connector=mysql_connector, dsn=dsn, min_connections=2, preopen_connections=True)
 
-    def tearDown(self):
-        self.pool.kill_instance()
+    def test_preopen_connections(self):
+        """ Опция preopen_connections контроллирует наполнение пула соединениями при инициализации объекта пула """
+        lazy_pool = Pool(connector=mysql_connector, dsn=self.dsn, min_connections=10, preopen_connections=False)
+        self.assertEqual(0, lazy_pool.size)
+
+        pool = Pool(connector=mysql_connector, dsn=self.dsn, min_connections=10, preopen_connections=True)
+        self.assertEqual(10, pool.size)
 
     def test_with(self):
         """ Соединение можно получить в with """
+        self.assertEqual(2, self.pool.size)
         with self.pool:
             self.assertEqual(1, self.pool.size)
             with self.pool:

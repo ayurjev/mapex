@@ -1,45 +1,30 @@
 from queue import Queue, Empty
-from threading import local as thread_local
-from mapex.core.Exceptions import TooManyConnectionsError
+from threading import local
+
 
 class Pool(object):
     """ Пул соединений с базой данных """
-    _pool = None
-    _min_connections = 0
-    _connection_timeout = 5
-    _raise_exception = True
-
-    _connector = None
-    _dsn = {}
-
-    _instance = None
-    _inited = False
-
-    _local = thread_local()
-
-    def __new__(cls, *a, **kwa):
-        if cls._instance is None:
-            cls._instance = object.__new__(cls)
-        return cls._instance
-
-    def kill_instance(self):
-        self.__class__._instance = None
-
-    def __init__(self, connector=None, dsn: dict=None, min_connections: int=0):
+    def __init__(self, connector=None, dsn: dict=None, min_connections: int=0, preopen_connections=True):
         """
         Конструктор пула коннектов
         @param connector: коннектор базы данных
         @param dsn: параметры подключения к базе данных
         @param min_connections: число минимально поддерживаемых в пуле соединений
+        @param preopen_connections: надо заполнить пул готовыми соединениями
         @return: Pool
         """
-        if not self._inited:
-            assert min_connections >= 0
-            self._inited = True
-            self._pool = Queue()
-            self._min_connections = min_connections
-            self._connector = connector
-            self._dsn = dsn
+        assert min_connections >= 0
+        self._pool = Queue()
+        self._connector = connector
+        self._dsn = dsn
+        self._min_connections = min_connections
+        self._raise_exception = True
+
+        self._local = local()
+        self._local.connections = []
+        self._local.connection = None
+
+        if preopen_connections:
             self._preopen_connections()
 
     def _open_connection(self):
@@ -51,23 +36,19 @@ class Pool(object):
         for _ in range(self._min_connections):
             self._free_connection(self._open_connection())
 
-    def _init_connections_container(self):
-        if not hasattr(self._local, "connections"):
-            self._local.connections = []
-
     @property
     def connection(self):
         """ Свойство хранит соединение с базой данных которое оно получило из пула """
-        if not hasattr(self._local, "connection"):
+        if self._local.connection is None:
             self._local.connection = self._get_connection()
         return self._local.connection
 
     @connection.deleter
     def connection(self):
         """ Возвращает соединение в пул """
-        if hasattr(self._local, "connection"):
+        if self._local.connection is not None:
             self._free_connection(self._local.connection)
-            del self._local.connection
+            self._local.connection = None
 
     def _get_connection(self):
         """ Пытается получить соединение из пула """
@@ -93,17 +74,34 @@ class Pool(object):
 
     @property
     def size(self):
-        """ Возвращает количество открытых соединений в пуле """
+        """ Возвращает количество готовых соединений """
         return self._pool.qsize()
 
     def __enter__(self):
-        if not hasattr(self._local, "connections"):
-            self._local.connections = []
+        """ На входе получает из пула новое соединение и запоминает в локальном списке """
+        self._local.connections.append(self._get_connection())
+        return self._local.connections[-1]
 
-        connection = self._get_connection()
-        self._local.connections.append(connection)
-        return connection
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, *args):
+        """ На выходе возвращает соединение в пул """
         self._free_connection(self._local.connections.pop())
 
+    def __del__(self):
+        """ Пул закрывает все занятые соединения """
+        if self._local.connection:
+            self._local.connection.close()
+
+        if self._local.connections:
+            for connection in self._local.connections:
+                connection.close()
+
+        while True:
+            try:
+                self._pool.get_nowait().close()
+            except Empty:
+                break
+
+
+class TooManyConnectionsError(Exception):
+    """ Превышено ограничение количества соединений с базой данных """
+    pass
