@@ -956,7 +956,7 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
     def connect(self, connection_data: tuple):
         """
         Выполняет подключение к СУБД
-        @param connection_data: Последовательность данных для подключения к СУЬД
+        @param connection_data: Последовательность данных для подключения к СУБД
         @type connection_data: tuple
 
         """
@@ -969,7 +969,8 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
 
     def close(self):
         """ Закрывает соединение с базой данных """
-        self.close_connection()
+        if self.connection:
+            self.close_connection()
 
     def execute(self, sql: str, params: list=None):
         """

@@ -171,7 +171,7 @@ class FieldTypes(object):
             @return: Тип поля маппера
             """
             db_type = self.get_db_type()
-            field_types = self.mapper.db.get_field_types_map()
+            field_types = self.mapper.pool.db.get_field_types_map()
             for mapperType in field_types:
                 if db_type in field_types[mapperType]:
                     return mapperType
@@ -948,7 +948,7 @@ class SqlMapper(metaclass=ABCMeta):
     # Немного магии, чтобы экземпляры данного класса создавались только один раз...
     _instance = None
     _inited = False
-    db = None
+    pool = None
     dependencies = []
     support_joins = True
 
@@ -1111,7 +1111,7 @@ class SqlMapper(metaclass=ABCMeta):
         @deprecated
         """
         self.table_name = table_name
-        self.db_fields, self.db_primary_key = self.db.get_table_fields(self.table_name)
+        self.db_fields, self.db_primary_key = self.pool.db.get_table_fields(self.table_name)
 
     def set_collection_name(self, collection_name: str):
         """
@@ -1329,7 +1329,7 @@ class SqlMapper(metaclass=ABCMeta):
         params = self.convert_params(params) if params else {}
         joined_tables = self.get_joined_tables(conditions, fields, params.get("order"))
 
-        for row in self.db.select_query(self.table_name, fields, conditions, params, joined_tables, "get_rows"):
+        for row in self.pool.db.select_query(self.table_name, fields, conditions, params, joined_tables, "get_rows"):
             result = {fields[it]: row[it] for it in range(len(fields))}
             yield self.translate_and_convert(result, "database2mapper", cache)
 
@@ -1411,7 +1411,7 @@ class SqlMapper(metaclass=ABCMeta):
         @rtype : int
         """
         conditions = self.translate_and_convert(conditions, save_unsaved=False)
-        return self.db.count_query(self.table_name, conditions, self.get_joined_tables(conditions))
+        return self.pool.db.count_query(self.table_name, conditions, self.get_joined_tables(conditions))
 
     def insert(self, data: list or dict):
         """
@@ -1431,7 +1431,7 @@ class SqlMapper(metaclass=ABCMeta):
             raise TableModelException("Can't insert an empty record")
 
         try:
-            last_record = self.db.insert_query(self.table_name, self.translate_and_convert(data), self.primary)
+            last_record = self.pool.db.insert_query(self.table_name, self.translate_and_convert(data), self.primary)
         except DublicateRecordException as err:
             raise self.__class__.dublicate_record_exception(err)
         return self.primary.grab_value_from(
@@ -1461,7 +1461,7 @@ class SqlMapper(metaclass=ABCMeta):
         if data != {}:
             converted_conditions = self.translate_and_convert(conditions, save_unsaved=False)
             try:
-                self.db.update_query(
+                self.pool.db.update_query(
                     self.table_name, self.translate_and_convert(data), converted_conditions,
                     self.get_joined_tables(converted_conditions), self.primary
                 )
@@ -1484,14 +1484,14 @@ class SqlMapper(metaclass=ABCMeta):
             ]
             if len(changed_records_ids) > 0:
                 self.unlink_objects(changed_records_ids)
-                self.db.delete_query(
+                self.pool.db.delete_query(
                     self.table_name,
                     self.translate_and_convert({self.primary.name(): ("in", changed_records_ids)}, save_unsaved=False)
                 )
                 return changed_records_ids
         else:
             conditions = self.translate_and_convert(conditions, save_unsaved=False)
-            self.db.delete_query(self.table_name, conditions, self.get_joined_tables(conditions))
+            self.pool.db.delete_query(self.table_name, conditions, self.get_joined_tables(conditions))
 
     def split_data_by_relation_type(self, data: dict) -> (dict, dict):
         """
@@ -1776,7 +1776,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
         rows_primaries = []
         foreign_models_primaries = defaultdict(list)
         foreign_models_by_row = {field: defaultdict(list) for field in main_collection_fields}
-        for row in self.db.select_query(self.table_name, main_collection_fields, collection_conditions["self"], params):
+        for row in self.pool.db.select_query(self.table_name, main_collection_fields, collection_conditions["self"], params):
             rows.append(row)
             rows_primaries.append(row.get("_id"))
             for key in row:
@@ -1808,7 +1808,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
                     linked_mapper.translate_and_convert(collection_conditions.get(prop), save_unsaved=False)
                 )
             requested_fields = ["_id", main_record_key.get_db_name()]
-            data = linked_mapper.db.select_query(linked_mapper.table_name, requested_fields, rev_collection_condtions)
+            data = linked_mapper.pool.db.select_query(linked_mapper.table_name, requested_fields, rev_collection_condtions)
             for reversed_model in data:
                 reversed_models_by_row[prop][reversed_model[main_record_key.get_db_name()]].append(
                     reversed_model.get("_id")
@@ -1845,7 +1845,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
 
                     # Заполняем модели
                     foreign_models = {}
-                    for row in linked_mapper.db.select_query(linked_mapper.table_name, db_fields, basic_conditions):
+                    for row in linked_mapper.pool.db.select_query(linked_mapper.table_name, db_fields, basic_conditions):
                         foreign_models[row["_id"]] = row
 
                     for main_record in rows:
@@ -1954,7 +1954,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
                     # noinspection PyUnresolvedReferences
                     fmapper = mf.get_items_collection_mapper()
                     if self.is_list_with_dependencies(mf):
-                        sub_conditions = fmapper.db.select_query(
+                        sub_conditions = fmapper.pool.db.select_query(
                             fmapper.table_name, [fmapper.get_property_that_is_link_for(self).get_db_name()],
                             self.to_mongo_conditions_format(
                                 {fmapper.translate(other_mapper_property_name, "mapper2database"): conditions[key]}
@@ -1965,7 +1965,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
                             [el[fmapper.get_property_that_is_link_for(self).get_db_name()] for el in sub_conditions]
                         )
                     else:
-                        sub_conditions = fmapper.db.select_query(
+                        sub_conditions = fmapper.pool.db.select_query(
                             fmapper.table_name, [fmapper.primary.db_name()],
                             self.to_mongo_conditions_format(
                                 {fmapper.translate(other_mapper_property_name, "mapper2database"): conditions[key]}
