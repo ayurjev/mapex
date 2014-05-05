@@ -122,6 +122,7 @@ class TableModel(object):
 
         # Сохраняем записи в основной таблице
         changed_models_pkeys = self.mapper.update(flat_data, conditions)
+
         if len(changed_models_pkeys) > 0:
             if model:
                 items_to_update = [model]
@@ -396,6 +397,7 @@ class RecordModel(ValueInside, TrackChangesValue):
         self.primary.set_value(primary)
         self._lazy_load = (lambda: self.cache_load(cache)) if cache else (lambda: self.normal_load())
         self._loaded_from_db = True
+        self._changed = False
         return self
 
     def load_from_array(self, data, loaded_from_db=False):
