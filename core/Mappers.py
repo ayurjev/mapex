@@ -1231,12 +1231,27 @@ class SqlMapper(metaclass=ABCMeta):
         else:
             order_fields = []
         fields, conditions = fields if fields else [], conditions if conditions else {}
-        #TODO учитывать имена полей которые используются в списке OR и AND
+
         foreign_tables = list(set(filter(
             None,
             [field.split(".")[0] if field.find(".") > -1 else None for field in
-             (fields + list(conditions.keys()) + order_fields)])))
+             (fields + self.get_fields_from_conditions(conditions) + order_fields)])))
         return {joined_table_name: self._joined[joined_table_name] for joined_table_name in foreign_tables}
+
+    def get_fields_from_conditions(self, sub_conditions: dict) -> list:
+        """ Рекурсивно вытаскивает имена полей из словарей с уловиями обрабатывая вложеные and и or
+        @param sub_conditions: Условия выборки
+        @return: Список полей по которым идет выборка
+        @rtype : list
+        """
+        fields_from_conditions = list(sub_conditions.keys()) if sub_conditions else []
+        if sub_conditions.get("and"):
+            for conj_sub_conditions in sub_conditions.get("and"):
+                fields_from_conditions += self.get_fields_from_conditions(conj_sub_conditions)
+        if sub_conditions.get("or"):
+            for conj_sub_conditions in sub_conditions.get("or"):
+                fields_from_conditions += self.get_fields_from_conditions(conj_sub_conditions)
+        return fields_from_conditions
 
     def get_db_type(self, field_name: str) -> str:
         """
