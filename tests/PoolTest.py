@@ -1,20 +1,20 @@
-from mysql import connector as mysql_connector
 from unittest import TestCase
 from mapex.dbms.Pool import Pool
+from mapex.dbms.Adapters import MySqlDbAdapter
 
 
 class PoolTestCase(TestCase):
-    dsn = {"user": "unittests", "host": "127.0.0.1", "port": "3306", "database": "test", "autocommit": True}
+    dsn = ("127.0.0.1", "3306", "unittests", "", "unittests")
 
     def setUp(self):
-        self.pool = Pool(connector=mysql_connector, dsn=self.dsn, min_connections=2, preopen_connections=True)
+        self.pool = Pool(adapter=MySqlDbAdapter, dsn=self.dsn, min_connections=2, preopen_connections=True)
 
     def test_preopen_connections(self):
         """ Опция preopen_connections контроллирует наполнение пула соединениями при инициализации объекта пула """
-        lazy_pool = Pool(connector=mysql_connector, dsn=self.dsn, min_connections=10, preopen_connections=False)
+        lazy_pool = Pool(adapter=MySqlDbAdapter, dsn=self.dsn, min_connections=10, preopen_connections=False)
         self.assertEqual(0, lazy_pool.size)
 
-        pool = Pool(connector=mysql_connector, dsn=self.dsn, min_connections=10, preopen_connections=True)
+        pool = Pool(adapter=MySqlDbAdapter, dsn=self.dsn, min_connections=10, preopen_connections=True)
         self.assertEqual(10, pool.size)
 
     def test_with(self):
@@ -25,25 +25,24 @@ class PoolTestCase(TestCase):
             with self.pool:
                 self.assertEqual(0, self.pool.size)
             self.assertEqual(1, self.pool.size)
-
         self.assertEqual(2, self.pool.size)
 
-    def test_connection_property(self):
+    def test_db_property(self):
         """ Соединение можно получить через свойство пула """
         # Изначально в пуле два соединения
         self.assertEqual(2, self.pool.size)
 
         # Получаем соединение
-        connection = self.pool.connection
+        db = self.pool.db
         self.assertEqual(1, self.pool.size)
 
         # Получаем ещё раз. Это всё то же самое соединение
-        connection2 = self.pool.connection
-        self.assertEqual(connection, connection2)
+        connection2 = self.pool.db
+        self.assertEqual(db, connection2)
         self.assertEqual(1, self.pool.size)
 
         # При удалении соединения оно возвращается в пул
-        del self.pool.connection
+        del self.pool.db
         self.assertEqual(2, self.pool.size)
 
     def test_exhausting_pool(self):
@@ -52,17 +51,16 @@ class PoolTestCase(TestCase):
         Когда создать соединение невозможно пул ждёт пока в него вернут одно из уже открытых соединений
         """
 
-        connection = self.pool.connection
-        # Мы вручную вернём коннект в пул (код исключительно для теста)
-        # noinspection PyProtectedMember
-        del self.pool._local.connection
+        connection = MySqlDbAdapter()
+        connection.connect(self.dsn)
 
         def exhaust_pool():
             """ Вычерпывает пул коннектов """
             from time import time
             t = time()
             with self.pool as connection2:
-                # Пришло соединение из БД или из пула можно понять по затраченному времени
+                # Если соединения долго не было то оно пришло из пула.
+                # Проверяю что это соединение возвращённое таймером
                 if time() - t >= 0.5:
                     self.assertEqual(connection, connection2)
                     return
@@ -71,6 +69,7 @@ class PoolTestCase(TestCase):
 
         def free_connection():
             """  Возвращает коннект в пул """
+            # noinspection PyProtectedMember
             self.pool._free_connection(connection)
 
         from threading import Timer

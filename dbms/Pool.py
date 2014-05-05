@@ -1,21 +1,22 @@
 from queue import Queue, Empty
 from threading import local
+from mapex.dbms.Adapters import Adapter
 
 
 class Pool(object):
-    """ Пул соединений с базой данных """
-    def __init__(self, connector=None, dsn: dict=None, min_connections: int=0, preopen_connections=True):
+    """ Пул адаптеров баз данных """
+    def __init__(self, adapter: type, dsn: tuple, min_connections: int=0, preopen_connections=True):
         """
-        Конструктор пула коннектов
-        @param connector: коннектор базы данных
-        @param dsn: параметры подключения к базе данных
+        Конструктор пула
+        @param adapter: класс адаптера
+        @param dsn: параметры подключения к БД
         @param min_connections: число минимально поддерживаемых в пуле соединений
         @param preopen_connections: надо заполнить пул готовыми соединениями
         @return: Pool
         """
         assert min_connections >= 0
         self._pool = Queue()
-        self._connector = connector
+        self._adapter = adapter
         self._dsn = dsn
         self._min_connections = min_connections
         self._raise_exception = True
@@ -25,30 +26,13 @@ class Pool(object):
         if preopen_connections:
             self._preopen_connections()
 
-    def _open_connection(self):
-        """ Возвращает новое соединение к базе данных """
-        return self._connector.connect(**self._dsn)
+    def _open_connection(self) -> Adapter:
+        """ Подключение к БД через адаптер """
+        db = self._adapter()
+        db.connect(self._dsn)
+        return db
 
-    def _preopen_connections(self):
-        """ Наполняет пул минимальным количеством соединений """
-        for _ in range(self._min_connections):
-            self._free_connection(self._open_connection())
-
-    @property
-    def connection(self):
-        """ Свойство хранит соединение с базой данных которое оно получило из пула """
-        if not hasattr(self._local, "connection"):
-            self._local.connection = self._get_connection()
-        return self._local.connection
-
-    @connection.deleter
-    def connection(self):
-        """ Возвращает соединение в пул """
-        if hasattr(self._local, "connection"):
-            self._free_connection(self._local.connection)
-            del self._local.connection
-
-    def _get_connection(self):
+    def _get_pool_connection(self) -> Adapter:
         """ Пытается получить соединение из пула """
         try:
             return self._pool.get_nowait()
@@ -59,12 +43,33 @@ class Pool(object):
             except:
                 return self._pool.get()
 
-    def _free_connection(self, connection):
-        """ Возвращает соединение в пул либо закрывает его если в пуле нет места """
-        if self._pool.qsize() >= self._min_connections:
-            connection.close()
+    def _preopen_connections(self, opened=0):
+        """ Наполняет пул минимальным количеством соединений """
+        if opened < self._min_connections:
+            with self:
+                self._preopen_connections(opened + 1)
+
+    def _free_connection(self, db: Adapter):
+        """ Возвращает соединение в пул если оно ещё нужно иначе закрывает его """
+        if self.size < self._min_connections:
+            self._pool.put(db)
         else:
-            self._pool.put(connection)
+            db.close()
+
+    @property
+    def db(self):
+        """ Свойство хранит соединение с базой данных """
+        #TODO проверять состояние соединения и `del self._local.connection` если соединение умерло
+        if not hasattr(self._local, "connection"):
+            self._local.connection = self._get_pool_connection()
+        return self._local.connection
+
+    @db.deleter
+    def db(self):
+        """ Освобождает соединение и возвращает в пул """
+        if hasattr(self._local, "connection"):
+            self._free_connection(self._local.connection)
+            del self._local.connection
 
     @property
     def size(self):
@@ -76,7 +81,7 @@ class Pool(object):
         if not hasattr(self._local, "connections"):
             self._local.connections = []
 
-        self._local.connections.append(self._get_connection())
+        self._local.connections.append(self._get_pool_connection())
         return self._local.connections[-1]
 
     def __exit__(self, *args):
@@ -87,13 +92,16 @@ class Pool(object):
         """ Пул закрывает все занятые соединения """
         if hasattr(self._local, "connection"):
             self._local.connection.close()
+            del self._local.connection
 
         if hasattr(self._local, "connections"):
-            for connection in self._local.connections:
-                connection.close()
+            for db in self._local.connections:
+                db.close()
+            self._local.connections = []
 
         while True:
             try:
-                self._pool.get_nowait().close()
+                connection = self._pool.get_nowait()
+                connection.close()
             except Empty:
                 break
