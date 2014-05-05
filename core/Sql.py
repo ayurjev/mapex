@@ -969,7 +969,8 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
 
     def close(self):
         """ Закрывает соединение с базой данных """
-        self.close_connection()
+        if self.connection:
+            self.close_connection()
 
     def execute(self, sql: str, params: list=None):
         """
