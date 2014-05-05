@@ -128,8 +128,9 @@ class MySqlDbAdapter(Adapter):
         import mysql.connector.errors
         self.dublicate_record_exception = mysql.connector.errors.IntegrityError
         return mysql.connector.connect(
+            host=connection_data[0], port=connection_data[1],
             user=connection_data[2], password=connection_data[3],
-            host=connection_data[0], port=connection_data[1], database=connection_data[4],
+            database=connection_data[4],
             autocommit=True
         )
 
