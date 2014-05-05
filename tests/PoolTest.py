@@ -7,14 +7,14 @@ class PoolTestCase(TestCase):
     dsn = ("127.0.0.1", "3306", "unittests", "", "unittests")
 
     def setUp(self):
-        self.pool = Pool(adapter=MySqlDbAdapter, dsn=self.dsn, min_connections=2, preopen_connections=True)
+        self.pool = Pool(adapter=MySqlDbAdapter, dsn=self.dsn, min_connections=2)
 
     def test_preopen_connections(self):
         """ Опция preopen_connections контроллирует наполнение пула соединениями при инициализации объекта пула """
         lazy_pool = Pool(adapter=MySqlDbAdapter, dsn=self.dsn, min_connections=10, preopen_connections=False)
         self.assertEqual(0, lazy_pool.size)
 
-        pool = Pool(adapter=MySqlDbAdapter, dsn=self.dsn, min_connections=10, preopen_connections=True)
+        pool = Pool(adapter=MySqlDbAdapter, dsn=self.dsn, min_connections=10)
         self.assertEqual(10, pool.size)
 
     def test_with(self):

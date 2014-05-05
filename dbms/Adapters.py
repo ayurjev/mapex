@@ -315,10 +315,16 @@ class MongoDbAdapter(AdapterLogger):
         self.dublicate_record_exception = pymongo.errors.DuplicateKeyError
         self.update_primary_exception = pymongo.errors.OperationFailure
 
-    def connect(self, host: str, port: int, database: str):
-        """ Выполняет подключение к СУБД по переданным реквизитам """
+    def connect(self, connection_data: tuple):
+        """ Выполняет подключение к СУБД по переданным реквизитам
+        @param connection_data: host, port, database
+        """
         import pymongo
-        self.db = pymongo.MongoClient(host, port)[database]
+        self.db = pymongo.MongoClient(connection_data[0], connection_data[1])[connection_data[2]]
+
+    def close(self):
+        """ Закрывает соединение с базой данных """
+        pass
 
     def count_query(self, collection_name: str, conditions: dict, joined_tables) -> int:
         """

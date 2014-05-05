@@ -6,6 +6,7 @@ from abc import ABCMeta, abstractmethod
 from mapex.dbms.Adapters import PgSqlDbAdapter, MySqlDbAdapter, MsSqlDbAdapter, MongoDbAdapter
 from mapex.core.Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
 from mapex.core.Mappers import SqlMapper, FieldTypes, NoSqlMapper
+from mapex.dbms.Pool import Pool
 
 import time
 import re
@@ -38,7 +39,7 @@ def for_all_dbms(test_function):
     def wrapped(*args, **kwargs):
         print()
         print("%s..." % test_doc)
-        for test_framework in [PgDbMock(), MyDbMock(), MongoDbMock()]:
+        for test_framework in [MyDbMock(), PgDbMock(), MongoDbMock()]:
             test_framework.up()
             try:
                 with Profiler() as p:
@@ -56,7 +57,7 @@ class DbMock(object, metaclass=ABCMeta):
     ident = "Unknown database"
 
     def __init__(self):
-        self.db = None
+        self.pool = None
 
     def __str__(self):
         return str(self.__class__.ident)
@@ -205,24 +206,24 @@ class SqlDbMock(DbMock):
         @param filepath: Путь до файла с sql-командами
         """
         with open(filepath) as f:
-            self.db.execute_raw(f.read())
+            self.pool.db.execute_raw(f.read())
 
     def up(self):
         """ Создает нужные для проведения тестирования таблицы в базе данных """
         self.exec_sql_from_file(self.up_script)
-        SqlUsersMapper.db = self.db
-        SqlUsersMapperWithBoundaries.db = self.db
-        SqlAccountsMapper.db = self.db
-        SqlTagsMapper.db = self.db
-        SqlUsersTagsMapper.db = self.db
-        SqlStatusesMapper.db = self.db
-        SqlProfilesMapper.db = self.db
-        SqlPassportsMapper.db = self.db
-        SqlDocumentsMapper.db = self.db
-        SqlDocumentsNotAiMapper.db = self.db
-        SqlNoPrimaryMapper.db = self.db
-        SqlMultiMappedCollectionMapper.db = self.db
-        SqlHousesMapper.db = self.db
+        SqlUsersMapper.pool = self.pool
+        SqlUsersMapperWithBoundaries.pool = self.pool
+        SqlAccountsMapper.pool = self.pool
+        SqlTagsMapper.pool = self.pool
+        SqlUsersTagsMapper.pool = self.pool
+        SqlStatusesMapper.pool = self.pool
+        SqlProfilesMapper.pool = self.pool
+        SqlPassportsMapper.pool = self.pool
+        SqlDocumentsMapper.pool = self.pool
+        SqlDocumentsNotAiMapper.pool = self.pool
+        SqlNoPrimaryMapper.pool = self.pool
+        SqlMultiMappedCollectionMapper.pool = self.pool
+        SqlHousesMapper.pool = self.pool
 
     def down(self):
         """ Уничтожает созданные в процессе тестирования таблицы базы данных """
@@ -366,31 +367,31 @@ class NoSqlDbMock(DbMock):
     """ Класс для создания тестовой инфраструктуры при работе с Sql базами данных """
     def up(self):
         """ Создает нужные для проведения тестирования таблицы в базе данных """
-        NoSqlUsersMapper.db = self.db
-        NoSqlUsersMapperWithBoundaries.db = self.db
-        NoSqlAccountsMapper.db = self.db
-        NoSqlTagsMapper.db = self.db
-        NoSqlUsersTagsMapper.db = self.db
-        NoSqlStatusesMapper.db = self.db
-        NoSqlProfilesMapper.db = self.db
-        NoSqlNoPrimaryMapper.db = self.db
-        NoSqlPassportsMapper.db = self.db
-        NoSqlDocumentsMapper.db = self.db
-        NoSqlDocumentsNotAiMapper.db = self.db
-        NoSqlMultiMappedCollectionMapper.db = self.db
-        NoSqlHousesMaper.db = self.db
+        NoSqlUsersMapper.pool = self.pool
+        NoSqlUsersMapperWithBoundaries.pool = self.pool
+        NoSqlAccountsMapper.pool = self.pool
+        NoSqlTagsMapper.pool = self.pool
+        NoSqlUsersTagsMapper.pool = self.pool
+        NoSqlStatusesMapper.pool = self.pool
+        NoSqlProfilesMapper.pool = self.pool
+        NoSqlNoPrimaryMapper.pool = self.pool
+        NoSqlPassportsMapper.pool = self.pool
+        NoSqlDocumentsMapper.pool = self.pool
+        NoSqlDocumentsNotAiMapper.pool = self.pool
+        NoSqlMultiMappedCollectionMapper.pool = self.pool
+        NoSqlHousesMaper.pool = self.pool
 
     def down(self):
         """ Уничтожает созданные в процессе тестирования таблицы базы данных """
-        self.db.db.drop_collection("usersTable")
-        self.db.db.drop_collection("accountsTable")
-        self.db.db.drop_collection("tagsTable")
-        self.db.db.drop_collection("users_tags_relations")
-        self.db.db.drop_collection("profilesTable")
-        self.db.db.drop_collection("statusesTable")
-        self.db.db.drop_collection("testTableFieldTypes")
-        self.db.db.drop_collection("tableWithoutPrimaryKey")
-        self.db.db.drop_collection("multiMappedTable")
+        self.pool.db.db.drop_collection("usersTable")
+        self.pool.db.db.drop_collection("accountsTable")
+        self.pool.db.db.drop_collection("tagsTable")
+        self.pool.db.db.drop_collection("users_tags_relations")
+        self.pool.db.db.drop_collection("profilesTable")
+        self.pool.db.db.drop_collection("statusesTable")
+        self.pool.db.db.drop_collection("testTableFieldTypes")
+        self.pool.db.db.drop_collection("tableWithoutPrimaryKey")
+        self.pool.db.db.drop_collection("multiMappedTable")
         NoSqlUsersMapper.kill_instance()
         NoSqlUsersMapperWithBoundaries.kill_instance()
         NoSqlAccountsMapper.kill_instance()
@@ -532,8 +533,7 @@ class PgDbMock(SqlDbMock):
 
     def __init__(self):
         super().__init__()
-        self.db = PgSqlDbAdapter()
-        self.db.connect(("localhost", 5432, "postgres", "z9czda5v", "postgres"))
+        self.pool = Pool(PgSqlDbAdapter, ("localhost", 5432, "postgres", "z9czda5v", "postgres"), min_connections=1)
         self.up_script = "framework/pg-up.sql"
         self.down_script = "framework/pg-down.sql"
 
@@ -545,8 +545,7 @@ class MyDbMock(SqlDbMock):
 
     def __init__(self):
         super().__init__()
-        self.db = MySqlDbAdapter()
-        self.db.connect(("localhost", 3306, "root", "z9czda5v", "test"))
+        self.pool = Pool(MySqlDbAdapter, ("localhost", 3306, "unittests", "", "unittests"), min_connections=1)
         self.up_script = "framework/my-up.sql"
         self.down_script = "framework/my-down.sql"
 
@@ -558,8 +557,7 @@ class MsDbMock(SqlDbMock):
 
     def __init__(self):
         super().__init__()
-        self.db = MsSqlDbAdapter()
-        self.db.connect(("MSSQL_HOST", 1433, "ka_user", "NHxq98S72vVSn", "orm_db"))
+        self.pool = Pool(MsSqlDbAdapter, ("MSSQL_HOST", 1433, "ka_user", "NHxq98S72vVSn", "orm_db"), min_connections=1)
         self.up_script = "framework/ms-up.sql"
         self.down_script = "framework/ms-down.sql"
 
@@ -570,8 +568,7 @@ class MongoDbMock(NoSqlDbMock):
 
     def __init__(self):
         super().__init__()
-        self.db = MongoDbAdapter()
-        self.db.connect("localhost", 27017, "test")
+        self.pool = Pool(MongoDbAdapter, ("localhost", 27017, "test"), min_connections=1)
 
 
 ########################################### Основная тестовая коллекция Users #########################################
@@ -1260,7 +1257,7 @@ class NoSqlMultiMappedCollectionItem(RecordModel):
 
 
 class AMapper(SqlMapper):
-    db = MyDbMock().db
+    pool = MyDbMock().pool
 
     def bind(self):
         self.set_collection_name("a")
@@ -1274,7 +1271,7 @@ class AMapper(SqlMapper):
 
 
 class BMapper(SqlMapper):
-    db = MyDbMock().db
+    pool = MyDbMock().pool
 
     def bind(self):
         self.set_collection_name("b")
@@ -1288,7 +1285,7 @@ class BMapper(SqlMapper):
 
 
 class CMapper(SqlMapper):
-    db = MyDbMock().db
+    pool = MyDbMock().pool
 
     def bind(self):
         self.set_collection_name("c")

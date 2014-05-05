@@ -956,7 +956,7 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
     def connect(self, connection_data: tuple):
         """
         Выполняет подключение к СУБД
-        @param connection_data: Последовательность данных для подключения к СУЬД
+        @param connection_data: Последовательность данных для подключения к СУБД
         @type connection_data: tuple
 
         """

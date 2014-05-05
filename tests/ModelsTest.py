@@ -1760,7 +1760,7 @@ class TableModelTest(unittest.TestCase):
         # так как адаптер внутри всех мапперов используется один и тот же,
         # то подсчет можно делать с помощью следующей функции:
         #
-        connection = users.mapper.db
+        connection = users.mapper.pool.db
         connection.start_logging()
 
         # Проверим, что подсчет ведется корректно хотя бы для простого случая
@@ -2072,7 +2072,7 @@ class RecordModelTestMySqlOnly(unittest.TestCase):
     def tearDown(self):
         MyDbMock().down()
 
-    def test_changed(self, ):
+    def test_changed(self):
         """ Проверим, как фиксируются изменения моделей любых уровней вложенности """
         c1 = CModel({"name": "C"})
         b1 = BModel({"name": "B", "c": c1})
