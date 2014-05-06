@@ -958,10 +958,10 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
         Выполняет подключение к СУБД
         @param connection_data: Последовательность данных для подключения к СУБД
         @type connection_data: tuple
-
         """
         self.connection_data = connection_data
         self.connection = self.open_connection(connection_data)
+        return self if self.connection else False
 
     def reconnect(self):
         """ Выполняет переподключение к серверу базы данных """

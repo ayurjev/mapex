@@ -57,7 +57,7 @@ class DbMock(object, metaclass=ABCMeta):
     ident = "Unknown database"
 
     def __init__(self):
-        self.pool = None
+        self.pool = Pool(adapter=self.get_adapter(), dsn=self.get_dsn(), min_connections=2)
 
     def __str__(self):
         return str(self.__class__.ident)
@@ -69,6 +69,14 @@ class DbMock(object, metaclass=ABCMeta):
     @abstractmethod
     def down(self):
         """ Уничтожает созданные в процессе тестирования таблицы базы данных """
+
+    @abstractmethod
+    def get_adapter(self) -> type:
+        """ Возвращает тип адаптера БД """
+
+    @abstractmethod
+    def get_dsn(self) -> tuple:
+        """ Возвращает DSN информацию для подключения к БД """
 
     @abstractmethod
     def get_new_user_instance(self, data=None, loaded_from_db=False):
@@ -206,7 +214,8 @@ class SqlDbMock(DbMock):
         @param filepath: Путь до файла с sql-командами
         """
         with open(filepath) as f:
-            self.pool.db.execute_raw(f.read())
+            with self.pool as db:
+                db.execute_raw(f.read())
 
     def up(self):
         """ Создает нужные для проведения тестирования таблицы в базе данных """
@@ -528,47 +537,69 @@ class NoSqlDbMock(DbMock):
 
 class PgDbMock(SqlDbMock):
     """ Класс для создания тестовой инфраструктуры при работе с PostgreSql """
-
     ident = "PostgreSQL"
+
+    def get_adapter(self) -> type:
+        """ Возвращает тип адаптера БД """
+        return PgSqlDbAdapter
+
+    def get_dsn(self) -> tuple:
+        """ Возвращает DSN информацию для подключения к БД """
+        return "localhost", 5432, "postgres", "z9czda5v", "postgres"
 
     def __init__(self):
         super().__init__()
-        self.pool = Pool(PgSqlDbAdapter, ("localhost", 5432, "postgres", "z9czda5v", "postgres"), min_connections=1)
         self.up_script = "framework/pg-up.sql"
         self.down_script = "framework/pg-down.sql"
 
 
 class MyDbMock(SqlDbMock):
     """ Класс для создания тестовой инфраструктуры при работе с MySql """
-
     ident = "MySQL"
+
+    def get_adapter(self) -> type:
+        """ Возвращает тип адаптера БД """
+        return MySqlDbAdapter
+
+    def get_dsn(self) -> tuple:
+        """ Возвращает DSN информацию для подключения к БД """
+        return "localhost", 3306, "unittests", "", "unittests"
 
     def __init__(self):
         super().__init__()
-        self.pool = Pool(MySqlDbAdapter, ("localhost", 3306, "unittests", "", "unittests"), min_connections=1)
         self.up_script = "framework/my-up.sql"
         self.down_script = "framework/my-down.sql"
 
 
 class MsDbMock(SqlDbMock):
     """ Класс для создания тестовой инфраструктуры при работе с MsSql """
-
     ident = "MsSQL"
+
+    def get_adapter(self) -> type:
+        """ Возвращает тип адаптера БД """
+        return MsSqlDbAdapter
+
+    def get_dsn(self) -> tuple:
+        """ Возвращает DSN информацию для подключения к БД """
+        return "MSSQL_HOST", 1433, "ka_user", "NHxq98S72vVSn", "orm_db"
 
     def __init__(self):
         super().__init__()
-        self.pool = Pool(MsSqlDbAdapter, ("MSSQL_HOST", 1433, "ka_user", "NHxq98S72vVSn", "orm_db"), min_connections=1)
         self.up_script = "framework/ms-up.sql"
         self.down_script = "framework/ms-down.sql"
 
 
 class MongoDbMock(NoSqlDbMock):
-
+    """ Класс для создания тестовой инфраструктуры при работе с Mongodb """
     ident = "MongoDB"
 
-    def __init__(self):
-        super().__init__()
-        self.pool = Pool(MongoDbAdapter, ("localhost", 27017, "test"), min_connections=1)
+    def get_adapter(self) -> type:
+        """ Возвращает тип адаптера БД """
+        return MongoDbAdapter
+
+    def get_dsn(self) -> tuple:
+        """ Возвращает DSN информацию для подключения к БД """
+        return "localhost", 27017, "test"
 
 
 ########################################### Основная тестовая коллекция Users #########################################
