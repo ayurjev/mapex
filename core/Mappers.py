@@ -1567,7 +1567,15 @@ class SqlMapper(metaclass=ABCMeta):
                 else:
                     translted_field = self.translate_and_convert(field, direction, cache, save_unsaved)
                     if type(value[field]) is tuple:
-                        converted[translted_field] = value[field]
+                        if value[field][0] in ["in", "nin"]:
+                            converted[translted_field] = (
+                                value[field][0],
+                                [it.get_value() if isinstance(it, ValueInside) else it for it in value[field][1]]
+                            )
+                        elif isinstance(value[field][1], ValueInside):
+                            converted[translted_field] = (value[field][0], value[field][1].get_value())
+                        else:
+                            converted[translted_field] = value[field]
                     else:
                         mapper_field = self.get_mapper_field(field, direction)
                         converted[translted_field] = mapper_field.convert(value[field], direction, cache, save_unsaved)

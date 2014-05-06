@@ -1,6 +1,6 @@
 from queue import Queue, Empty
 from threading import local
-from mapex.dbms.Adapters import Adapter
+from mapex.core.Sql import Adapter
 
 
 class Pool(object):
@@ -87,21 +87,3 @@ class Pool(object):
     def __exit__(self, *args):
         """ На выходе возвращает соединение в пул """
         self._free_connection(self._local.connections.pop())
-
-    def __del__(self):
-        """ Пул закрывает все занятые соединения """
-        if hasattr(self._local, "connection"):
-            self._local.connection.close()
-            del self._local.connection
-
-        if hasattr(self._local, "connections"):
-            for db in self._local.connections:
-                db.close()
-            self._local.connections = []
-
-        while True:
-            try:
-                connection = self._pool.get_nowait()
-                connection.close()
-            except Empty:
-                break
