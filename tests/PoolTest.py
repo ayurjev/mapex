@@ -1,79 +1,78 @@
 from unittest import TestCase
-from mapex.dbms.Pool import Pool
-from mapex.dbms.Adapters import MySqlDbAdapter
+from mapex import Pool, TooManyConnectionsError
+from time import time
+from mapex.tests.framework.TestFramework import for_all_dbms, DbMock, MsDbMock
+from threading import Timer
 
 
 class PoolTestCase(TestCase):
-    dsn = ("127.0.0.1", "3306", "unittests", "", "unittests")
-
-    def setUp(self):
-        self.pool = Pool(adapter=MySqlDbAdapter, dsn=self.dsn, min_connections=2)
-
-    def test_preopen_connections(self):
+    @for_all_dbms
+    def test_preopen_connections(self, dbms_fw: DbMock):
         """ Опция preopen_connections контроллирует наполнение пула соединениями при инициализации объекта пула """
-        lazy_pool = Pool(adapter=MySqlDbAdapter, dsn=self.dsn, min_connections=10, preopen_connections=False)
+        lazy_pool = Pool(adapter=dbms_fw.get_adapter(), dsn=dbms_fw.get_dsn(), min_connections=10, preopen_connections=False)
         self.assertEqual(0, lazy_pool.size)
 
-        pool = Pool(adapter=MySqlDbAdapter, dsn=self.dsn, min_connections=10)
+        pool = Pool(adapter=dbms_fw.get_adapter(), dsn=dbms_fw.get_dsn(), min_connections=10)
         self.assertEqual(10, pool.size)
 
-    def test_with(self):
+    @for_all_dbms
+    def test_with(self, dbms_fw):
         """ Соединение можно получить в with """
-        self.assertEqual(2, self.pool.size)
-        with self.pool:
-            self.assertEqual(1, self.pool.size)
-            with self.pool:
-                self.assertEqual(0, self.pool.size)
-            self.assertEqual(1, self.pool.size)
-        self.assertEqual(2, self.pool.size)
+        self.assertEqual(2, dbms_fw.pool.size)
+        with dbms_fw.pool:
+            self.assertEqual(1, dbms_fw.pool.size)
+            with dbms_fw.pool:
+                self.assertEqual(0, dbms_fw.pool.size)
+            self.assertEqual(1, dbms_fw.pool.size)
+        self.assertEqual(2, dbms_fw.pool.size)
 
-    def test_db_property(self):
+    @for_all_dbms
+    def test_db_property(self, dbms_fw):
         """ Соединение можно получить через свойство пула """
         # Изначально в пуле два соединения
-        self.assertEqual(2, self.pool.size)
+        self.assertEqual(2, dbms_fw.pool.size)
 
         # Получаем соединение
-        db = self.pool.db
-        self.assertEqual(1, self.pool.size)
+        db = dbms_fw.pool.db
+        self.assertEqual(1, dbms_fw.pool.size)
 
         # Получаем ещё раз. Это всё то же самое соединение
-        connection2 = self.pool.db
+        connection2 = dbms_fw.pool.db
         self.assertEqual(db, connection2)
-        self.assertEqual(1, self.pool.size)
+        self.assertEqual(1, dbms_fw.pool.size)
 
         # При удалении соединения оно возвращается в пул
-        del self.pool.db
-        self.assertEqual(2, self.pool.size)
+        del dbms_fw.pool.db
+        self.assertEqual(2, dbms_fw.pool.size)
 
-    def test_exhausting_pool(self):
-        """
-        Пул выделяет коннекты пока есть возможность их создавать
-        Когда создать соединение невозможно пул ждёт пока в него вернут одно из уже открытых соединений
-        """
+    @for_all_dbms
+    def test_exhausting_connections(self, dbms_fw: DbMock):
+        """ Поведение пула когда заканчиваются соединения с БД """
+        # Тест умышленно пропускает базу данных MsSql
+        if isinstance(dbms_fw, MsDbMock):
+            return
 
-        connection = MySqlDbAdapter()
-        connection.connect(self.dsn)
+        connection = dbms_fw.get_adapter()()
+        connection.connect(dbms_fw.get_dsn())
 
-        def exhaust_pool():
-            """ Вычерпывает пул коннектов """
-            from time import time
-            t = time()
-            with self.pool as connection2:
-                # Если соединения долго не было то оно пришло из пула.
-                # Проверяю что это соединение возвращённое таймером
-                if time() - t >= 0.5:
-                    self.assertEqual(connection, connection2)
-                    return
+        # Пул который не хранит в себе соединения может получить соединения только прямо из базы данных
+        # Если исчерпать все соединения то получим исключение
+        pool_without_min_connections = Pool(dbms_fw.get_adapter(), dbms_fw.get_dsn())
+        self.assertRaises(TooManyConnectionsError, self.exhaust_connections, pool_without_min_connections, connection)
+        del pool_without_min_connections
 
-                exhaust_pool()
+        # В обычном случае пул может подождать соединение из пула если закончились соединения с базой данных
+        # Имитируем ситуацию когда через 5 секунд в пул возвращается соединение
+        # noinspection PyProtectedMember
+        Timer(5, lambda: dbms_fw.pool._return_connection(connection)).start()
+        self.exhaust_connections(dbms_fw.pool, connection)
 
-        def free_connection():
-            """  Возвращает коннект в пул """
-            # noinspection PyProtectedMember
-            self.pool._free_connection(connection)
-
-        from threading import Timer
-        # Через секунду в пул вернётся соединение
-        Timer(1, free_connection).start()
-        # К этому моменту все соединения к базе данных уже будут заняты и пул будет ждать возвращения соединений
-        exhaust_pool()
+    def exhaust_connections(self, pool, connection):
+        """ Занимает все соединения с БД """
+        t = time()
+        with pool as connection2:
+            # Если соединения долго не было то оно пришло из пула.
+            if time() - t >= 0.5:
+                self.assertEqual(connection, connection2)
+            else:
+                self.exhaust_connections(pool, connection)

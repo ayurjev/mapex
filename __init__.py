@@ -4,6 +4,6 @@ from mapex.core.Models import TableModel as CollectionModel, RecordModel as Enti
 from mapex.core.Models import EmbeddedObject, EmbeddedObjectFactory
 from mapex.dbms.Adapters import PgSqlDbAdapter as PgSqlClient, MySqlDbAdapter as MySqlClient, \
     MsSqlDbAdapter as MsSqlClient, MongoDbAdapter as MongoClient
-from mapex.dbms.Pool import Pool
+from mapex.dbms.Pool import Pool, TooManyConnectionsError
 
 from mapex.core.Exceptions import DublicateRecordException
