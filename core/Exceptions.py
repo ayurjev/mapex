@@ -25,3 +25,8 @@ class TableModelException(Exception):
 class RecordModelException(Exception):
     """ Класс исключений, связанных с ошибками работы модели """
     pass
+
+
+class EmbeddedObjectFactoryException(Exception):
+    """ Класс исключений, связанных с ошибками при работе с EmbeddedObjectFactory """
+    pass

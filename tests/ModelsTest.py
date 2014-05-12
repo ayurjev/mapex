@@ -8,8 +8,9 @@ import unittest
 from datetime import date
 
 from mapex.tests.framework.TestFramework import for_all_dbms, CustomProperty, CustomPropertyFactory, \
-    CustomPropertyPositive, CustomPropertyNegative, DbMock
-from mapex.core.Exceptions import TableModelException, TableMapperException
+    CustomPropertyPositive, CustomPropertyNegative, DbMock,\
+    CustomPropertyWithNoneFactory, CustomPropertyWithoutNoneFactory
+from mapex.core.Exceptions import TableModelException, TableMapperException, EmbeddedObjectFactoryException
 
 
 class TableModelTest(unittest.TestCase):
@@ -2105,6 +2106,19 @@ class RecordModelTestMySqlOnly(unittest.TestCase):
         self.assertTrue(b1.is_changed())
         self.assertTrue(a1.is_changed())
 
+
+class EmbeddedObjectsFactoryUnittests(unittest.TestCase):
+    """ Юниттесты EmbeddedObjectsFactory """
+    def test_factory_default_instantiating(self):
+        """ Тестирование дефолтной логики фабрики"""
+        self.assertIsInstance(CustomPropertyWithNoneFactory(1), CustomPropertyWithNoneFactory.CustomType1)
+        self.assertIsInstance(CustomPropertyWithNoneFactory(2), CustomPropertyWithNoneFactory.CustomType2)
+        self.assertIsInstance(CustomPropertyWithNoneFactory(None), CustomPropertyWithNoneFactory.BaseCustomType)
+
+        self.assertIsInstance(CustomPropertyWithoutNoneFactory(1), CustomPropertyWithoutNoneFactory.CustomType1)
+        self.assertIsInstance(CustomPropertyWithoutNoneFactory(2), CustomPropertyWithoutNoneFactory.CustomType2)
+        self.assertIsNone(CustomPropertyWithoutNoneFactory(None))
+        self.assertRaises(EmbeddedObjectFactoryException, CustomPropertyWithoutNoneFactory, 3)
 
 if __name__ == "__main__":
     unittest.main()

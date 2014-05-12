@@ -2,7 +2,7 @@
 """ Модуль для работы с БД """
 
 from abc import ABCMeta, abstractmethod
-from mapex.core.Exceptions import TableModelException
+from mapex.core.Exceptions import TableModelException, EmbeddedObjectFactoryException
 from mapex.core.Common import TrackChangesValue, ValueInside
 
 
@@ -575,22 +575,28 @@ class EmbeddedObject(ValueInside, metaclass=ABCMeta):
         """
 
     def __eq__(self, other):
-        if isinstance(other, EmbeddedObject):
-            return self.get_value() == other.get_value()
+        return isinstance(other, EmbeddedObject)\
+            and self.get_value() == other.get_value()
 
 
 class EmbeddedObjectFactory(object, metaclass=ABCMeta):
-
+    """ Фабрика встраиваемых объектов """
     def __new__(cls, value):
         return cls.get_instance(value)
 
     @classmethod
     def get_instance(cls, value):
         """
-        @param value: Значение, для конструирования экземпляра класса
-        @return: Возвращает созданный экземпляр, корректного для данного value класса
+        @param value: Значение для конструирования экземпляра класса
+        @return: Возвращает экземпляр класса, корректного для данного value
         """
-        raise NotImplementedError("method get_instance of EmbeddedObjectFactory is not implemented")
+        objects = (obj() for obj in cls.__dict__.values() if type(obj) == ABCMeta and issubclass(obj, EmbeddedObject))
+        for obj in objects:
+            if obj.get_value() == value:
+                return obj
+
+        if value is not None:
+            raise EmbeddedObjectFactoryException('There are no factory for "%s"' % value)
 
 
 class TableModelCache(object):
