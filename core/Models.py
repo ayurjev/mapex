@@ -581,8 +581,8 @@ class EmbeddedObject(ValueInside, metaclass=ABCMeta):
 
 class EmbeddedObjectFactory(object, metaclass=ABCMeta):
     """ Фабрика встраиваемых объектов """
-    def __new__(cls, value):
-        return cls.get_instance(value)
+    def __new__(cls, value=None):
+        return cls.get_instance(value) if value else object.__new__(cls)
 
     @classmethod
     def get_instance(cls, value):
