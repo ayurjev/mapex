@@ -624,7 +624,6 @@ class CustomPropertyNegative(CustomProperty):
 
 
 class CustomPropertyFactory(EmbeddedObjectFactory):
-
     @classmethod
     def get_instance_base_type(cls):
         return CustomProperty
@@ -635,6 +634,52 @@ class CustomPropertyFactory(EmbeddedObjectFactory):
             return CustomPropertyPositive(value)
         else:
             return CustomPropertyNegative(value)
+
+
+class CustomPropertyWithNoneFactory(EmbeddedObjectFactory):
+    """ Фабрика для значений None, 1, 2 """
+    # noinspection PyDocstring
+    class BaseCustomType(EmbeddedObject):
+        value = None
+
+        @staticmethod
+        def get_value_type():
+            return int
+
+        def get_value(self):
+            return self.value
+
+    # noinspection PyDocstring
+    class CustomType1(BaseCustomType):
+        value = 1
+
+    # noinspection PyDocstring
+    class CustomType2(BaseCustomType):
+        value = 2
+
+
+class CustomPropertyWithoutNoneFactory(EmbeddedObjectFactory):
+    """ Фабрика для значений 1 и 2 """
+    # noinspection PyDocstring
+    class BaseCustomType(object):
+        value = None
+
+        @staticmethod
+        def get_value_type():
+            return int
+
+        def get_value(self):
+            return self.value
+
+    # noinspection PyDocstring
+    class CustomType1(BaseCustomType, EmbeddedObject):
+        value = 1
+
+    # noinspection PyDocstring
+    class CustomType2(BaseCustomType, EmbeddedObject):
+        value = 2
+
+
 
 
 class SqlUsersMapper(SqlMapper):
