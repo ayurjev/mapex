@@ -26,12 +26,12 @@ class TableModelTest(unittest.TestCase):
         users = dbms_fw.get_new_users_collection_instance()
         self.assertEqual(0, users.count())
 
-        users.insert({"name": "third"})
+        users.insert(dbms_fw.get_new_user_instance({"name": "third"}))
         self.assertEqual(1, users.count())
 
         users.insert([
-            {"age": 99, "name": "valueForFieldName1"},
-            {"age": 999, "name": "valueForFieldName2"}
+            dbms_fw.get_new_user_instance({"age": 99, "name": "valueForFieldName1"}),
+            dbms_fw.get_new_user_instance({"age": 999, "name": "valueForFieldName2"})
         ])
         self.assertEqual(3, users.count())
 
@@ -41,7 +41,7 @@ class TableModelTest(unittest.TestCase):
         users.delete()
         self.assertEqual(0, users.count())
 
-        user = users.insert({"name": "InitialValue"})
+        user = users.insert(dbms_fw.get_new_user_instance({"name": "InitialValue"}))
         users.update({"name": "NewValue"}, {"uid": user.uid})
         self.assertEqual(0, users.count({"name": "InitalValue"}))
         self.assertEqual(1, users.count({"name": "NewValue"}))
@@ -101,7 +101,7 @@ class TableModelTest(unittest.TestCase):
         ##################################### DublicateRecord ###################################################
         users = dbms_fw.get_new_users_collection_instance()
         self.assertEqual(0, users.count())
-        user1 = users.insert({"name": "first"})
+        user1 = users.insert(dbms_fw.get_new_user_instance({"name": "first"}))
         self.assertEqual(1, users.count())
 
         from mapex import DublicateRecordException
@@ -135,9 +135,9 @@ class TableModelTest(unittest.TestCase):
         """ Проверим способ получения свойств для объектов, хранящихся в модели """
         users = dbms_fw.get_new_users_collection_instance()
         users.insert([
-            {"age": 99, "name": "valueForFieldName1"},
-            {"age": 999, "name": "valueForFieldName2"},
-            {"age": 9999, "name": "valueForFieldName3"}
+            dbms_fw.get_new_user_instance({"age": 99, "name": "valueForFieldName1"}),
+            dbms_fw.get_new_user_instance({"age": 999, "name": "valueForFieldName2"}),
+            dbms_fw.get_new_user_instance({"age": 9999, "name": "valueForFieldName3"})
         ])
         self.assertCountEqual(
             ["valueForFieldName1", "valueForFieldName2"],
@@ -158,8 +158,8 @@ class TableModelTest(unittest.TestCase):
         users = dbms_fw.get_new_users_collection_instance()
         item = users.get_item({"age": 1})
         self.assertIsNone(item)
-        users.insert({"name": "FirstItem", "age": 1})
-        users.insert({"name": "SecondItem", "age": 2})
+        users.insert(dbms_fw.get_new_user_instance({"name": "FirstItem", "age": 1}))
+        users.insert(dbms_fw.get_new_user_instance({"name": "SecondItem", "age": 2}))
         item = users.get_item({"age": 1})
         self.assertTrue(isinstance(item, dbms_fw.get_new_user_instance().__class__))
         self.assertEqual("FirstItem", item.name)
@@ -178,8 +178,8 @@ class TableModelTest(unittest.TestCase):
     def test_params(self, dbms_fw: DbMock):
         """ Проверим сортировку и ограничение выборки """
         users = dbms_fw.get_new_users_collection_instance()
-        users.insert({"name": "FirstItem", "age": 1})
-        users.insert({"name": "SecondItem", "age": 2})
+        users.insert(dbms_fw.get_new_user_instance({"name": "FirstItem", "age": 1}))
+        users.insert(dbms_fw.get_new_user_instance({"name": "SecondItem", "age": 2}))
         res = users.get_items()
         self.assertEqual(2, len(res))
 
@@ -204,10 +204,10 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(0, ausers.count())
 
         users.insert([
-            {"name": "andrey", "age": 0},
-            {"name": "alexey", "age": 0},
-            {"name": "nikolay", "age": 0},
-            {"name": "vasiliy", "age": 0}
+            dbms_fw.get_new_user_instance({"name": "andrey", "age": 0}),
+            dbms_fw.get_new_user_instance({"name": "alexey", "age": 0}),
+            dbms_fw.get_new_user_instance({"name": "nikolay", "age": 0}),
+            dbms_fw.get_new_user_instance({"name": "vasiliy", "age": 0})
         ])
 
         # test counting
@@ -264,10 +264,10 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(0, ausers.count())
 
         users.insert([
-            {"name": "andrey", "age": 0},
-            {"name": "alexey", "age": 0},
-            {"name": "nikolay", "age": 0},
-            {"name": "vasiliy", "age": 0}
+            dbms_fw.get_new_user_instance({"name": "andrey", "age": 0}),
+            dbms_fw.get_new_user_instance({"name": "alexey", "age": 0}),
+            dbms_fw.get_new_user_instance({"name": "nikolay", "age": 0}),
+            dbms_fw.get_new_user_instance({"name": "vasiliy", "age": 0})
         ])
 
         self.assertEqual(4, users.count())
@@ -278,9 +278,9 @@ class TableModelTest(unittest.TestCase):
         """ Проверим, что можно использовать коллекции TableModel как фабрики инстансов разного типа """
         users = dbms_fw.get_new_users_collection_instance()
         self.assertEqual(0, users.count())
-        users.insert({"name": "FirstUser", "age": 5})
-        users.insert({"name": "SecondUser", "age": 35})
-        users.insert({"name": "ThirdUser", "age": 67})
+        users.insert(dbms_fw.get_new_user_instance({"name": "FirstUser", "age": 5}))
+        users.insert(dbms_fw.get_new_user_instance({"name": "SecondUser", "age": 35}))
+        users.insert(dbms_fw.get_new_user_instance({"name": "ThirdUser", "age": 67}))
         self.assertEqual(3, users.count())
         self.assertTrue(isinstance(users.get_item({"age": 5}), dbms_fw.get_new_user_instance().__class__))
         self.assertTrue(isinstance(users.get_item({"age": 35}), dbms_fw.get_new_user_instance().__class__))
@@ -418,9 +418,9 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(0, users.count())
         # Создадим двух пользователей и присвоим им созданные аккаунты, третьему из них присвоим объект аккаунта,
         # который еще не сохранен в БД, таким образом проверим, что он сохраняется при инсерте
-        users.insert({"name": "FirstUser", "account": account1})
-        users.insert({"name": "SecondUser", "account": account2})
-        users.insert({"name": "ThirdUser", "account": account3})
+        users.insert(dbms_fw.get_new_user_instance({"name": "FirstUser", "account": account1}))
+        users.insert(dbms_fw.get_new_user_instance({"name": "SecondUser", "account": account2}))
+        users.insert(dbms_fw.get_new_user_instance({"name": "ThirdUser", "account": account3}))
         # И пользователей и аккаунтов стало 3
         self.assertEqual(3, accounts.count())
         self.assertEqual(3, users.count())
@@ -532,12 +532,12 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(0, tags.count())
 
         # Создадим первого пользователя, у которого есть оба тега
-        first_user = users.insert({"name": "FirstUser", "tags": [tag1, tag2]})
+        first_user = users.insert(dbms_fw.get_new_user_instance({"name": "FirstUser", "tags": [tag1, tag2]}))
         self.assertEqual(1, users.count())
         self.assertEqual(2, tags.count())
 
         # Создадим второго пользователя, у которого только один тег (из вух имеющихся)
-        second_user = users.insert({"name": "SecondUser", "tags": [tag2]})
+        second_user = users.insert(dbms_fw.get_new_user_instance({"name": "SecondUser", "tags": [tag2]}))
         self.assertEqual(2, users.count())
         self.assertEqual(2, tags.count())
 
@@ -731,8 +731,8 @@ class TableModelTest(unittest.TestCase):
         profile2.likes = 91
 
         self.assertEqual(0, profiles.count())
-        first_user = users.insert({"name": "FirstUser", "profile": profile1})
-        second_user = users.insert({"name": "SecondUser", "profile": profile2})
+        first_user = users.insert(dbms_fw.get_new_user_instance({"name": "FirstUser", "profile": profile1}))
+        second_user = users.insert(dbms_fw.get_new_user_instance({"name": "SecondUser", "profile": profile2}))
 
         self.assertIsNotNone(profile1.id)
         self.assertIsNotNone(profile2.id)
@@ -858,7 +858,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(0, statuses.count())
 
         # Создадим первого пользователя, у которого есть оба статуса
-        first_user = users.insert({"name": "FirstUser", "statuses": [status1, status2]})
+        first_user = users.insert(dbms_fw.get_new_user_instance({"name": "FirstUser", "statuses": [status1, status2]}))
 
         self.assertIsNotNone(status1.id)
         self.assertIsNotNone(status2.id)
@@ -873,7 +873,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(users.get_item({"uid": first_user.uid}), status2.user)
 
         # Создадим второго пользователя, у которого только один статус (из двух имеющихся)
-        second_user = users.insert({"name": "SecondUser", "statuses": [status2]})
+        second_user = users.insert(dbms_fw.get_new_user_instance({"name": "SecondUser", "statuses": [status2]}))
 
         self.assertIsNotNone(status1.id)
         self.assertIsNotNone(status2.id)
@@ -892,7 +892,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(3, statuses.count())
 
         # Создадим третьего пользователя, у которого только один статус (из имеющихся, уже сохраненных в базе)
-        third_user = users.insert({"name": "ThirdUser", "statuses": [status3]})
+        third_user = users.insert(dbms_fw.get_new_user_instance({"name": "ThirdUser", "statuses": [status3]}))
         self.assertEqual(users.get_item({"uid": third_user.uid}), status3.user)
         self.assertEqual(users.get_item({"uid": third_user.uid}).statuses, [status3])
         self.assertEqual(3, users.count())
@@ -1029,8 +1029,8 @@ class TableModelTest(unittest.TestCase):
             self.assertRaises(TableModelException, passport0.save)
 
         # Два других прикрепим к пользователям:
-        first_user = users.insert({"name": "FirstUser", "passport": passport1})
-        second_user = users.insert({"name": "SecondUser", "passport": passport2})
+        first_user = users.insert(dbms_fw.get_new_user_instance({"name": "FirstUser", "passport": passport1}))
+        second_user = users.insert(dbms_fw.get_new_user_instance({"name": "SecondUser", "passport": passport2}))
 
         first_user = users.get_item({"uid": first_user.uid})
         second_user = users.get_item({"uid": second_user.uid})
@@ -1212,7 +1212,9 @@ class TableModelTest(unittest.TestCase):
         document2.number = 911456
 
         # Создадим первого пользователя, у которого есть оба паспорта
-        first_user = users.insert({"name": "FirstUser", "documents": [document1, document2]})
+        first_user = users.insert(
+            dbms_fw.get_new_user_instance({"name": "FirstUser", "documents": [document1, document2]})
+        )
         self.assertCountEqual(
             [document1.number, document2.number],
             [d.number for d in users.get_item({"uid": first_user.uid}).documents]
@@ -1223,7 +1225,7 @@ class TableModelTest(unittest.TestCase):
             self.assertEqual(2, documents.count())
 
         # Создадим второго пользователя, у которого только один паспорт (из двух имеющихся)
-        second_user = users.insert({"name": "SecondUser", "documents": [document2]})
+        second_user = users.insert(dbms_fw.get_new_user_instance({"name": "SecondUser", "documents": [document2]}))
 
         self.assertCountEqual(
             [d.number for d in users.get_item({"uid": first_user.uid}).documents],
@@ -1243,7 +1245,7 @@ class TableModelTest(unittest.TestCase):
         document3.number = 642458
 
         # Создадим третьего пользователя, у которого только один паспорт
-        third_user = users.insert({"name": "ThirdUser", "documents": [document3]})
+        third_user = users.insert(dbms_fw.get_new_user_instance({"name": "ThirdUser", "documents": [document3]}))
         self.assertCountEqual(
             [d.number for d in users.get_item({"uid": third_user.uid}).documents],
             [document3.number]
@@ -1376,7 +1378,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(1, collection_without_primary.count({"name": "FirstName", "value": 12}))
         collection_without_primary.insert(item)
         self.assertEqual(2, collection_without_primary.count({"name": "FirstName", "value": 12}))
-        collection_without_primary.insert({"name": "SecondName", "value": 31})
+        collection_without_primary.insert(dbms_fw.get_new_noprimary_instance({"name": "SecondName", "value": 31}))
         self.assertEqual(2, collection_without_primary.count({"name": "FirstName", "value": 12}))
         self.assertEqual(1, collection_without_primary.count({"name": "SecondName", "value": 31}))
         self.assertEqual(3, collection_without_primary.count())
@@ -1392,7 +1394,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(0, collection_without_primary.count({"name": "SecondName", "value": 31}))
         self.assertEqual(0, collection_without_primary.count({"name": "NewName", "value": 31}))
 
-        collection_without_primary.insert({"name": "SecondName", "value": 31})
+        collection_without_primary.insert(dbms_fw.get_new_noprimary_instance({"name": "SecondName", "value": 31}))
         self.assertEqual(2, collection_without_primary.count({"name": "FirstName", "value": 12}))
         self.assertEqual(1, collection_without_primary.count({"name": "SecondName", "value": 31}))
 
@@ -1425,7 +1427,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(1, collection_without_primary.count({"value": 12}))
 
         collection_without_primary.insert(item)
-        collection_without_primary.insert({"name": "SecondName", "value": 31})
+        collection_without_primary.insert(dbms_fw.get_new_noprimary_instance({"name": "SecondName", "value": 31}))
         self.assertEqual(2, collection_without_primary.count({"name": "FirstName", "value": 12}))
         self.assertEqual(1, collection_without_primary.count({"name": "SecondName", "value": 31}))
         self.assertEqual(3, collection_without_primary.count())
@@ -1470,7 +1472,7 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(1, collection_without_primary.count({"value": 12}))
 
         collection_without_primary.insert(item)
-        collection_without_primary.insert({"name": "SecondName", "value": 31})
+        collection_without_primary.insert(dbms_fw.get_new_noprimary_instance({"name": "SecondName", "value": 31}))
         self.assertEqual(2, collection_without_primary.count({"name": "FirstName", "value": 12}))
         self.assertEqual(1, collection_without_primary.count({"name": "SecondName", "value": 31}))
         self.assertEqual(3, collection_without_primary.count())
@@ -1540,7 +1542,7 @@ class TableModelTest(unittest.TestCase):
         no_primary_key_item1.value = 42
 
         # Теперь вставка работает и мы можем убедиться в корректности привязки
-        users.insert({"name": "FirstUser", "account": no_primary_key_item1})
+        users.insert(dbms_fw.get_new_user_instance({"name": "FirstUser", "account": no_primary_key_item1}))
         user = users.get_item({"account.name": "FirstItem"})
         self.assertEqual("FirstUser", user.name)
 
@@ -1595,7 +1597,12 @@ class TableModelTest(unittest.TestCase):
         no_primary_key_item2.value = 21
 
         # Теперь вставка работает и мы можем убедиться в корректности привязки
-        users.insert({"name": "FirstUser", "statuses": [no_primary_key_item1, no_primary_key_item2]})
+        users.insert(
+            dbms_fw.get_new_user_instance({
+                "name": "FirstUser",
+                "statuses": [no_primary_key_item1, no_primary_key_item2]
+            })
+        )
         user1 = users.get_item({"statuses.name": "FirstItem"})
         user2 = users.get_item({"statuses.name": "SecondItem"})
         self.assertEqual("FirstUser", user1.name)
@@ -1641,7 +1648,12 @@ class TableModelTest(unittest.TestCase):
         no_primary_key_item2.value = 21
 
         # Теперь вставка работает и мы можем убедиться в корректности привязки
-        users.insert({"name": "FirstUser", "statuses": [no_primary_key_item1, no_primary_key_item2]})
+        users.insert(
+            dbms_fw.get_new_user_instance({
+                "name": "FirstUser",
+                "statuses": [no_primary_key_item1, no_primary_key_item2]
+            })
+        )
         user1 = users.get_item({"statuses.name": "FirstItem"})
         user2 = users.get_item({"statuses.name": "SecondItem"})
         self.assertEqual("FirstUser", user1.name)
@@ -1752,9 +1764,9 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(3, accounts.count())
 
         # Создадим пользователей
-        users.insert({"name": "FirstUser", "account": account1, "tags": [tag1, tag2]})
-        users.insert({"name": "SecondUser", "account": account2,  "tags": [tag2]})
-        users.insert({"name": "ThirdUser", "account": account3,  "tags": [tag3]})
+        users.insert(dbms_fw.get_new_user_instance({"name": "FirstUser", "account": account1, "tags": [tag1, tag2]}))
+        users.insert(dbms_fw.get_new_user_instance({"name": "SecondUser", "account": account2,  "tags": [tag2]}))
+        users.insert(dbms_fw.get_new_user_instance({"name": "ThirdUser", "account": account3,  "tags": [tag3]}))
         self.assertEqual(3, users.count())
 
         # нам потребуется считать запросы к БД,
@@ -1997,18 +2009,27 @@ class RecordModelTest(unittest.TestCase):
     def test_validate(self, dbms_fw: DbMock):
         """
         Проверим работу валидации объектов перед сохранением в базу
-        В настройках модели User должно быть предусмотрено, что свойство count не должно быть равно 42
-        Попробуем нарушить это требование
+        В настройках модели User предусмотрено что свойство count не должно быть равно 42
+        1. Попробуем нарушить это требование
+        2. Нарушим валидность свойства passport
         """
         users = dbms_fw.get_new_users_collection_instance()
         self.assertEqual(0, users.count())
 
         user = dbms_fw.get_new_user_instance()
         user.name = "Андрей"
+
+        # Не сохранено из-за невалидности user.passport
+        user.passport = dbms_fw.get_new_passport_instance()
+        user.passport.invalid = True
+        self.assertRaises(Exception, user.save)
+        self.assertEqual(0, users.count())  # При этом запись в БД не добавляется
+
+        # Не сохранено из-за невалидности user
+        user.passport = None
         user.age = 42
         self.assertRaises(Exception, user.save)
-        # При этом запись в БД не добавляется:
-        self.assertEqual(0, users.count())
+        self.assertEqual(0, users.count())  # При этом запись в БД не добавляется
 
     @for_all_dbms
     def test_load_by_primary(self, dbms_fw: DbMock):

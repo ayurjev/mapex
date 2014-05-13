@@ -27,28 +27,6 @@ class TableModel(object):
         """
         return self.mapper.get_new_item()
 
-    def check_incoming_data(self, data):
-        """
-        Проверяет входящие данные на корректноcть
-        :param data:    Входящие данные, которые требуется проверить
-        """
-        if type(data) is list:
-            return [self.check_incoming_data(item) for item in data]
-        else:
-            if type(data) is dict:
-                data = self.get_new_item().load_from_array(data, False)
-            if isinstance(data, RecordModel):
-                if data.mapper.__class__ != self.mapper.__class__:
-                    raise TableModelException("Invalid data for inserting into the collection")
-                data.validate()
-                data_for_write_operation = data.get_data_for_write_operation()
-                for mapper_field_name in data_for_write_operation:
-                    mapper_field = self.mapper.get_property(mapper_field_name)
-                    mapper_field.check_value(data_for_write_operation[mapper_field_name])
-            else:
-                raise TableModelException("Invalid data for inserting into the collection")
-            return data
-
     def mix_boundaries(self, conditions: dict=None):
         if self.object_boundaries and conditions and self.mapper.boundaries:
             conditions = {"and": [conditions, self.object_boundaries, self.mapper.boundaries]}
@@ -71,19 +49,33 @@ class TableModel(object):
         """
         return self.mapper.count(self.mix_boundaries(conditions))
 
+    def check_incoming_data(self, data):
+        """
+        Проверяет входящие данные на корректноcть
+        :param data:    Входящие данные, которые требуется проверить
+        """
+        if type(data) is list:
+            for item in data:
+                self.check_incoming_data(item)
+        else:
+            if isinstance(data, RecordModel) and data.mapper.__class__ == self.mapper.__class__:
+                data.validate()
+            else:
+                raise TableModelException("Invalid data for inserting into the collection")
+
     def insert(self, data):
         """
         Осуществляет вставку данных в коллекцию
         :param data:    Данные для вставки в коллекцию
         """
-        data = self.check_incoming_data(data)
-        if type(data) is list:
-            return [self.insert(it) for it in data]
-        if isinstance(data, RecordModel):
-            model_data = data.get_data_for_write_operation()
-            model = data
-        else:
-            raise TableModelException("Insert failed: unknown item format")
+        self.check_incoming_data(data)
+        return [self._insert_one(item) for item in data] if (type(data) is list) else self._insert_one(data)
+
+    def _insert_one(self, item):
+        """ Вставка записи без выполнения проверок """
+        model_data = item.get_data_for_write_operation()
+        model = item
+
         flat_data, lists_objects = self.mapper.split_data_by_relation_type(model_data)
         last_record = self.mapper.insert(flat_data)
         if self.mapper.primary.exists():
@@ -282,8 +274,15 @@ class UpdateLock(RecordModelLock):
     flag = "_updating"
 
 
+# noinspection PyDocstring
 class CalcChangesLock(RecordModelLock):
     flag = "cant_calc_changed"
+
+
+# noinspection PyDocstring
+class ValidateLock(RecordModelLock):
+    """ Лок для выполнения операции валидации модели """
+    flag = "_validate_lock"
 
 
 class RecordModel(ValueInside, TrackChangesValue):
@@ -297,6 +296,7 @@ class RecordModel(ValueInside, TrackChangesValue):
         self.cant_calc_changed = False
         self._loaded_from_db = False
         self._updating = False
+        self._validate_lock = False
         self.origin = None
         if self.__class__.mapper is None:
             raise TableModelException("No mapper for %s model" % self)
@@ -322,6 +322,21 @@ class RecordModel(ValueInside, TrackChangesValue):
     def validate(self):
         """ Данный метод можно переопределить для автоматической проверки модели перед записью в базу данных """
 
+    def recursive_validate(self):
+        """ Рекурсивная валидация моделей """
+        if not self._validate_lock:
+            with ValidateLock(self):
+                for model in self.values(lambda value: isinstance(value, RecordModel) and value.is_changed()):
+                    model.validate()
+
+                data_for_write_operation = self.get_data_for_write_operation()
+                for mapper_field_name in data_for_write_operation:
+                    mapper_field = self.mapper.get_property(mapper_field_name)
+                    mapper_field.check_value(data_for_write_operation[mapper_field_name])
+
+                object.__getattribute__(self, "validate")()
+
+
     def get_new_collection(self) -> TableModel:
         """
         Возвращает модель коллекции, соответствующую мапперу текущего объекта
@@ -339,7 +354,6 @@ class RecordModel(ValueInside, TrackChangesValue):
 
         self.primary.ensure_exists()
         if self._loaded_from_db is False:
-            self.validate()
             try:
                 self._loaded_from_db = True
                 self.get_new_collection().insert(self)
@@ -538,6 +552,10 @@ class RecordModel(ValueInside, TrackChangesValue):
         # Список полей первичного ключа
         if mapper and name in mapper.get_properties() and name not in self.primary.to_list():
             self.exec_lazy_loading()
+
+        if name == "validate":
+            return object.__getattribute__(self, "recursive_validate")
+
         return object.__getattribute__(self, name)
 
     def __eq__(self, other):

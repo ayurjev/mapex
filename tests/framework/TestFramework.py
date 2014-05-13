@@ -138,7 +138,7 @@ class DbMock(object, metaclass=ABCMeta):
         """ Возвращает новый экземпляр коллекции записей без первичного ключа """
 
     @abstractmethod
-    def get_new_noprimary_instance(self):
+    def get_new_noprimary_instance(self, data=None):
         """ Возвращает новый экземпляр записи без первичного ключа """
 
     @abstractmethod
@@ -306,9 +306,9 @@ class SqlDbMock(DbMock):
         """ Возвращает новый экземпляр коллекции статусов пользователя """
         return SqlProfiles()
 
-    def get_new_noprimary_instance(self):
+    def get_new_noprimary_instance(self, data=None):
         """ Возвращает новый экземпляр записи без первичного ключа """
-        return SqlNoPrimaryItem()
+        return SqlNoPrimaryItem(data)
 
     def get_new_noprimary_collection_instance(self):
         """ Возвращает новый экземпляр коллекции записей без первичного ключа """
@@ -469,9 +469,9 @@ class NoSqlDbMock(DbMock):
         """ Возвращает новый экземпляр коллекции статусов пользователя """
         return NoSqlProfiles()
 
-    def get_new_noprimary_instance(self):
+    def get_new_noprimary_instance(self, data=None):
         """ Возвращает новый экземпляр записи без первичного ключа """
-        return NoSqlNoPrimaryItem()
+        return NoSqlNoPrimaryItem(data)
 
     def get_new_noprimary_collection_instance(self):
         """ Возвращает новый экземпляр коллекции записей без первичного ключа """
@@ -705,7 +705,7 @@ class SqlUsersMapper(SqlMapper):
             self.embedded_link("passport", collection=SqlPassports),
             self.embedded_list("documents", collection=SqlDocuments),
             self.embedded_list("documents_not_ai", collection=SqlNotAiDocuments),
-            self.embedded_object("custom_property_obj", "CustomPropertyValue", model=CustomProperty)
+            self.embedded_object("custom_property_obj", "CustomPropertyValue", model=CustomProperty),
         ])
 
 
@@ -1132,6 +1132,11 @@ class SqlPassports(TableModel):
 class SqlPassport(RecordModel):
     mapper = SqlPassportsMapper
 
+    invalid = False
+
+    def validate(self):
+        if self.invalid:
+            raise Exception("Passport is invalid")
 
 # noinspection PyDocstring
 class NoSqlPassports(TableModel):
@@ -1142,6 +1147,11 @@ class NoSqlPassports(TableModel):
 class NoSqlPassport(RecordModel):
     mapper = NoSqlPassportsMapper
 
+    invalid = False
+
+    def validate(self):
+        if self.invalid:
+            raise Exception("Passport is invalid")
 
 ######################################### Коллекция документов (Embedded lists) ####################################
 
