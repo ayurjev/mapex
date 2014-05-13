@@ -530,10 +530,7 @@ class RecordModel(ValueInside, TrackChangesValue):
         if mapper and name in mapper.get_properties():
             self._changed = True
             self.exec_lazy_loading()
-        try:
-            object.__setattr__(self, name, val)
-        except AttributeError:  # На случай, если аттрибут определен через property, но только на чтение
-            pass
+        object.__setattr__(self, name, val)
 
     def __getattribute__(self, name):
         """ При любом обращении к полям модели необходимо инициализировать модель """
