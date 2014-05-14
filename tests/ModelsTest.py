@@ -107,6 +107,7 @@ class TableModelTest(unittest.TestCase):
         from mapex import DublicateRecordException
         user2 = dbms_fw.get_new_user_instance({"uid": user1.uid, "name": "second"})
         self.assertRaises(DublicateRecordException, user2.save)
+        self.assertEqual(1, users.count())
 
         # Теперь назначим другое исключение на эту ситуацию для данного маппера
         class CustomException(Exception):

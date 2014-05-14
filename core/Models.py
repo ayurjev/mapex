@@ -542,8 +542,8 @@ class RecordModel(ValueInside, TrackChangesValue):
         """ При любом изменении полей модели необходимо инициализировать модель """
         mapper = object.__getattribute__(self, "__dict__").get("mapper")
         if mapper and name in mapper.get_properties():
-            self._changed = True
             self.exec_lazy_loading()
+            self.mark_as_changed()
         object.__setattr__(self, name, val)
 
     def __getattribute__(self, name):
