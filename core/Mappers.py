@@ -376,13 +376,17 @@ class FieldTypes(object):
             }.get(value_type)
 
         def value_assertion(self, v) -> bool:
+            if not isinstance(v, EmbeddedObject):
+                return False
+
             if issubclass(self.model, EmbeddedObject):
                 model = self.model
             elif issubclass(self.model, EmbeddedObjectFactory):
                 model = self.model.get_instance(v.get_value())
             else:
                 return False
-            return isinstance(v, EmbeddedObject) and isinstance(v.get_value(), model.get_value_type())
+
+            return isinstance(v.get_value(), model.get_value_type())
 
     class NoSqlEmbeddedObject(EmbeddedObject, NoSqlBaseField):
         """ Класс для представления кастомного типа поля уровня маппера """

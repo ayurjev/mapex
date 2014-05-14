@@ -328,6 +328,10 @@ class TableModelTest(unittest.TestCase):
         user.save()
         self.assertEqual(1, users.count())
 
+        # Поле кастомного типа принимает только EmbeddedObject
+        user.custom_property_obj = -1
+        self.assertRaises(TableModelException, user.save)
+
         user.custom_property_obj = CustomProperty(-1)
         user.save()
         # TODO починить для MsDbMock()
@@ -344,6 +348,7 @@ class TableModelTest(unittest.TestCase):
         self.assertTrue(isinstance(user.custom_property_obj, CustomProperty))
         self.assertFalse(isinstance(user.custom_property_obj, CustomPropertyPositive))
         self.assertEqual(1, user.custom_property_obj.get_value())
+
 
         # Теперь проверим использование фабрики типов:
         users.mapper.set_field(
