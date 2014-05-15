@@ -353,7 +353,7 @@ class RecordModel(ValueInside, TrackChangesValue):
             return self
 
         self.primary.ensure_exists()
-        if self._loaded_from_db is False:
+        if not self._loaded_from_db:
             try:
                 self._loaded_from_db = True
                 self.get_new_collection().insert(self)
