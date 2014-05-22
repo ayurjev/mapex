@@ -609,13 +609,16 @@ class EmbeddedObjectFactory(object, metaclass=ABCMeta):
         @param value: Значение для конструирования экземпляра класса
         @return: Возвращает экземпляр класса, корректного для данного value
         """
-        objects = (obj() for obj in cls.__dict__.values() if type(obj) == ABCMeta and issubclass(obj, EmbeddedObject))
-        for obj in objects:
+        for obj in cls.get_options():
             if obj.get_value() == value:
                 return obj
 
         if value is not None:
             raise EmbeddedObjectFactoryException('There are no factory for "%s"' % value)
+
+    @classmethod
+    def get_options(cls):
+        return (obj() for obj in cls.__dict__.values() if type(obj) == ABCMeta and issubclass(obj, EmbeddedObject))
 
 
 class TableModelCache(object):
