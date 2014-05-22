@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS `accountsTable` (
     `AccountID` INT(11) NOT NULL AUTO_INCREMENT,
     `EmailField` VARCHAR(32) DEFAULT NULL,
     `PhoneField` VARCHAR(32) DEFAULT NULL,
+    `ProfileID` INT(11) DEFAULT NULL,
      PRIMARY KEY (`AccountID`)
 ) COLLATE='utf8_general_ci' ENGINE=MyISAM;
 

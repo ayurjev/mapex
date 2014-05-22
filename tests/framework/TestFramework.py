@@ -867,12 +867,14 @@ class SqlAccountsMapper(SqlMapper):
         self.set_map([
             self.int("id", "AccountID"),
             self.str("email", "EmailField"),
-            self.str("phone", "PhoneField")
+            self.str("phone", "PhoneField"),
+            self.link("profile", "ProfileID", collection=SqlProfiles)
         ])
 
 
 # noinspection PyDocstring
 class NoSqlAccountsMapper(NoSqlMapper):
+
     def bind(self):
         self.set_new_item(NoSqlAccount)
         self.set_new_collection(NoSqlAccounts)
@@ -880,7 +882,8 @@ class NoSqlAccountsMapper(NoSqlMapper):
         self.set_map([
             self.object_id("id", "_id"),
             self.str("email", "EmailField"),
-            self.str("phone", "PhoneField")
+            self.str("phone", "PhoneField"),
+            self.link("profile", "ProfileID", collection=NoSqlProfiles)
         ])
 
 

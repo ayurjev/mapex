@@ -1974,9 +1974,9 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
         for key in conditions:
             if key.find(".") > -1:
                 mapper_field_name, other_mapper_property_name = key.split(".")
-                mf = self.get_property(mapper_field_name)
+                mf = self.get_property_by_db_name(mapper_field_name)
                 if self.is_real_embedded(mf):
-                    new_conditions["%s.%s" % (mf.get_name(), other_mapper_property_name)] = conditions[key]
+                    new_conditions["%s.%s" % (mf.get_db_name(), other_mapper_property_name)] = conditions[key]
                 elif self.is_rel(mf):
                     # noinspection PyUnresolvedReferences
                     fmapper = mf.get_items_collection_mapper()
@@ -2017,9 +2017,10 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
         """
         if direction == "database2mapper" and value == "_id" and self.get_property_by_db_name(value) is None:
             return value
+
         if type(value) is dict:
-            value = self.convert_conditions_to_one_collection(value)
             value = super().translate_and_convert(value, direction, cache, save_unsaved)
+            value = self.convert_conditions_to_one_collection(value)
             value = self.to_mongo_conditions_format(value)
         else:
             value = super().translate_and_convert(value, direction, cache, save_unsaved)
