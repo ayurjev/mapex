@@ -1459,7 +1459,6 @@ class SqlMapper(metaclass=ABCMeta):
         fields = self.translate_and_convert(fields)
         conditions = self.translate_and_convert(conditions, save_unsaved=False)
         params = self.translate_params(params)
-        print("conditions", conditions)
         for row in self.pool.db.select_query(self.table_name, fields, conditions, params, joins, "get_rows"):
             result = {fields[it]: row[it] for it in range(len(fields))}
             yield self.translate_and_convert(result, "database2mapper", cache)
