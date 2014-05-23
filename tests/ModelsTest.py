@@ -201,6 +201,9 @@ class TableModelTest(unittest.TestCase):
         found = users.get_item({"account.profile": user.account.profile})
         self.assertEqual(user, found)
 
+        found = users.get_item({"account.profile.avatar": "first_avatar"})
+        self.assertEqual(user, found)
+
     @for_all_dbms
     def test_generate_items(self, dbms_fw: DbMock):
         """ Проверка работы генератора коллекции """

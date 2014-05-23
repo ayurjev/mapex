@@ -243,11 +243,11 @@ class FieldTypes(object):
 
             if direction == "mapper2database":
                 if name.find(".") > -1:
-                    mapper_field_name, mapper_property = name.split(".")
+                    path = name.split(".")
+                    mapper_field_name, mapper_property = path[0], ".".join(path[1:])
                     linked_mapper = self.mapper.get_property(mapper_field_name).get_items_collection_mapper()
                     return "%s.%s" % (
-                        mapper_field_name
-                        if self.mapper.support_joins else self.translate(mapper_field_name, "mapper2database"),
+                        mapper_field_name if self.mapper.support_joins else self.translate(mapper_field_name, "mapper2database"),
                         linked_mapper.translate(mapper_property, "mapper2database")
                     )
                 else:
@@ -946,6 +946,18 @@ class FieldTypes(object):
                 return False
 
 
+class Joins(object):
+    def __init__(self):
+        self._joins = []
+
+
+class Join(object):
+    def __init__(self, table_name, alias, target_table_name, target_table_field_name, foreign_table_name, foreign_table_field_name):
+        self.table_name = table_name
+        self.alias = alias
+        self.join_conditions = ((target_table_name, target_table_field_name), (foreign_table_name, foreign_table_field_name))
+
+
 class SqlMapper(metaclass=ABCMeta):
     """Класс создания Mapper'ов к таблицам БД """
 
@@ -1189,6 +1201,10 @@ class SqlMapper(metaclass=ABCMeta):
         @rtype : FieldTypes.BaseField
 
         """
+        if field_name.find(".") > -1:
+            path = field_name.split(".")
+            first, tale = path[0], ".".join(path[1:])
+            return self.get_property(first).get_items_collection_mapper().get_property(tale)
         return self._properties.get(field_name)
 
     def get_property_by_db_name(self, db_name: str) -> FieldTypes.BaseField:
@@ -1236,11 +1252,25 @@ class SqlMapper(metaclass=ABCMeta):
             order_fields = []
         fields, conditions = fields if fields else [], conditions if conditions else {}
 
-        foreign_tables = list(set(filter(
+
+        all = list(set(filter(
             None,
-            [field.split(".")[0] if field.find(".") > -1 else None for field in
+            [field if field.find(".") > -1 else None for field in
              (fields + self.get_fields_from_conditions(conditions) + order_fields)])))
-        return {joined_table_name: self._joined[joined_table_name] for joined_table_name in foreign_tables}
+
+
+        joined_directly = {}
+        joined_via_proxy = {}
+
+        for ft in all:
+            path = ft.split(".")
+            first, tale = path[0], ".".join(path[1:len(path)])
+            joined_directly[first] = self._joined[first]
+            if len(path) > 2:
+                joined_via_proxy[ft] = list(self.get_property(first).items_collection_mapper.get_joined_tables(conditions={}, fields=[tale]).values())[0]
+
+        joined_directly.update(joined_via_proxy)
+        return joined_directly
 
     def get_fields_from_conditions(self, sub_conditions: dict) -> list:
         """ Рекурсивно вытаскивает имена полей из словарей с уловиями обрабатывая вложеные and и or
@@ -1341,9 +1371,9 @@ class SqlMapper(metaclass=ABCMeta):
         @param cache: Используемый кэш
 
         """
+
         fields = self.translate_and_convert(fields) \
             if fields not in [[], None] else list(self._reversed_map.keys())
-
         conditions = self.translate_and_convert(conditions, save_unsaved=False)
         params = self.convert_params(params) if params else {}
         joined_tables = self.get_joined_tables(conditions, fields, params.get("order"))
@@ -1601,9 +1631,9 @@ class SqlMapper(metaclass=ABCMeta):
 
         """
         field = self.get_mapper_field(name, direction, first=True)
+
         if not field:
             raise TableMapperException("Поле %s не определено в коллекции %s" % (name, self.get_new_collection().__class__))
-
         return field.translate(name, direction)
 
     def get_mapper_field(self, field_name: str, direction: str, first: bool=False) -> FieldTypes.BaseField:
@@ -1623,7 +1653,8 @@ class SqlMapper(metaclass=ABCMeta):
             mapper_field_name = re.search("\[(.+?)\]", field_name).group(1)
             return self.get_property(mapper_field_name)
         if field_name.find(".") > -1:
-            mapper_field_name, mapper_field_property = field_name.split(".")
+            path = field_name.split(".")
+            mapper_field_name, mapper_field_property = path[0], ".".join(path[1:])
             if direction == "database2mapper":
                 foreign_table, foreign_table_field_name = mapper_field_name, mapper_field_property
                 mapper_field_name = self.get_property(foreign_table).get_name()
