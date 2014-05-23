@@ -9,6 +9,39 @@ from collections import defaultdict
 from mapex.core.Exceptions import TableModelException, TableMapperException, DublicateRecordException
 from mapex.core.Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
 from mapex.core.Common import TrackChangesValue, ValueInside
+from mapex.core.Sql import SqlBuilder
+
+
+def string2int20(text, radix=88):
+    """
+    Преобразует текст в численно-буквенное выражение длиной до 20 символов
+    Как md5, только короче
+
+    :param text:        Текст для которого необходимо получить 20-символьный хэш
+    :param radix:       Длинна словаря (88 максимум)
+    :return: :raise:
+    """
+    import hashlib
+    import string
+
+    md5 = hashlib.md5(text.encode()).hexdigest()
+    number = int(md5, 16)
+    digits = string.digits + string.ascii_lowercase + string.ascii_letters
+    if not 2 <= radix <= len(digits):
+        raise ValueError("radix must be in 2..%r, not %r" % (len(digits), radix))
+    result = []
+    sign = ''
+    if number < 0:
+        number = -number
+        sign = '-'
+    elif number == 0:
+        sign = '0'
+    while number:
+        number, rdigit = divmod(number, radix)
+        result.append(digits[rdigit])
+    result.append(sign)
+    result.reverse()
+    return ''.join(result)
 
 
 class Primary(ValueInside):
@@ -122,6 +155,12 @@ class FieldTypes(object):
             self.mapper = mapper
             self.mapper_field_name = mapper_field_name
             self.db_field_name = kwargs.get("db_field_name")
+
+        def __eq__(self, other):
+            return self.get_name() == other.get_name()
+
+        def __hash__(self):
+            return int("".join([str(ord(l)) for l in self.get_name()]))
 
         @abstractmethod
         def value_assertion(self, v) -> bool:
@@ -706,8 +745,8 @@ class FieldTypes(object):
             super().__init__(mapper, mapper_field_name, **kwargs)
             self.rel_mapper = kwargs.get("rel_mapper")()
             self.db_field_name = "%s.%s[%s]" % (
-                self.rel_mapper.table_name,
-                self.rel_mapper.get_property_that_is_link_for(self.items_collection_mapper).get_db_name(),
+                mapper_field_name,
+                self.items_collection_mapper.primary.db_name(),
                 mapper_field_name
             )
 
@@ -773,7 +812,7 @@ class FieldTypes(object):
                 )
             else:
                 self.db_field_name = "%s.%s[%s]" % (
-                    self.items_collection_mapper.table_name,
+                    mapper_field_name,
                     self.items_collection_mapper.translate(
                         self.items_collection_mapper.primary.name(),
                         "mapper2database"
@@ -948,14 +987,42 @@ class FieldTypes(object):
 
 class Joins(object):
     def __init__(self):
-        self._joins = []
+        self._joins = OrderedDict()
+
+    def already_joined(self, alias):
+        return alias in self._joins.keys()
+
+    def add(self, join):
+        self._joins[join.alias] = join
+
+    def get_by_alias(self, alias):
+        return self._joins.get(alias)
 
 
 class Join(object):
-    def __init__(self, table_name, alias, target_table_name, target_table_field_name, foreign_table_name, foreign_table_field_name):
-        self.table_name = table_name
+    def __init__(self, alias, target_table_name, target_table_field_name, foreign_table_name, foreign_table_field_name):
         self.alias = alias
-        self.join_conditions = ((target_table_name, target_table_field_name), (foreign_table_name, foreign_table_field_name))
+        self.target_table_name = target_table_name
+        self.target_table_field_name = target_table_field_name
+        self.foreign_table_name = foreign_table_name
+        self.foreign_table_field_name = foreign_table_field_name
+
+    def stringify_condition(self, builder: SqlBuilder):
+        """ """
+        return "(%s.%s = %s.%s)" % (
+            builder.wrap_table(self.target_table_name),
+            builder.wrap_field(self.target_table_field_name),
+            builder.wrap_table(self.alias),
+            builder.wrap_field(self.foreign_table_field_name)
+        )
+
+    def stringify(self, builder: SqlBuilder):
+        """ """
+        return "LEFT JOIN %s as %s ON %s" % (
+            builder.wrap_table(self.foreign_table_name),
+            builder.wrap_table(self.alias),
+            self.stringify_condition(builder)
+        )
 
 
 class SqlMapper(metaclass=ABCMeta):
@@ -996,7 +1063,7 @@ class SqlMapper(metaclass=ABCMeta):
             self.primary = Primary(self)                # Объект, представляющий собой первичный ключ маппера
             self.boundaries = None
             self._properties = {}
-            self._joined = OrderedDict()
+            self._joined = Joins()
             self._reversed_map = {}
             self.is_mock = False
             self.binded = False
@@ -1153,7 +1220,7 @@ class SqlMapper(metaclass=ABCMeta):
         б) создает карту join'ов маппера и других таблиц
 
         """
-        self._joined = OrderedDict()
+        self._joined = Joins()
         self._reversed_map = {}
         for mapperFieldName in self._properties:
             mapper_field = self._properties[mapperFieldName]
@@ -1165,23 +1232,23 @@ class SqlMapper(metaclass=ABCMeta):
                         rel_mapper = mapper_field.get_relations_mapper()
                         first_mapper_key_in_rel_mapper = rel_mapper.get_property_that_is_link_for(self).get_db_name()
                         target_mapper_key_in_rel_mapper = rel_mapper.get_property_that_is_link_for(collection_mapper).get_db_name()
-                        self.link_mappers(self, rel_mapper, self.db_primary_key, first_mapper_key_in_rel_mapper, rel_mapper.table_name, rel_mapper.table_name)
-                        self.link_mappers(self, rel_mapper, self.db_primary_key, first_mapper_key_in_rel_mapper, mapper_field.get_name(), rel_mapper.table_name)
-                        self.link_mappers(rel_mapper, collection_mapper, target_mapper_key_in_rel_mapper, collection_mapper.db_primary_key, mapper_field.get_name(), mapper_field.get_name())
+                        self.link_mappers(self, rel_mapper, self.db_primary_key, first_mapper_key_in_rel_mapper, rel_mapper.table_name)
+                        self.link_mappers(rel_mapper, collection_mapper, target_mapper_key_in_rel_mapper, collection_mapper.db_primary_key, mapper_field.get_name())
                     else:
                         first_mapper_key_in_target_mapper = collection_mapper.get_property_that_is_link_for(self).get_db_name()
-                        self.link_mappers(self, collection_mapper, self.db_primary_key, first_mapper_key_in_target_mapper, collection_mapper.table_name, collection_mapper.table_name)
-                        self.link_mappers(self, collection_mapper, self.db_primary_key, first_mapper_key_in_target_mapper, mapper_field.get_name(), collection_mapper.table_name)
-                        self.link_mappers(self, collection_mapper, self.db_primary_key, first_mapper_key_in_target_mapper, mapper_field.get_name(), mapper_field.get_name())
+                        self.link_mappers(self, collection_mapper, self.db_primary_key, first_mapper_key_in_target_mapper, mapper_field.get_name())
                 else:
-                    self.link_mappers(self, collection_mapper, mapper_field.get_db_name(), collection_mapper.db_primary_key, mapper_field.get_name(), mapper_field.get_name())
+                    self.link_mappers(self, collection_mapper, mapper_field.get_db_name(), collection_mapper.db_primary_key, mapper_field.get_name())
 
-    def link_mappers(self, first_mapper, second_mapper, first_key, second_key, target, alias):
-        if target not in self._joined:
-            self._joined[target] = OrderedDict()
-        self._joined[target][(first_mapper.table_name, first_key)] = (
-            second_mapper.table_name, second_key, alias
-        )
+    def link_mappers(self, first_mapper, second_mapper, first_key, second_key, alias):
+        if not self._joined.already_joined(alias):
+            self._joined.add(
+                Join(
+                    target_table_name=first_mapper.table_name, target_table_field_name=first_key,
+                    foreign_table_name=second_mapper.table_name, foreign_table_field_name=second_key,
+                    alias=alias
+                )
+            )
 
     def get_properties(self) -> list:
         """
@@ -1233,59 +1300,29 @@ class SqlMapper(metaclass=ABCMeta):
                 if prop.get_items_collection_mapper() == foreign_mapper:
                     return prop
 
-    def get_joined_tables(self, conditions: dict, fields: list=None, order=None):
+    def get_joins(self, fields: list=None) -> []:
         """
-        Возвращает часть словаря _joined, оставив только те таблицы, которые используются в conditions и fields
-        @param conditions: Условия выборки
-        @type conditions: dict
-        @param fields: Поля для выборки
+        Возвращает часть словаря _joined, оставив только те таблицы, которые используются в fields
+        @param fields: Список полей
         @type fields: list
-        @return: Словарь с данными ог присоединенных таблицах
-        @rtype : dict
+        @return: Список Join'ов
+        @rtype : []
 
         """
-        if order:
-            if type(order) is tuple:
-                order = [order]
-            order_fields = [f[0] for f in order]
-        else:
-            order_fields = []
-        fields, conditions = fields if fields else [], conditions if conditions else {}
-
-
-        all = list(set(filter(
-            None,
-            [field if field.find(".") > -1 else None for field in
-             (fields + self.get_fields_from_conditions(conditions) + order_fields)])))
-
-
-        joined_directly = {}
-        joined_via_proxy = {}
-
-        for ft in all:
-            path = ft.split(".")
-            first, tale = path[0], ".".join(path[1:len(path)])
-            joined_directly[first] = self._joined[first]
-            if len(path) > 2:
-                joined_via_proxy[ft] = list(self.get_property(first).items_collection_mapper.get_joined_tables(conditions={}, fields=[tale]).values())[0]
-
-        joined_directly.update(joined_via_proxy)
+        if not fields:
+            return []
+        fields = [f.split(".")[0] if f.find(".") > -1 else f for f in fields]
+        props = list(set(filter(lambda p: self.is_rel(p), [self.get_property(f) for f in fields])))
+        joined_directly = []
+        for prop in props:
+            if isinstance(prop, FieldTypes.SqlListWithRelationsTable):
+                dj1 = self._joined.get_by_alias(prop.get_relations_mapper().table_name)
+                if dj1:
+                    joined_directly.append(dj1)
+            dj = self._joined.get_by_alias(prop.get_name())
+            if dj:
+                joined_directly.append(dj)
         return joined_directly
-
-    def get_fields_from_conditions(self, sub_conditions: dict) -> list:
-        """ Рекурсивно вытаскивает имена полей из словарей с уловиями обрабатывая вложеные and и or
-        @param sub_conditions: Условия выборки
-        @return: Список полей по которым идет выборка
-        @rtype : list
-        """
-        fields_from_conditions = list(sub_conditions.keys()) if sub_conditions else []
-        if sub_conditions.get("and"):
-            for conj_sub_conditions in sub_conditions.get("and"):
-                fields_from_conditions += self.get_fields_from_conditions(conj_sub_conditions)
-        if sub_conditions.get("or"):
-            for conj_sub_conditions in sub_conditions.get("or"):
-                fields_from_conditions += self.get_fields_from_conditions(conj_sub_conditions)
-        return fields_from_conditions
 
     def get_db_type(self, field_name: str) -> str:
         """
@@ -1359,6 +1396,29 @@ class SqlMapper(metaclass=ABCMeta):
 
     ############################################ CRUD ###############################################################
 
+    def get_fields_from_conditions(self, sub_conditions: dict) -> list:
+        """ Рекурсивно вытаскивает имена полей из словарей с уловиями обрабатывая вложеные and и or
+        @param sub_conditions: Условия выборки
+        @return: Список полей по которым идет выборка
+        @rtype : list
+        """
+        fields_from_conditions = list(sub_conditions.keys()) if sub_conditions else []
+        if sub_conditions.get("and"):
+            for conj_sub_conditions in sub_conditions.get("and"):
+                fields_from_conditions += self.get_fields_from_conditions(conj_sub_conditions)
+        if sub_conditions.get("or"):
+            for conj_sub_conditions in sub_conditions.get("or"):
+                fields_from_conditions += self.get_fields_from_conditions(conj_sub_conditions)
+        return fields_from_conditions
+
+    def get_fields_from_params(self, params):
+        order = params.get("order")
+        if order:
+            if type(order) is tuple:
+                order = [order]
+            return [f[0] for f in order]
+        return []
+
     def generate_rows(self, fields: list=None, conditions: dict=None, params: dict=None, cache=None):
         """
         Делаем выборку данных, осуществляя функции маппинга строк (названия полей + формат значений)
@@ -1371,14 +1431,15 @@ class SqlMapper(metaclass=ABCMeta):
         @param cache: Используемый кэш
 
         """
-
-        fields = self.translate_and_convert(fields) \
-            if fields not in [[], None] else list(self._reversed_map.keys())
+        fields = fields if fields not in [[], None] else self.get_properties()
+        conditions = conditions if conditions else {}
+        params = params if params else {}
+        joins = self.get_joins(fields + self.get_fields_from_conditions(conditions) + self.get_fields_from_params(params))
+        fields = self.translate_and_convert(fields)
         conditions = self.translate_and_convert(conditions, save_unsaved=False)
-        params = self.convert_params(params) if params else {}
-        joined_tables = self.get_joined_tables(conditions, fields, params.get("order"))
+        params = self.translate_params(params)
 
-        for row in self.pool.db.select_query(self.table_name, fields, conditions, params, joined_tables, "get_rows"):
+        for row in self.pool.db.select_query(self.table_name, fields, conditions, params, joins, "get_rows"):
             result = {fields[it]: row[it] for it in range(len(fields))}
             yield self.translate_and_convert(result, "database2mapper", cache)
 
@@ -1460,7 +1521,7 @@ class SqlMapper(metaclass=ABCMeta):
         @rtype : int
         """
         conditions = self.translate_and_convert(conditions, save_unsaved=False)
-        return self.pool.db.count_query(self.table_name, conditions, self.get_joined_tables(conditions))
+        return self.pool.db.count_query(self.table_name, conditions, self.get_joins(conditions))
 
     def insert(self, data: list or dict):
         """
@@ -1498,6 +1559,7 @@ class SqlMapper(metaclass=ABCMeta):
         @return: Значение первичного ключа для обновленной записи/записей
         
         """
+        conditions = conditions or {}
         if self.primary.exists():           # Если, конечно, первичный ключ определен
             if self.primary.compound:       # Если он составной
                 changed_records_ids = [
@@ -1508,11 +1570,12 @@ class SqlMapper(metaclass=ABCMeta):
         else:
             changed_records_ids = []
         if data != {}:
-            converted_conditions = self.translate_and_convert(conditions, save_unsaved=False)
             try:
                 self.pool.db.update_query(
-                    self.table_name, self.translate_and_convert(data), converted_conditions,
-                    self.get_joined_tables(converted_conditions), self.primary
+                    self.table_name, self.translate_and_convert(data),
+                    self.translate_and_convert(conditions, save_unsaved=False),
+                    self.get_joins(self.get_fields_from_conditions(conditions)),
+                    self.primary
                 )
             except DublicateRecordException as err:
                 raise self.__class__.dublicate_record_exception(err)
@@ -1539,8 +1602,9 @@ class SqlMapper(metaclass=ABCMeta):
                 )
                 return changed_records_ids
         else:
+            joins = self.get_joins(self.get_fields_from_conditions(conditions))
             conditions = self.translate_and_convert(conditions, save_unsaved=False)
-            self.pool.db.delete_query(self.table_name, conditions, self.get_joined_tables(conditions))
+            self.pool.db.delete_query(self.table_name, conditions, joins)
 
     def split_data_by_relation_type(self, data: dict) -> (dict, dict):
         """
@@ -1670,7 +1734,7 @@ class SqlMapper(metaclass=ABCMeta):
         res = self._reversed_map.get(field_name)
         return res if res else self.get_property(field_name)
 
-    def convert_params(self, params: dict) -> dict:
+    def translate_params(self, params: dict) -> dict:
         """
         Маппинг имен полей, используемых в параметрах выборки
         @param params: Параметры выборки
@@ -1685,6 +1749,7 @@ class SqlMapper(metaclass=ABCMeta):
             elif type(params.get("order")) is list:
                 params["order"] = [(self.translate_and_convert(ordOpt[0]), ordOpt[1]) for ordOpt in params["order"]]
         return params
+
 
     @staticmethod
     def get_type_for_primary():
@@ -1784,9 +1849,9 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
     def bind(self):
         """ Переопределить в суб-класса  """
 
-    def get_joined_tables(self, conditions: dict, fields: list=None, order=None):
+    def get_joins(self, fields: list=None):
         """ Переопределяем базовый метод, join'ы не поддерживаются """
-        return {}
+        return []
 
     def split_data_by_relation_type(self, data: dict) -> (dict, dict):
         """ Переопределяем базовый метод так, чтобы он не отделял значения типа list от общей массы данных """
@@ -1827,7 +1892,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
                 if key.find(".") > -1 and self.is_rel(self.get_property(key.split(".")[0])):
                     collection_conditions[key.split(".")[0]] = {key.split(".")[1]: conditions[key]}
         # Конвертируем параметры выборки
-        params = self.convert_params(params)
+        params = self.translate_params(params)
 
         # Сохраняем данные основных записей, их первичные ключи и ключи внешних моделей, прилинкованнык к записям:
         rows = []
