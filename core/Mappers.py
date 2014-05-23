@@ -1311,18 +1311,38 @@ class SqlMapper(metaclass=ABCMeta):
         """
         if not fields:
             return []
+
+        # Определяем список полей, запрашиваемых "через уровень", то есть с помощью двух джойнов
+        proxy_fields = defaultdict(list)
+        for pf in list(filter(lambda f: len(f.split(".")) > 2, fields)):
+            proxy_fields[pf.split(".")[0]].append(".".join(pf.split(".")[1:]))
+
+        # Определяем список свойств маппера, через которые идут обращения к другим свойствам (только они имеют смысл)
         fields = [f.split(".")[0] if f.find(".") > -1 else f for f in fields]
         props = list(set(filter(lambda p: self.is_rel(p), [self.get_property(f) for f in fields])))
-        joined_directly = []
+
+        joined_directly = [] # Непосредственные джойны к основному мапперу
+        proxy_joins = []    # Джойны к присоединенным к основному мапперу таблицам
+
         for prop in props:
+            # Если идет обращение к сущности (м-к-м через таблицу связей), добавляем джойн таблицы связей:
             if isinstance(prop, FieldTypes.SqlListWithRelationsTable):
                 dj1 = self._joined.get_by_alias(prop.get_relations_mapper().table_name)
                 if dj1:
                     joined_directly.append(dj1)
+
+            # Добавляем в список непосредственный джойн сущности, на которую смотрит поле маппера:
             dj = self._joined.get_by_alias(prop.get_name())
             if dj:
                 joined_directly.append(dj)
-        return joined_directly
+
+            # Обрабатываем джойны, получаемые из присоединенных непосредственно сущностей, если такие имеются:
+            for proxy_join in prop.items_collection_mapper.get_joins(proxy_fields.get(prop.get_name())):
+                proxy_join.alias = "%s.%s" % (prop.get_name(), proxy_join.alias)
+                proxy_join.target_table_name = prop.get_name()
+                proxy_joins.append(proxy_join)
+
+        return joined_directly + proxy_joins
 
     def get_db_type(self, field_name: str) -> str:
         """
@@ -1411,7 +1431,8 @@ class SqlMapper(metaclass=ABCMeta):
                 fields_from_conditions += self.get_fields_from_conditions(conj_sub_conditions)
         return fields_from_conditions
 
-    def get_fields_from_params(self, params):
+    @staticmethod
+    def get_fields_from_params(params):
         order = params.get("order")
         if order:
             if type(order) is tuple:
@@ -1438,7 +1459,7 @@ class SqlMapper(metaclass=ABCMeta):
         fields = self.translate_and_convert(fields)
         conditions = self.translate_and_convert(conditions, save_unsaved=False)
         params = self.translate_params(params)
-
+        print("conditions", conditions)
         for row in self.pool.db.select_query(self.table_name, fields, conditions, params, joins, "get_rows"):
             result = {fields[it]: row[it] for it in range(len(fields))}
             yield self.translate_and_convert(result, "database2mapper", cache)

@@ -178,6 +178,7 @@ class MySqlDbAdapter(Adapter):
         :param sql:         SQL-Запрос
         :param params:      Параметры для плейсхолдеров запроса
         """
+        print(sql)
         cursor = self.connection.cursor()
         try:
             cursor.execute(sql, params if params is not None else [])

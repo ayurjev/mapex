@@ -141,7 +141,7 @@ class SqlBuilder(object, metaclass=ABCMeta):
         if field.find(".") > -1:
             path = field.split(".")
             field = path.pop()
-            table = path.pop()
+            table = ".".join(path)
         if field.find("+") > -1:
             return "%s as %s" % (
                 self.aggregate_function(self.concat_ws_function(field, table, "$!"), table, joins),
