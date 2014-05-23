@@ -2090,7 +2090,11 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
         new_conditions = {}
         for key in conditions:
             if key.find(".") > -1:
-                mapper_field_name, other_mapper_property_name = key.split(".")
+                path = key.split(".")
+                if len(path) > 2:
+                    mapper_field_name, other_mapper_property_name = path[0], ".".join(path[1:len(path)-1])
+                else:
+                    mapper_field_name, other_mapper_property_name = path
                 mf = self.get_property_by_db_name(mapper_field_name)
                 if self.is_real_embedded(mf):
                     new_conditions["%s.%s" % (mf.get_db_name(), other_mapper_property_name)] = conditions[key]
