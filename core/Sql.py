@@ -141,7 +141,7 @@ class SqlBuilder(object, metaclass=ABCMeta):
         if field.find(".") > -1:
             path = field.split(".")
             field = path.pop()
-            table = ".".join(path)
+            table = "_".join(path)
         if field.find("+") > -1:
             return "%s as %s" % (
                 self.aggregate_function(self.concat_ws_function(field, table, "$!"), table, joins),
@@ -1018,7 +1018,7 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
         Выполняет запрос на подсчет строк в таблице по заданным условиям
         :param table_name:      Имя таблицы
         :param conditions:      Условия подсчета строк
-        :param joined_tables:   Таблицы, которые необходимо присоединить к основной
+        :param joins:           Список джойнов, необходимых для выполнения запроса
         :return:
         """
         query = CountQuery(self.query_builder)

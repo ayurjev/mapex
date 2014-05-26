@@ -996,7 +996,8 @@ class Joins(object):
         self._joins[join.alias] = join
 
     def get_by_alias(self, alias):
-        return self._joins.get(alias)
+        from copy import deepcopy
+        return deepcopy(self._joins.get(alias))
 
 
 class Join(object):
@@ -1338,7 +1339,7 @@ class SqlMapper(metaclass=ABCMeta):
 
             # Обрабатываем джойны, получаемые из присоединенных непосредственно сущностей, если такие имеются:
             for proxy_join in prop.items_collection_mapper.get_joins(proxy_fields.get(prop.get_name())):
-                proxy_join.alias = "%s.%s" % (prop.get_name(), proxy_join.alias)
+                proxy_join.alias = "%s_%s" % (prop.get_name(), proxy_join.alias)
                 proxy_join.target_table_name = prop.get_name()
                 proxy_joins.append(proxy_join)
 
@@ -1459,7 +1460,8 @@ class SqlMapper(metaclass=ABCMeta):
         fields = self.translate_and_convert(fields)
         conditions = self.translate_and_convert(conditions, save_unsaved=False)
         params = self.translate_params(params)
-        for row in self.pool.db.select_query(self.table_name, fields, conditions, params, joins, "get_rows"):
+        rows = self.pool.db.select_query(self.table_name, fields, conditions, params, joins, "get_rows")
+        for row in rows:
             result = {fields[it]: row[it] for it in range(len(fields))}
             yield self.translate_and_convert(result, "database2mapper", cache)
 
@@ -1540,8 +1542,10 @@ class SqlMapper(metaclass=ABCMeta):
         @return: Количество строк, соответствующих условиям подсчета
         @rtype : int
         """
+        conditions = conditions or {}
+        joins = self.get_joins(self.get_fields_from_conditions(conditions))
         conditions = self.translate_and_convert(conditions, save_unsaved=False)
-        return self.pool.db.count_query(self.table_name, conditions, self.get_joins(conditions))
+        return self.pool.db.count_query(self.table_name, conditions, joins)
 
     def insert(self, data: list or dict):
         """
@@ -1575,7 +1579,6 @@ class SqlMapper(metaclass=ABCMeta):
         @type data: dict
         @param conditions: Условия выборки записей для применения обновлений
         @type conditions: dict
-        @param new_item: Экземпляр класса модели, соответствующей основной добавляемой записи
         @return: Значение первичного ключа для обновленной записи/записей
         
         """
@@ -1586,7 +1589,10 @@ class SqlMapper(metaclass=ABCMeta):
                     self.primary.grab_value_from(chid) for chid in self.get_rows(self.primary.name(), conditions)
                 ]
             else:                           # Если он обычный
-                changed_records_ids = list(self.get_column(self.primary.name(), conditions))
+                if self.primary.name() in list(conditions.keys()) and len(list(conditions.keys())) == 1:
+                    changed_records_ids = list(conditions.values())
+                else:
+                    changed_records_ids = list(self.get_column(self.primary.name(), conditions))
         else:
             changed_records_ids = []
         if data != {}:
