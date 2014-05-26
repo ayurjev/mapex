@@ -176,6 +176,15 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(2, len(items))
 
     @for_all_dbms
+    def test_generate_items(self, dbms_fw: DbMock):
+        """ Проверка работы генератора коллекции """
+        users = dbms_fw.get_new_users_collection_instance()
+        user1 = dbms_fw.get_new_user_instance({"name": "FirstItem", "age": 1})
+        user2 = dbms_fw.get_new_user_instance({"name": "SecondItem", "age": 2})
+        users.insert([user1, user2])
+        self.assertEqual([user1, user2], list(users.generate_items(params={"order": ("age", "asc")})))
+
+    @for_all_dbms
     def test_params(self, dbms_fw: DbMock):
         """ Проверим сортировку и ограничение выборки """
         users = dbms_fw.get_new_users_collection_instance()

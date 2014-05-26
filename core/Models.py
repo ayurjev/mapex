@@ -183,6 +183,19 @@ class TableModel(object):
         cache.cache(arrays)
         return items
 
+    def generate_items(self, bounds=None, params=None):
+        """
+        Генератор экзепляров класса RecordModel, соответствующих условиями выборки из коллекции
+        :param bounds:              Условия выборки записей
+        :param params:              Параметры выборки (сортировка, лимит)
+        :return: :raise:            TableModelException
+        """
+        if isinstance(self.get_new_item().mapper, self.mapper.__class__) is False:
+            raise TableModelException("Collection mapper and collection item mapper should be equal")
+
+        for row in self.mapper.generate_rows([], self.mix_boundaries(bounds), params):
+            yield self.mapper.factory_method(self.get_new_item().load_from_array(row, True))
+
 
 class Primary(object):
     def __init__(self, model):
