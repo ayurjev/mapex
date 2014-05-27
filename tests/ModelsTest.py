@@ -176,6 +176,39 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(2, len(items))
 
     @for_all_dbms
+    def test_advanced_get_item(self, dbms_fw: DbMock):
+        """ Проверим возмлжность выборки записей, используя более одного уровная вложенности """
+        users = dbms_fw.get_new_users_collection_instance()
+        accounts = dbms_fw.get_new_accounts_collection_instance()
+        profiles = dbms_fw.get_new_profiles_collection_instance()
+
+        user = dbms_fw.get_new_user_instance({"name": "FirstUser", "age": 1})
+        user.account = dbms_fw.get_new_account_instance()
+        user.account.email = "first@email.com"
+        user.account.profile = dbms_fw.get_new_profile_instance()
+        user.account.profile.avatar = "first_avatar"
+        user.save()
+        self.assertEqual(1, users.count())
+        self.assertEqual(1, accounts.count())
+        self.assertEqual(1, profiles.count())
+
+        found = users.get_item({"name": "FirstUser"})
+        self.assertEqual(user, found)
+
+        found = users.get_item({"account.email": "first@email.com"})
+        self.assertEqual(user, found)
+
+        found = users.get_item({"account.profile": user.account.profile})
+        self.assertEqual(user, found)
+
+        # Данная функциональность доступна только при наличии join'ов в СУБД:
+        if not users.mapper.support_joins:
+            return
+        else:
+            found = users.get_item({"account.profile.avatar": "first_avatar"})
+            self.assertEqual(user, found)
+
+    @for_all_dbms
     def test_generate_items(self, dbms_fw: DbMock):
         """ Проверка работы генератора коллекции """
         users = dbms_fw.get_new_users_collection_instance()
@@ -1933,7 +1966,7 @@ class RecordModelTest(unittest.TestCase):
                 "register_date": date(2013, 9, 8),
                 "register_time": None,
                 "register_datetime": None,
-                'account': {"email": "andrey.yurjev@gmail.com", 'id': None, 'phone': None},
+                'account': {"email": "andrey.yurjev@gmail.com", 'id': None, 'phone': None, "profile": None},
                 'tags': [
                     {"id": None, "name": "FirstTag", "weight": None},
                     {"id": None, "name": "SecondTag", "weight": None}

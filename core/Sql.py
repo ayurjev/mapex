@@ -36,7 +36,7 @@ class SqlBuilder(object, metaclass=ABCMeta):
         "match": " LIKE "
     }
 
-    def fields_enumeration(self, field_list: list, main_table: str=None, joined_tables: dict=None) -> str:
+    def fields_enumeration(self, field_list: list, main_table: str=None, joins: list=None) -> str:
         """
         Возвращает строку с перечислением полей, оформленную в соответствии с синтаксисом SQL
         @param field_list: Список полей
@@ -48,8 +48,8 @@ class SqlBuilder(object, metaclass=ABCMeta):
 
         """
         return ", ".join([
-            self.field(field, main_table, joined_tables) if type(field) == str else "%s as %s" % (
-                self.field(field[0], main_table, joined_tables), self.wrap_alias(field[1])
+            self.field(field, main_table, joins) if type(field) == str else "%s as %s" % (
+                self.field(field[0], main_table, joins), self.wrap_alias(field[1])
             ) for field in field_list
         ])
 
@@ -127,7 +127,7 @@ class SqlBuilder(object, metaclass=ABCMeta):
                             values.append(value)
         return "(%s)" % " AND ".join(conditions), values
 
-    def field(self, field: str, table: str=None, joined_tables: dict=None) -> str:
+    def field(self, field: str, table: str=None, joins: list=None) -> str:
         """
         Обрабатывает переданное имя поля и таблицы в соответствии с синтаксисом SQL
         @param field:
@@ -139,20 +139,20 @@ class SqlBuilder(object, metaclass=ABCMeta):
 
         """
         if field.find(".") > -1:
-            table, field = field.split(".")
+            path = field.split(".")
+            field = path.pop()
+            table = "_".join(path)
         if field.find("+") > -1:
             return "%s as %s" % (
-                self.aggregate_function(
-                    self.concat_ws_function(field, table, "$!"),
-                    table, joined_tables
-                ),
-                self.wrap_alias(field[1].replace("]", ""))
+                self.aggregate_function(self.concat_ws_function(field, table, "$!"), table, joins),
+                self.wrap_alias(field)
             )
         if field.endswith("]"):
             field = field.split("[")
+            alias = "%s_%s" % (field[1].replace("]", ""), field[0])
             return "%s as %s" % (
-                self.aggregate_function(self.field(field[0], table), table, joined_tables),
-                self.wrap_alias(field[1].replace("]", ""))
+                self.aggregate_function(self.field(field[0], table), table, joins),
+                self.wrap_alias(alias)
             )
         return "%s.%s" % (self.wrap_table(table), self.wrap_field(field)) if table else "%s" % self.wrap_field(field)
 
@@ -274,7 +274,7 @@ class SqlBuilder(object, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def aggregate_function(self, field: str, table: str, joined_tables: dict=None) -> str:
+    def aggregate_function(self, field: str, table: str, joins: list=None) -> str:
         """
         Возвращает имя аггрегатной функции для группирования строк
         @param field: Имя поля для объединения значений в массив
@@ -444,57 +444,15 @@ class JoinMixin(BaseSqlQuery):
 
         """
         super().__init__(builder)
-        self.joined_tables = {}
-        self.join_lines, self.joined_tables_list, self.join_conditions = None, None, None
+        self.joins = []
 
-    def set_joined_tables(self, joined_tables: dict):
+    def set_joins(self, joins: list):
         """
-        Устанавливает схему join'a таблиц
-        @param joined_tables: Схема присоединения внешних таблиц
-        @type joined_tables: dict
+        @param joins: Список джойнов внешних таблиц
+        @type joins: list
 
         """
-        self.joined_tables = joined_tables
-        self.join_lines, self.joined_tables_list, self.join_conditions = self._analyze_joines()
-
-    def _analyze_joines(self):
-        """
-        Возвращает секцию JOIN для запроса
-        @return: Секция JOIN для запроса
-        @rtype : str
-
-        """
-        unique_joined_tables = {}
-        all_left_joins_strings = []
-        all_join_conditions = []
-        for joined_table_name in self.joined_tables:
-            for join_conditions in self.joined_tables[joined_table_name]:
-                if (
-                        joined_table_name not in unique_joined_tables and
-                        self.joined_tables[joined_table_name][join_conditions][2] not in unique_joined_tables
-                ):
-                    # Сохраняем условие присоединения таблицы:
-                    join_condition = "(%s.%s = %s.%s)" % (
-                        self.builder.wrap_table(join_conditions[0]),
-                        self.builder.wrap_field(join_conditions[1]),
-                        self.builder.wrap_table(self.joined_tables[joined_table_name][join_conditions][2]),
-                        self.builder.wrap_field(self.joined_tables[joined_table_name][join_conditions][1])
-                    )
-                    all_join_conditions.append(join_condition)
-
-                    # Сохраняем строку с LEFT JOIN, присоединяющую эту таблицу
-                    all_left_joins_strings.append(
-                        "LEFT JOIN %s as %s ON %s" % (
-                            self.builder.wrap_table(self.joined_tables[joined_table_name][join_conditions][0]),
-                            self.builder.wrap_table(self.joined_tables[joined_table_name][join_conditions][2]),
-                            join_condition
-                        )
-                    )
-
-                if self.joined_tables[joined_table_name][join_conditions][2] not in unique_joined_tables:
-                    unique_joined_tables[self.joined_tables[joined_table_name][join_conditions][2]] = self.joined_tables[joined_table_name][join_conditions][0]
-
-        return all_left_joins_strings, unique_joined_tables, all_join_conditions
+        self.joins = joins
 
     def get_join_section(self) -> str:
         """
@@ -503,7 +461,7 @@ class JoinMixin(BaseSqlQuery):
         @rtype : str
 
         """
-        return " ".join(self.join_lines)
+        return " ".join(list([j.stringify(self.builder) for j in self.joins]))
 
     def get_joined_tables(self) -> list:
         """
@@ -512,10 +470,11 @@ class JoinMixin(BaseSqlQuery):
         @rtype : list
 
         """
-        return ["%s as %s" %(
-            self.builder.wrap_table(self.joined_tables_list[table]),
-            self.builder.wrap_table(table)
-        ) for table in self.joined_tables_list]
+        return [
+            "%s as %s" % (
+                self.builder.wrap_table(j.foreign_table_name), self.builder.wrap_table(j.alias)
+            ) for j in self.joins
+        ]
 
     def get_join_conditions(self) -> str:
         """
@@ -524,7 +483,7 @@ class JoinMixin(BaseSqlQuery):
         @rtype : str
 
         """
-        return " AND ".join(self.join_conditions)
+        return " AND ".join([j.stringify_condition(self.builder) for j in self.joins])
 
 
 class ConditionsMixin(BaseSqlQuery):
@@ -609,7 +568,7 @@ class SelectQuery(ConditionsMixin, JoinMixin, BaseSqlQuery):
         @rtype : str
 
         """
-        return self.builder.fields_enumeration(self.fields, self.table_name, self.joined_tables)
+        return self.builder.fields_enumeration(self.fields, self.table_name, self.joins)
 
     def get_groupby_section(self) -> str:
         """
@@ -1055,18 +1014,18 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
         for row in self.generate(sql, params):
             yield row
 
-    def count_query(self, table_name, conditions, joined_tables=None):
+    def count_query(self, table_name, conditions, joins=None):
         """
         Выполняет запрос на подсчет строк в таблице по заданным условиям
         :param table_name:      Имя таблицы
         :param conditions:      Условия подсчета строк
-        :param joined_tables:   Таблицы, которые необходимо присоединить к основной
+        :param joins:           Список джойнов, необходимых для выполнения запроса
         :return:
         """
         query = CountQuery(self.query_builder)
         query.set_table_name(table_name)
         query.set_conditions(conditions)
-        query.set_joined_tables(joined_tables)
+        query.set_joins(joins)
         return int(self.get_value(*query.build()))
 
     def insert_query(self, table_name, data, primary_key):
@@ -1087,13 +1046,13 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
         res = self.get_value(*query.build())
         return res if primary_key and res not in ["DELETE", "INSERT", "UPDATE"] else 0
 
-    def update_query(self, table_name, data, conditions, joined_tables=None, primary_key=None):
+    def update_query(self, table_name, data, conditions, joins=None, primary_key=None):
         """
         Выполняет запрос на обновление данных в таблице в соответствии с условиями
         :param table_name:      Имя таблицы
         :param data:            Данные для обновления
         :param conditions:      Условия выборки
-        :param joined_tables:   Внещние таблицы
+        :param joins:           Список join'ов
         :param primary_key:     Первичный ключ таблицы
         :return:
         """
@@ -1101,41 +1060,41 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
         query.set_table_name(table_name)
         query.set_update_data(data)
         query.set_conditions(conditions)
-        query.set_joined_tables(joined_tables)
+        query.set_joins(joins)
         query.set_primary(primary_key.db_name() if primary_key.exists() else None)
         res = self.get_column(*query.build())
         res = [item if item not in ["DELETE", "INSERT", "UPDATE"] else None for item in res]
         return res if None not in res else []
 
-    def delete_query(self, table_name, conditions, joined_tables=None):
+    def delete_query(self, table_name, conditions, joins=None):
         """
         Выполняет запрос на удаление строк из таблицы в соответствии с уловиями
         :param table_name:      Имя таблицы
         :param conditions:      Условия удаления
-        :param joined_tables:   Внещние таблицы
+        :param joins:           Список джойнов
         :return:
         """
         query = DeleteQuery(self.query_builder)
         query.set_table_name(table_name)
         query.set_conditions(conditions)
-        query.set_joined_tables(joined_tables if joined_tables else {})
+        query.set_joins(joins if joins else [])
         return self.get_value(*query.build())
 
-    def select_query(self, table_name, fields, conditions, params=None, joined_tables=None, adapter_method=None):
+    def select_query(self, table_name, fields, conditions, params=None, joins=None, adapter_method=None):
         """
         Выполняет запрос на получение строк из таблицы помощью указанного метода адаптера
         :param table_name:      Имя таблицы
         :param fields:          Список полей
         :param conditions:      Условия выборки
         :param params:          Параметры выборки
-        :param joined_tables:   Внещние таблицы
+        :param joins:           Список джойнов
         :param adapter_method:  Метод адаптера, для выполнения запроса
         :return:
         """
         query = SelectQuery(self.query_builder)
         query.set_table_name(table_name)
         query.set_fields(fields)
-        query.set_joined_tables(joined_tables)
+        query.set_joins(joins)
         query.set_conditions(conditions)
         query.set_params(params)
         res = query.build()

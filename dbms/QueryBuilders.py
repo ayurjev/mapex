@@ -27,7 +27,7 @@ class PgSqlBuilder(SqlBuilder):
         """
         return '''"%s"''' % alias
 
-    def aggregate_function(self, field: str, table: str, joined_tables: dict=None) -> str:
+    def aggregate_function(self, field: str, table: str, joins: list=None) -> str:
         """
         Возвращает имя аггрегатной функции для группирования строк
         @param field: Имя поля для группировки значений в массив
@@ -51,7 +51,7 @@ class PgSqlBuilder(SqlBuilder):
         """
         return "concat_ws('%s', %s)" % (
             separator,
-            ", ".join([self.field(f.split("[")[0], table) for f in field.split("+")])
+            ", ".join([self.field(f.split("[")[0], f.split("[")[1].strip("]")) for f in field.split("+")])
         )
 
     # noinspection PyUnusedLocal
@@ -178,7 +178,7 @@ class MySqlBuilder(SqlBuilder):
         """
         return '''`%s`''' % alias
 
-    def aggregate_function(self, field: str, table: str, joined_tables: dict=None) -> str:
+    def aggregate_function(self, field: str, table: str, joins: list=None) -> str:
         """
         Возвращает имя аггрегатной функции для группирования строк
         @param field: Имя поля для группировки значений в массив
@@ -202,7 +202,7 @@ class MySqlBuilder(SqlBuilder):
         """
         return "concat_ws('%s', %s)" % (
             separator,
-            ", ".join([self.field(f.split("[")[0], table) for f in field.split("+")])
+            ", ".join([self.field(f.split("[")[0], f.split("[")[1].rstrip("]")) for f in field.split("+")])
         )
 
     # noinspection PyUnusedLocal
@@ -323,7 +323,7 @@ class MsSqlBuilder(SqlBuilder):
         """
         return '''"%s"''' % alias
 
-    def aggregate_function(self, field: str, table: str, joined_tables: dict=None) -> str:
+    def aggregate_function(self, field: str, table: str, joins: list=None) -> str:
         """
         Возвращает имя аггрегатной функции для группирования строк
         @param field: Имя поля для группировки значений в массив
@@ -332,13 +332,14 @@ class MsSqlBuilder(SqlBuilder):
         @rtype : str
 
         """
-        conditions = " AND ".join([
-            '''%s = %s''' % (
-                self.field(joined_tables[table][mt_tuple][1], joined_tables[table][mt_tuple][0]),
-                self.field(mt_tuple[1], mt_tuple[0]),
-            ) for mt_tuple in joined_tables[table]
-        ])
-        return '''STUFF((SELECT ',' + CAST(%s as VARCHAR(MAX)) FROM %s WHERE %s FOR XML PATH('')), 1, 1, '')''' % (
+
+        # Для MS SQL коллизия алиасов и имен полей недопустима, поэтому возвращаем имена таблиц
+        for j in joins:
+            if table == j.alias:
+                table = j.foreign_table_name
+
+        conditions = " ".join([j.stringify(self) for j in joins])
+        return '''STUFF((SELECT DISTINCT ',' + CAST(%s as VARCHAR(MAX)) FROM %s %s FOR XML PATH('')), 1, 1, '')''' % (
             field, self.wrap_table(table), conditions
         )
 

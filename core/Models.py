@@ -198,7 +198,7 @@ class TableModel(object):
             yield self.mapper.factory_method(self.get_new_item().load_from_array(row, True))
 
 
-class Primary(object):
+class Primary(ValueInside):
     def __init__(self, model):
         self.model = model
         self.pk_list = None
@@ -614,7 +614,7 @@ class EmbeddedObject(ValueInside, metaclass=ABCMeta):
             and self.get_value() == other.get_value()
 
 
-class EmbeddedObjectFactory(object, metaclass=ABCMeta):
+class EmbeddedObjectFactory(object):
     """ Фабрика встраиваемых объектов """
     def __new__(cls, *args):
         assert len(args) <= 1
@@ -626,7 +626,7 @@ class EmbeddedObjectFactory(object, metaclass=ABCMeta):
         @param value: Значение для конструирования экземпляра класса
         @return: Возвращает экземпляр класса, корректного для данного value
         """
-        for obj in cls.get_options():
+        for obj in cls.all():
             if obj.get_value() == value:
                 return obj
 
@@ -634,7 +634,7 @@ class EmbeddedObjectFactory(object, metaclass=ABCMeta):
             raise EmbeddedObjectFactoryException('There are no factory for "%s"' % value)
 
     @classmethod
-    def get_options(cls):
+    def all(cls):
         return (obj() for obj in cls.__dict__.values() if type(obj) == ABCMeta and issubclass(obj, EmbeddedObject))
 
 

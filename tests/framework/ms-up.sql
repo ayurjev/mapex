@@ -16,7 +16,8 @@ IF OBJECT_ID('accountsTable', 'Table') IS NULL
 CREATE TABLE "accountsTable" (
   "AccountID" BIGINT PRIMARY KEY IDENTITY,
   "EmailField" NVARCHAR(32),
-  "PhoneField" NVARCHAR(32)
+  "PhoneField" NVARCHAR(32),
+  "ProfileID" BIGINT
 );
 
 IF OBJECT_ID('tagsTable', 'Table') IS NULL

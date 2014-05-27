@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS "usersTable" (
 CREATE TABLE IF NOT EXISTS "accountsTable" (
     "AccountID" serial primary key,
     "EmailField" varchar(32),
-    "PhoneField" varchar(32)
+    "PhoneField" varchar(32),
+    "ProfileID"  integer
 );
 
 CREATE TABLE IF NOT EXISTS "tagsTable" (
