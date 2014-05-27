@@ -4,6 +4,7 @@
 from abc import ABCMeta, abstractmethod
 from mapex.core.Exceptions import TableModelException, EmbeddedObjectFactoryException
 from mapex.core.Common import TrackChangesValue, ValueInside
+import weakref
 
 
 class TableModel(object):
@@ -305,7 +306,8 @@ class RecordModel(ValueInside, TrackChangesValue):
     def __init__(self, data=None, loaded_from_db=False):
         self._lazy_load = False
         self._changed = True
-        self.primary = Primary(self)
+        # weakref.proxy решает проблему циклической связанности между экземплярами Primary и RecordModel
+        self.primary = Primary(weakref.proxy(self))
         self.cant_calc_changed = False
         self._loaded_from_db = False
         self._updating = False

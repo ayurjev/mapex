@@ -182,7 +182,7 @@ class MySqlDbAdapter(Adapter):
         try:
             cursor.execute(sql, params if params is not None else [])
             if cursor.with_rows:
-                for res in cursor.fetchall():
+                for res in cursor:
                     yield res
             else:
                 yield cursor.lastrowid
@@ -272,7 +272,7 @@ class MsSqlDbAdapter(Adapter):
         if cursor.rowcount == 0:
             return
         elif cursor.rowcount == -1:
-            for res in cursor.fetchall():
+            for res in cursor:
                 yield res
         else:
             cursor.commit()
