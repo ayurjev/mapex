@@ -198,7 +198,7 @@ class TableModel(object):
             yield self.mapper.factory_method(self.get_new_item().load_from_array(row, True))
 
 
-class Primary(object):
+class Primary(ValueInside):
     def __init__(self, model):
         self.model = model
         self.pk_list = None

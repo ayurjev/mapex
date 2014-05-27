@@ -332,8 +332,14 @@ class MsSqlBuilder(SqlBuilder):
         @rtype : str
 
         """
-        conditions = " AND ".join([j.stringify_condition(self) for j in joins])
-        return '''STUFF((SELECT ',' + CAST(%s as VARCHAR(MAX)) FROM %s WHERE %s FOR XML PATH('')), 1, 1, '')''' % (
+
+        # Для MS SQL коллизия алиасов и имен полей недопустима, поэтому возвращаем имена таблиц
+        for j in joins:
+            if table == j.alias:
+                table = j.foreign_table_name
+
+        conditions = " ".join([j.stringify(self) for j in joins])
+        return '''STUFF((SELECT DISTINCT ',' + CAST(%s as VARCHAR(MAX)) FROM %s %s FOR XML PATH('')), 1, 1, '')''' % (
             field, self.wrap_table(table), conditions
         )
 

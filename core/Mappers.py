@@ -1,6 +1,7 @@
 """ Модуль для работы с БД """
 import re
 import time
+from copy import deepcopy
 from datetime import datetime, date, time as dtime
 from abc import abstractmethod, ABCMeta
 from collections import OrderedDict
@@ -12,40 +13,9 @@ from mapex.core.Common import TrackChangesValue, ValueInside
 from mapex.core.Sql import SqlBuilder
 
 
-def string2int20(text, radix=88):
-    """
-    Преобразует текст в численно-буквенное выражение длиной до 20 символов
-    Как md5, только короче
-
-    :param text:        Текст для которого необходимо получить 20-символьный хэш
-    :param radix:       Длинна словаря (88 максимум)
-    :return: :raise:
-    """
-    import hashlib
-    import string
-
-    md5 = hashlib.md5(text.encode()).hexdigest()
-    number = int(md5, 16)
-    digits = string.digits + string.ascii_lowercase + string.ascii_letters
-    if not 2 <= radix <= len(digits):
-        raise ValueError("radix must be in 2..%r, not %r" % (len(digits), radix))
-    result = []
-    sign = ''
-    if number < 0:
-        number = -number
-        sign = '-'
-    elif number == 0:
-        sign = '0'
-    while number:
-        number, rdigit = divmod(number, radix)
-        result.append(digits[rdigit])
-    result.append(sign)
-    result.reverse()
-    return ''.join(result)
-
-
-class Primary(ValueInside):
+class Primary(object):
     """ Класс для представления первичных ключей мапперов """
+
     def __init__(self, mapper, name_in_db: str=None, name_in_mapper: str=None):
         """
         @param mapper: Родительский маппер
@@ -286,7 +256,8 @@ class FieldTypes(object):
                     mapper_field_name, mapper_property = path[0], ".".join(path[1:])
                     linked_mapper = self.mapper.get_property(mapper_field_name).get_items_collection_mapper()
                     return "%s.%s" % (
-                        mapper_field_name if self.mapper.support_joins else self.translate(mapper_field_name, "mapper2database"),
+                        mapper_field_name
+                        if self.mapper.support_joins else self.translate(mapper_field_name, "mapper2database"),
                         linked_mapper.translate(mapper_property, "mapper2database")
                     )
                 else:
@@ -989,14 +960,10 @@ class Joins(object):
     def __init__(self):
         self._joins = OrderedDict()
 
-    def already_joined(self, alias):
-        return alias in self._joins.keys()
-
     def add(self, join):
         self._joins[join.alias] = join
 
     def get_by_alias(self, alias):
-        from copy import deepcopy
         return deepcopy(self._joins.get(alias))
 
 
@@ -1227,29 +1194,28 @@ class SqlMapper(metaclass=ABCMeta):
             mapper_field = self._properties[mapperFieldName]
             self._reversed_map[mapper_field.get_db_name()] = mapper_field
             if isinstance(mapper_field, FieldTypes.RelationField):
-                collection_mapper = mapper_field.get_items_collection_mapper()
+                cm = mapper_field.get_items_collection_mapper()
                 if isinstance(mapper_field, FieldTypes.SqlList):
                     if isinstance(mapper_field, FieldTypes.SqlListWithRelationsTable):
-                        rel_mapper = mapper_field.get_relations_mapper()
-                        first_mapper_key_in_rel_mapper = rel_mapper.get_property_that_is_link_for(self).get_db_name()
-                        target_mapper_key_in_rel_mapper = rel_mapper.get_property_that_is_link_for(collection_mapper).get_db_name()
-                        self.link_mappers(self, rel_mapper, self.db_primary_key, first_mapper_key_in_rel_mapper, rel_mapper.table_name)
-                        self.link_mappers(rel_mapper, collection_mapper, target_mapper_key_in_rel_mapper, collection_mapper.db_primary_key, mapper_field.get_name())
+                        rm = mapper_field.get_relations_mapper()
+                        first_key_in_rm = rm.get_property_that_is_link_for(self).get_db_name()
+                        target_key_in_rm = rm.get_property_that_is_link_for(cm).get_db_name()
+                        self.link_mappers(self, rm, self.db_primary_key, first_key_in_rm, rm.table_name)
+                        self.link_mappers(rm, cm, target_key_in_rm, cm.db_primary_key, mapper_field.get_name())
                     else:
-                        first_mapper_key_in_target_mapper = collection_mapper.get_property_that_is_link_for(self).get_db_name()
-                        self.link_mappers(self, collection_mapper, self.db_primary_key, first_mapper_key_in_target_mapper, mapper_field.get_name())
+                        first_key_in_cm = cm.get_property_that_is_link_for(self).get_db_name()
+                        self.link_mappers(self, cm, self.db_primary_key, first_key_in_cm, mapper_field.get_name())
                 else:
-                    self.link_mappers(self, collection_mapper, mapper_field.get_db_name(), collection_mapper.db_primary_key, mapper_field.get_name())
+                    self.link_mappers(self, cm, mapper_field.get_db_name(), cm.db_primary_key, mapper_field.get_name())
 
     def link_mappers(self, first_mapper, second_mapper, first_key, second_key, alias):
-        if not self._joined.already_joined(alias):
-            self._joined.add(
-                Join(
-                    target_table_name=first_mapper.table_name, target_table_field_name=first_key,
-                    foreign_table_name=second_mapper.table_name, foreign_table_field_name=second_key,
-                    alias=alias
-                )
+        self._joined.add(
+            Join(
+                target_table_name=first_mapper.table_name, target_table_field_name=first_key,
+                foreign_table_name=second_mapper.table_name, foreign_table_field_name=second_key,
+                alias=alias
             )
+        )
 
     def get_properties(self) -> list:
         """
@@ -1272,6 +1238,7 @@ class SqlMapper(metaclass=ABCMeta):
         if field_name.find(".") > -1:
             path = field_name.split(".")
             first, tale = path[0], ".".join(path[1:])
+            # noinspection PyUnresolvedReferences
             return self.get_property(first).get_items_collection_mapper().get_property(tale)
         return self._properties.get(field_name)
 
@@ -1322,8 +1289,8 @@ class SqlMapper(metaclass=ABCMeta):
         fields = [f.split(".")[0] if f.find(".") > -1 else f for f in fields]
         props = list(set(filter(lambda p: self.is_rel(p), [self.get_property(f) for f in fields])))
 
-        joined_directly = [] # Непосредственные джойны к основному мапперу
-        proxy_joins = []    # Джойны к присоединенным к основному мапперу таблицам
+        joined_directly = []    # Непосредственные джойны к основному мапперу
+        proxy_joins = []        # Джойны к присоединенным к основному мапперу таблицам
 
         for prop in props:
             # Если идет обращение к сущности (м-к-м через таблицу связей), добавляем джойн таблицы связей:
@@ -1453,17 +1420,26 @@ class SqlMapper(metaclass=ABCMeta):
         @param cache: Используемый кэш
 
         """
+        # Смотрим на переданные данные и инициализируем значения, если какие-либо параметры не переданы:
         fields = fields if fields not in [[], None] else self.get_properties()
         conditions = conditions if conditions else {}
         params = params if params else {}
-        joins = self.get_joins(fields + self.get_fields_from_conditions(conditions) + self.get_fields_from_params(params))
+
+        # Анализируя список упоминаемых полей создаем список необходимых для выполнения запроса джойнов:
+        joins = self.get_joins(
+            fields + self.get_fields_from_conditions(conditions) + self.get_fields_from_params(params)
+        )
+
+        # Переводим имена объектов в формат СУБД:
         fields = self.translate_and_convert(fields)
         conditions = self.translate_and_convert(conditions, save_unsaved=False)
         params = self.translate_params(params)
-        rows = self.pool.db.select_query(self.table_name, fields, conditions, params, joins, "get_rows")
-        for row in rows:
-            result = {fields[it]: row[it] for it in range(len(fields))}
-            yield self.translate_and_convert(result, "database2mapper", cache)
+
+        # Выполняем запрос и начинаем отдавать результаты, переводя их в формат маппера на лету:
+        for row in self.pool.db.select_query(self.table_name, fields, conditions, params, joins, "get_rows"):
+            yield self.translate_and_convert(
+                {fields[it]: row[it] for it in range(len(fields))}, "database2mapper", cache
+            )
 
     def get_value(self, field_name: str, conditions: dict=None):
         """
@@ -1585,6 +1561,7 @@ class SqlMapper(metaclass=ABCMeta):
         conditions = conditions or {}
         if self.primary.exists():           # Если, конечно, первичный ключ определен
             if self.primary.compound:       # Если он составной
+                # noinspection PyTypeChecker
                 changed_records_ids = [
                     self.primary.grab_value_from(chid) for chid in self.get_rows(self.primary.name(), conditions)
                 ]
@@ -1723,7 +1700,9 @@ class SqlMapper(metaclass=ABCMeta):
         field = self.get_mapper_field(name, direction, first=True)
 
         if not field:
-            raise TableMapperException("Поле %s не определено в коллекции %s" % (name, self.get_new_collection().__class__))
+            raise TableMapperException(
+                "Поле %s не определено в коллекции %s" % (name, self.get_new_collection().__class__)
+            )
         return field.translate(name, direction)
 
     def get_mapper_field(self, field_name: str, direction: str, first: bool=False) -> FieldTypes.BaseField:
@@ -1775,7 +1754,6 @@ class SqlMapper(metaclass=ABCMeta):
             elif type(params.get("order")) is list:
                 params["order"] = [(self.translate_and_convert(ordOpt[0]), ordOpt[1]) for ordOpt in params["order"]]
         return params
-
 
     @staticmethod
     def get_type_for_primary():
@@ -1925,7 +1903,10 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
         rows_primaries = []
         foreign_models_primaries = defaultdict(list)
         foreign_models_by_row = {field: defaultdict(list) for field in main_collection_fields}
-        for row in self.pool.db.select_query(self.table_name, main_collection_fields, collection_conditions["self"], params):
+        generator = self.pool.db.select_query(
+            self.table_name, main_collection_fields, collection_conditions["self"], params
+        )
+        for row in generator:
             rows.append(row)
             rows_primaries.append(row.get("_id"))
             for key in row:
@@ -1957,8 +1938,10 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
                     linked_mapper.translate_and_convert(collection_conditions.get(prop), save_unsaved=False)
                 )
             requested_fields = ["_id", main_record_key.get_db_name()]
-            data = linked_mapper.pool.db.select_query(linked_mapper.table_name, requested_fields, rev_collection_condtions)
-            for reversed_model in data:
+            generator = linked_mapper.pool.db.select_query(
+                linked_mapper.table_name, requested_fields, rev_collection_condtions
+            )
+            for reversed_model in generator:
                 reversed_models_by_row[prop][reversed_model[main_record_key.get_db_name()]].append(
                     reversed_model.get("_id")
                 )
@@ -1994,7 +1977,10 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
 
                     # Заполняем модели
                     foreign_models = {}
-                    for row in linked_mapper.pool.db.select_query(linked_mapper.table_name, db_fields, basic_conditions):
+                    generator = linked_mapper.pool.db.select_query(
+                        linked_mapper.table_name, db_fields, basic_conditions
+                    )
+                    for row in generator:
                         foreign_models[row["_id"]] = row
 
                     for main_record in rows:
@@ -2238,6 +2224,7 @@ class FieldValues(object):
         def __getattribute__(self, item):
             raise AttributeError("'NoneType' object has no attribute '%s'" % item)
 
+        # noinspection PyMethodMayBeStatic
         def __setattribute__(self, item, value):
             raise AttributeError("'NoneType' object has no attribute '%s'" % item)
 
@@ -2296,11 +2283,16 @@ class FieldTypesConverter(object):
         ("DateTime", "String"): lambda v, mf, cache, s: v.strftime("%Y-%m-%d %H:%M:%S") if v else FNone(),
         ("DateTime", "Int"): lambda v, mf, cache, s: int(time.mktime(v.timetuple())) if v else FNone(),
         ("DateTime", "Date"): lambda v, mf, cache, s: date(v.year, v.month, v.day) if v else FNone(),
-        ("Link", "Int"): lambda v, mf, cache, s: (v.save().primary.get_value(deep=True) if s else v.primary.get_value(deep=True)) if v else FNone(),
-        ("Link", "String"): lambda v, mf, cache, s: str((v.save().primary.get_value(deep=True) if s else v.primary.get_value(deep=True))) if v else FNone(),
-        ("Link", "ObjectID"): lambda v, mf, cache, s: (v.save().primary.get_value(deep=True) if s else v.primary.get_value(deep=True)) if v else FNone(),
+        ("Link", "Int"): lambda v, mf, cache, s:
+        (v.save().primary.get_value(deep=True) if s else v.primary.get_value(deep=True)) if v else FNone(),
+        ("Link", "String"): lambda v, mf, cache, s:
+        str((v.save().primary.get_value(deep=True) if s else v.primary.get_value(deep=True))) if v else FNone(),
+        ("Link", "ObjectID"): lambda v, mf, cache, s:
+        (v.save().primary.get_value(deep=True) if s else v.primary.get_value(deep=True)) if v else FNone(),
         ("List", "String"): lambda v, mf, cache, s: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
-        ("List", "ObjectID"): lambda v, mf, cache, s: [(it.save().primary.get_value(deep=True) if s else it.primary.get_value(deep=True)) for it in v] if v is not None else [],
+        ("List", "ObjectID"): lambda v, mf, cache, s:
+        [(it.save().primary.get_value(deep=True) if s else it.primary.get_value(deep=True))
+         for it in v] if v is not None else [],
         ("EmbeddedLink", "EmbeddedDocument"): lambda v, mf, cache, s: FieldTypesConverter.embedded(mf, v),
         ("EmbeddedDocument", "EmbeddedLink"): lambda v, mf, cache, s: FieldTypesConverter.from_embedded(mf, v),
         ("EmbeddedList", "EmbeddedDocument"): lambda v, mf, cache, s:
@@ -2328,12 +2320,14 @@ class FieldTypesConverter(object):
         ("ObjectID", "Repr"): lambda v, mf, cache, s: str(v),
         ("Unknown", "Repr"): lambda v, mf, cache, s: str(v),
         ("EmbeddedObject", "Int"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Int"),
-        ("EmbeddedObject", "String"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "String"),
+        ("EmbeddedObject", "String"): lambda v, mf, cache, s:
+        FieldTypesConverter.custom_types(v, mf, cache, s, "String"),
         ("EmbeddedObject", "Float"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Float"),
         ("EmbeddedObject", "Bool"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Bool"),
         ("EmbeddedObject", "Date"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Date"),
         ("EmbeddedObject", "Time"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Time"),
-        ("EmbeddedObject", "DateTime"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "DateTime"),
+        ("EmbeddedObject", "DateTime"): lambda v, mf, cache, s:
+        FieldTypesConverter.custom_types(v, mf, cache, s, "DateTime"),
         ("EmbeddedObject", "EmbeddedObject"):
         lambda v, mf, cache, s: None if not v else v.get_value() if isinstance(v, EmbeddedObject) else mf.model(v),
         ("Int", "EmbeddedObject"): lambda v, mf, cache, s: mf.model(v) if v else None,
@@ -2484,33 +2478,3 @@ class FieldTypesConverter(object):
             (mf.get_value_type_in_mapper_terms(v.get_value_type()).ident, target_type)
         )
         return target_lambda(v.get_value(), mf, cache, s)
-
-
-# noinspection PyPep8Naming
-def MapperMock(real_mapper):
-    """
-    Возвращает мок для переданного маппера
-    @param real_mapper: Настоящий маппер
-    @return: Мок маппера
-    """
-
-    from unittest.mock import Mock
-    collection = real_mapper.get_new_collection()
-    item = real_mapper.get_new_item()
-    mapper_mock = Mock(spec=SqlMapper)
-    mapper_mock.get_properties.return_value = real_mapper.get_properties()
-    mapper_mock.boundaries = {}
-    mapper_mock.get_rows.return_value = [{}]
-    mapper_mock.factory_method.return_value = item
-    mapper_mock.split_data_by_relation_type.return_value = {}, {}
-    mapper_mock.primary = Mock(exists=lambda: True, compound=False)
-    item.set_mapper(mapper_mock)
-    collection.mapper = mapper_mock
-    mapper_mock.get_new_collection.return_value = collection
-    mapper_mock.get_new_item.return_value = item
-    mapper_mock.insert.return_value = item
-    mapper_mock.refresh = lambda model: model
-    mapper_mock.is_mock = True
-    mapper_mock.get_base_none.return_value = FieldValues.NoneValue()
-    mapper_mock.convert_to_list_value = lambda l: FieldValues.ListValue(l)
-    return mapper_mock

@@ -145,13 +145,14 @@ class SqlBuilder(object, metaclass=ABCMeta):
         if field.find("+") > -1:
             return "%s as %s" % (
                 self.aggregate_function(self.concat_ws_function(field, table, "$!"), table, joins),
-                self.wrap_alias(field[1].replace("]", ""))
+                self.wrap_alias(field)
             )
         if field.endswith("]"):
             field = field.split("[")
+            alias = "%s_%s" % (field[1].replace("]", ""), field[0])
             return "%s as %s" % (
                 self.aggregate_function(self.field(field[0], table), table, joins),
-                self.wrap_alias(field[1].replace("]", ""))
+                self.wrap_alias(alias)
             )
         return "%s.%s" % (self.wrap_table(table), self.wrap_field(field)) if table else "%s" % self.wrap_field(field)
 
