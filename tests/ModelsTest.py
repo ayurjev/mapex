@@ -1817,17 +1817,28 @@ class TableModelTest(unittest.TestCase):
         users.insert(dbms_fw.get_new_user_instance({"name": "ThirdUser", "account": account3,  "tags": [tag3]}))
         self.assertEqual(3, users.count())
 
-        # нам потребуется считать запросы к БД,
-        # так как адаптер внутри всех мапперов используется один и тот же,
-        # то подсчет можно делать с помощью следующей функции:
-        #
-        connection = users.mapper.pool.db
-        connection.start_logging()
+        def start_logging():
+            """ Включает логирование во всех соединениях """
+            # Возвращаем соединение в пул
+            del users.mapper.pool.db
+            with users.mapper.pool as connection1:
+                with users.mapper.pool as connection2:
+                    connection1.start_logging()
+                    connection2.start_logging()
+
+        def count_queries():
+            """ Считает сумму запросов всех соединений """
+            # Возвращаем соединение в пул
+            del users.mapper.pool.db
+            with users.mapper.pool as connection1:
+                with users.mapper.pool as connection2:
+                    return connection1.count_queries() + connection2.count_queries()
+
+        start_logging()
 
         # Проверим, что подсчет ведется корректно хотя бы для простого случая
-        initial_count = connection.count_queries()
         users.count()
-        self.assertEqual(initial_count + 1, connection.count_queries())
+        self.assertEqual(1, count_queries())
 
         # Для теста будем получать все элементы с полным набором прилегающих данных и считать как тратятся запросы
         # Самый частоиспользуемый метод при разработке - "Минимальное кол-во запросов / Без экономии памяти"
@@ -1843,30 +1854,29 @@ class TableModelTest(unittest.TestCase):
         # Расчетное кол-во запросов:
         # 3 (Основная выборка (3 элемента), Данные аккаунтов (3 элемента), Данные тегов (3 элемента)
         # Момент траты: по одному запросу на каждую сущность по мере запроса
-        initial_count = connection.count_queries()
-        count = initial_count
-        count += dbms_fw.get_queries_amount("get_items")
+        count = count_queries() + dbms_fw.get_queries_amount("get_items")
         users_collection = users.get_items()
-        self.assertEqual(count, connection.count_queries())
+        self.assertEqual(count, count_queries())
+
         # При этом получили три элемента, содержащие все данные, но прилинкованные данные пока ждут инициализации
         self.assertEqual(3, len(users_collection))
         for user in users_collection:
             name = user.name
             self.assertIsNotNone(name)
         count += dbms_fw.get_queries_amount("loading_names")
-        self.assertEqual(count, connection.count_queries())
+        self.assertEqual(count, count_queries())
 
         for user in users_collection:
             email = user.account.email
             self.assertIsNotNone(email)
         count += dbms_fw.get_queries_amount("loading_accounts")
-        self.assertEqual(count, connection.count_queries())
+        self.assertEqual(count, count_queries())
 
         for user in users_collection:
             tags_names = [tag.name for tag in user.tags]
             self.assertTrue(len(tags_names) > 0)
         count += dbms_fw.get_queries_amount("loading_tags")
-        self.assertEqual(count, connection.count_queries())             # Потрачено три запроса
+        self.assertEqual(count, count_queries())             # Потрачено три запроса
 
 
 class RecordModelTest(unittest.TestCase):
