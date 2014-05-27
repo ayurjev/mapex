@@ -591,19 +591,21 @@ class EmbeddedObject(ValueInside, metaclass=ABCMeta):
     Класс для создания моделей, для которых в БД может храниться только одно значение,
     на основе которого должно происходить конструирование экземпляров класса этой модели
     """
-    @abstractmethod
+    value = None
+    value_type = str
+
     def get_value(self):
         """
         @return: Значение, которое будет храниться в поле таблицы БД
         и на основе которого будет конструироваться экземпляр данного класса
         """
+        return self.value
 
-    @staticmethod
-    @abstractmethod
-    def get_value_type():
+    def get_value_type(self):
         """
         @return: Тип значения, которое будует храниться в БД в качестве идентификатора данной модели
         """
+        return self.value_type
 
     def __eq__(self, other):
         return isinstance(other, EmbeddedObject)\
