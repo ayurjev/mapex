@@ -189,6 +189,10 @@ class MySqlDbAdapter(Adapter):
         except self.dublicate_record_exception as err:
             raise DublicateRecordException(err)
         finally:
+            # noinspection PyProtectedMember
+            if self.connection._unread_result:
+                self.connection.get_rows()
+
             cursor.close()
 
     def get_table_fields(self, table_name):
