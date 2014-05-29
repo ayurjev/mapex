@@ -648,14 +648,13 @@ class FieldTypes(object):
 
             """
             main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
+            self.items_collection_mapper.update(
+                {"%s" % main_record_key: None},
+                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record.primary.get_value()}
+            )
             if item:
                 item.__setattr__(main_record_key, main_record)
                 item.save()
-            else:
-                self.items_collection_mapper.update(
-                    {"%s" % main_record_key: None},
-                    {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record.primary.get_value()}
-                )
 
     class NoSqlRelationField(RelationField, NoSqlBaseField):
 
@@ -1002,6 +1001,7 @@ class SqlMapper(metaclass=ABCMeta):
     pool = None
     dependencies = []
     support_joins = True
+    binded = False
 
     def __new__(cls, *a, **kwa):
         if cls._instance is None:
