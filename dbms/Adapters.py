@@ -244,7 +244,8 @@ class MsSqlDbAdapter(Adapter):
         """
         # noinspection PyUnresolvedReferences
         return pyodbc.connect(
-            'DSN=egServer70;DATABASE='+connection_data[4]+';UID='+connection_data[2]+';PWD='+connection_data[3]
+            'DSN=egServer70;DATABASE='+connection_data[4]+';UID='+connection_data[2]+';PWD='+connection_data[3],
+            autocommit=True
         )
 
     def close_connection(self):
@@ -259,7 +260,6 @@ class MsSqlDbAdapter(Adapter):
         """
         cursor = self.connection.cursor()
         cursor.execute(sql)
-        cursor.commit()
 
     def execute_query(self, sql, params=None):
         """
@@ -279,9 +279,7 @@ class MsSqlDbAdapter(Adapter):
             for res in cursor:
                 yield res
         else:
-            cursor.commit()
-            lid = cursor.execute('''SELECT @@IDENTITY''').fetchone()
-            yield lid
+            yield cursor.execute('''SELECT @@IDENTITY''').fetchone()
 
     def get_table_fields(self, table_name):
         """
