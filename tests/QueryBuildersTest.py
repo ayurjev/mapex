@@ -6,6 +6,7 @@ from collections import OrderedDict
 from mapex.dbms.QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder,  \
     SelectQuery, DeleteQuery, InsertQuery, UpdateQuery
 from mapex.core.Sql import PlaceHoldersCounter
+from mapex.core.Mappers import Join
 
 
 class QueryBuildersTest(unittest.TestCase):
@@ -19,7 +20,7 @@ class QueryBuildersTest(unittest.TestCase):
             '''
             SELECT "mainTable"."FirstField", "mainTable"."SecondField"
             FROM "mainTable"
-            LEFT JOIN "secondTable" ON ("mainTable"."FirstField" = "secondTable"."ID")
+            LEFT JOIN "secondTable" as "secondTable" ON ("mainTable"."FirstField" = "secondTable"."ID")
             WHERE ("mainTable"."SecondField" = $1 AND "mainTable"."FirstField" = $2)
             ORDER BY "mainTable"."FirstField" ASC, "secondTable"."ID" DESC LIMIT 10 OFFSET 50
             ''',
@@ -31,9 +32,9 @@ class QueryBuildersTest(unittest.TestCase):
             '''
             SELECT `mainTable`.`FirstField`, `mainTable`.`SecondField`
             FROM `mainTable`
-            LEFT JOIN `secondTable` ON (`mainTable`.`FirstField` = `secondTable`.`ID`)
+            LEFT JOIN `secondTable` as `secondTable` ON (`mainTable`.`FirstField` = `secondTable`.`ID`)
             WHERE (`mainTable`.`SecondField` = %s AND `mainTable`.`FirstField` = %s)
-            ORDER BY `mainTable`.`FirstField` ASC, `secondTable`.`ID` DESC LIMIT 50, 10
+            ORDER BY `mainTable`.`FirstField` ASC, `secondTable`.`ID` DESC LIMIT 10 OFFSET 50
             ''',
             ["aaa", 1]
         )
@@ -43,7 +44,7 @@ class QueryBuildersTest(unittest.TestCase):
             '''
             SELECT TOP(10) [mainTable].[FirstField], [mainTable].[SecondField]
             FROM [mainTable]
-            LEFT JOIN [secondTable] ON ([mainTable].[FirstField] = [secondTable].[ID])
+            LEFT JOIN [secondTable] as [secondTable] ON ([mainTable].[FirstField] = [secondTable].[ID])
             WHERE ([mainTable].[SecondField] = ? AND [mainTable].[FirstField] = ?)
             ORDER BY [mainTable].[FirstField] ASC, [secondTable].[ID] DESC
             ''',
@@ -57,7 +58,7 @@ class QueryBuildersTest(unittest.TestCase):
             PgSqlBuilder(),
             '''
             DELETE FROM "mainTable"
-            USING "secondTable"
+            USING "secondTable" as "secondTable"
             WHERE
             ("mainTable"."SecondField" = $1 AND "mainTable"."FirstField" = $2) AND
             ("mainTable"."FirstField" = "secondTable"."ID")
@@ -69,7 +70,7 @@ class QueryBuildersTest(unittest.TestCase):
             MySqlBuilder(),
             '''
             DELETE `mainTable` FROM `mainTable`
-            LEFT JOIN `secondTable` ON (`mainTable`.`FirstField` = `secondTable`.`ID`)
+            LEFT JOIN `secondTable` as `secondTable` ON (`mainTable`.`FirstField` = `secondTable`.`ID`)
             WHERE
             (`mainTable`.`SecondField` = %s AND `mainTable`.`FirstField` = %s)
             ''',
@@ -112,7 +113,7 @@ class QueryBuildersTest(unittest.TestCase):
             '''
             UPDATE "mainTable" *
             SET "ID" = $1, "Name" = $2
-            FROM "secondTable"
+            FROM "secondTable" as "secondTable"
             WHERE
             ("mainTable"."ID" = $3) AND
             ("mainTable"."FirstField" = "secondTable"."ID")
@@ -125,7 +126,7 @@ class QueryBuildersTest(unittest.TestCase):
             MySqlBuilder(),
             '''
             UPDATE `mainTable`
-            LEFT JOIN `secondTable` ON (`mainTable`.`FirstField` = `secondTable`.`ID`)
+            LEFT JOIN `secondTable` as `secondTable` ON (`mainTable`.`FirstField` = `secondTable`.`ID`)
             SET `mainTable`.`ID` = %s, `mainTable`.`Name` = %s
             WHERE (`mainTable`.`ID` = %s)
             ''',
@@ -138,7 +139,7 @@ class QueryBuildersTest(unittest.TestCase):
             UPDATE [mainTable]
             SET [mainTable].[ID] = ?, [mainTable].[Name] = ?
             FROM [mainTable]
-            LEFT JOIN [secondTable] ON ([mainTable].[FirstField] = [secondTable].[ID])
+            LEFT JOIN [secondTable] as [secondTable] ON ([mainTable].[FirstField] = [secondTable].[ID])
             WHERE ([mainTable].[ID] = ?)
             ''',
             [9, "NewName", 1]
@@ -267,7 +268,15 @@ class QueryBuildersTest(unittest.TestCase):
             '''((("FirstField" > $1 AND (("ThirdField" = $2 AND "SecondField" = $3) OR ("SecondField" < $4)))))''',
             [2, "bbb", "aaa", 10]
         )
-        self.assertTrue(opt1 or opt2)
+        opt3 = res == (
+            '''((((("SecondField" = $1 AND "ThirdField" = $2) OR ("SecondField" < $3)) AND "FirstField" > $4)))''',
+            ['aaa', 'bbb', 10, 2]
+        )
+        opt4 = res == (
+            '''((((("ThirdField" = $1 AND "SecondField" = $2) OR ("SecondField" < $3)) AND "FirstField" > $4)))''',
+            ['bbb', 'aaa', 10, 2]
+        )
+        self.assertTrue(opt1 or opt2 or opt3 or opt4)
 
     def test_field_comparisons_in(self):
         """ Проверка на вхождение в диапазон """
@@ -318,7 +327,7 @@ class QueryBuildersTest(unittest.TestCase):
         conditions["SecondField"] = "aaa"
         conditions["FirstField"] = 1
         query.set_conditions(conditions)
-        query.set_joined_tables({"secondTable": {("mainTable", "FirstField"): ("secondTable", "ID")}})
+        query.set_joins([Join("secondTable", "mainTable", "FirstField", "secondTable", "ID")])
         query.set_params({
             "order": [("FirstField", "ASC"), ("secondTable.ID", "DESC")],
             "limit": 10,
@@ -344,7 +353,7 @@ class QueryBuildersTest(unittest.TestCase):
         conditions["SecondField"] = "aaa"
         conditions["FirstField"] = 1
         query.set_conditions(conditions)
-        query.set_joined_tables({"secondTable": {("mainTable", "FirstField"): ("secondTable", "ID")}})
+        query.set_joins([Join("secondTable", "mainTable", "FirstField", "secondTable", "ID")])
         sql, data = sql_builder.build_delete_query(query)
         self.assertEqual(
             (self.unittest_trim(expected_sql), expected_data),
@@ -380,7 +389,7 @@ class QueryBuildersTest(unittest.TestCase):
         query = UpdateQuery(sql_builder)
         query.set_table_name("mainTable")
         query.set_conditions({"ID": 1})
-        query.set_joined_tables({"secondTable": {("mainTable", "FirstField"): ("secondTable", "ID")}})
+        query.set_joins([Join("secondTable", "mainTable", "FirstField", "secondTable", "ID")])
         data = OrderedDict()
         data["ID"] = 9
         data["Name"] = "NewName"
