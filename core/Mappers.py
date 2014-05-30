@@ -1605,8 +1605,8 @@ class SqlMapper(metaclass=ABCMeta):
                 )
                 return changed_records_ids
         else:
-            joins = self.get_joins(self.get_fields_from_conditions(conditions))
-            conditions = self.translate_and_convert(conditions, save_unsaved=False)
+            joins = self.get_joins(self.get_fields_from_conditions(conditions)) if conditions else None
+            conditions = self.translate_and_convert(conditions, save_unsaved=False) if conditions else None
             self.pool.db.delete_query(self.table_name, conditions, joins)
 
     def split_data_by_relation_type(self, data: dict) -> (dict, dict):
