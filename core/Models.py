@@ -630,7 +630,7 @@ class EmbeddedObjectFactory(object):
             if obj.get_value() == value:
                 return obj
 
-        if value is not None:
+        if value != None:
             raise EmbeddedObjectFactoryException('There are no factory for "%s"' % value)
 
     @classmethod
