@@ -81,9 +81,11 @@ class TableModel(object):
         last_record = self.mapper.insert(flat_data)
         if self.mapper.primary.exists():
             model.primary.set_value(last_record)
-            self.mapper.link_all_list_objects(
-                lists_objects, model.load_from_array(model.get_data(), loaded_from_db=True)
-            )
+            with UpdateLock(model):
+                self.mapper.link_all_list_objects(
+                    lists_objects, model.load_from_array(model.get_data(), loaded_from_db=True)
+                )
+                model.up_to_date()
         return model
 
     def delete(self, conditions=None):
