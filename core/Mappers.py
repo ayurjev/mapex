@@ -825,6 +825,27 @@ class FieldTypes(object):
                 )
 
     class SqlEmbeddedLink(BaseReversedLink, SqlListWithoutRelationsTable):
+        def save_items(self, item: RecordModel, main_record: RecordModel):
+            """
+            Сохраняет все привязанные к основному объекту объекты
+            @param item: Привязанная модель
+            @type item: RecordModel
+            @param main_record: Основной объект
+            @type main_record: RecordModel
+
+            """
+            main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
+            self.items_collection_mapper.delete(
+                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record.primary.get_value()}
+            )
+
+            if item:
+                # Если item - это модель которую мы только что удалили то она не сохранится. т.к. loaded_from_db
+                # Поэтому пересобираем модель с помощью load_from_array()
+                item.load_from_array(item.get_data())
+                item.__setattr__(main_record_key, main_record)
+                item.save()
+
         def clear_dependencies_from(self, main_records_ids: list):
             """
             Очищает зависимость присоединенных записей, от тех записей основной таблицы, которые были удалены и
@@ -2401,7 +2422,8 @@ class FieldTypesConverter(object):
         length = len(collection)
         if length > 1:
             raise TableMapperException(
-                "SqlReversedLink field is configured incorrectly and represents more than one record"
+                "SqlReversedLink '%s' is configured incorrectly and represents more than one record"
+                % (mf.get_name(),)
             )
         elif length == 0:
             return None

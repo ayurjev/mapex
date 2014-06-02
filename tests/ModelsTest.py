@@ -714,8 +714,12 @@ class TableModelTest(unittest.TestCase):
         user.house.address = "ул. Пушкина"
         user.save()
         user.refresh()
-
         self.assertEqual("ул. Пушкина", user.house.address)
+
+        user.house = None
+        user.save()
+        user.refresh()
+        self.assertEqual(None, user.house)
 
     @for_all_dbms
     def test_instantiating_a_model_on_primary_key_when_loading_by_primary(self, dbms_fw: DbMock):
@@ -1104,7 +1108,7 @@ class TableModelTest(unittest.TestCase):
         first_user.passport = passport1
         first_user.save()
 
-        # Выборка пользователей по номеру пасспорта
+        # Выборка пользователей по номеру паспорта
         found_user = users.get_item({"passport.number": 789463})
         self.assertEqual(second_user.uid, found_user.uid)
 
