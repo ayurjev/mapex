@@ -11,7 +11,7 @@ from mapex.core.Exceptions import TableModelException, TableMapperException, Dub
 from mapex.core.Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
 from mapex.core.Common import TrackChangesValue, ValueInside
 from mapex.core.Sql import SqlBuilder
-
+from mapex.utils import partition
 
 class Primary(object):
     """ Класс для представления первичных ключей мапперов """
@@ -1619,14 +1619,9 @@ class SqlMapper(metaclass=ABCMeta):
         @rtype : (dict, dict)
 
         """
-        lists, flat = {}, {}
-        for mapperFieldName in data:
-            mapper_field = self.get_property(mapperFieldName)
-            if self.is_list(mapper_field):
-                lists[mapper_field] = data[mapperFieldName]
-            else:
-                flat[mapperFieldName] = data[mapperFieldName]
-        return flat, lists
+        mapper_field_is_list = lambda field: self.is_list(self.get_property(field))
+        lists, flats = partition(mapper_field_is_list, data)
+        return {field: data[field] for field in flats}, {self.get_property(field): data[field] for field in lists}
 
     @staticmethod
     def link_all_list_objects(data: dict, main_record_obj: RecordModel):
