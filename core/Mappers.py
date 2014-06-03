@@ -1531,7 +1531,7 @@ class SqlMapper(metaclass=ABCMeta):
         @return: Обновленная модель
         """
         actual_copy = self.get_new_collection().get_item(model.primary.to_dict())
-        #model = actual_copy
+        #TODO вместо следующей строчки сделать прямую заливку: model = actual_copy
         model.load_from_array(actual_copy.get_data(), loaded_from_db=True)
         return model
 
