@@ -353,7 +353,6 @@ class RecordModel(ValueInside, TrackChangesValue):
 
                 object.__getattribute__(self, "validate")()
 
-
     def get_new_collection(self) -> TableModel:
         """
         Возвращает модель коллекции, соответствующую мапперу текущего объекта

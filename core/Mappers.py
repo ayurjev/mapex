@@ -834,6 +834,9 @@ class FieldTypes(object):
             @type main_record: RecordModel
 
             """
+            # Сохраняем данные из модели до удаления из базы, на случай, если она заряжена lazy_load:
+            old_stored_data = item.get_data() if item else {}
+
             main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
             self.items_collection_mapper.delete(
                 {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record.primary.get_value()}
@@ -842,7 +845,7 @@ class FieldTypes(object):
             if item:
                 # Если item - это модель которую мы только что удалили то она не сохранится. т.к. loaded_from_db
                 # Поэтому пересобираем модель с помощью load_from_array()
-                item.load_from_array(item.get_data())
+                item.load_from_array(old_stored_data)
                 item.__setattr__(main_record_key, main_record)
                 item.save()
 
@@ -1528,6 +1531,7 @@ class SqlMapper(metaclass=ABCMeta):
         @return: Обновленная модель
         """
         actual_copy = self.get_new_collection().get_item(model.primary.to_dict())
+        #model = actual_copy
         model.load_from_array(actual_copy.get_data(), loaded_from_db=True)
         return model
 
