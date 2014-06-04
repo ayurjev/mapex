@@ -6,21 +6,12 @@ from mapex.core.Mappers import FieldTypes
 from mapex.dbms.QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder
 from mapex.core.Sql import AdapterLogger
 
-import mysql.connector.errors
-import mysql.connector
-
-import postgresql
-import postgresql.exceptions
-
-import pyodbc
-
-import pymongo
-import pymongo.errors
-
 
 class PgSqlDbAdapter(Adapter):
     """ Адаптер для работы с PostgreSQL """
     def __init__(self):
+        import postgresql.exceptions
+
         super().__init__()
         self.dublicate_record_exception = postgresql.exceptions.UniqueError
 
@@ -36,6 +27,9 @@ class PgSqlDbAdapter(Adapter):
         :param connection_data: Данные для подключение к СУБД
         :return:               Экземпляр соединения
         """
+        import postgresql
+        import postgresql.exceptions
+
         try:
             return postgresql.open("pq://%s:%s@%s:%s/%s" % (
                 connection_data[2], connection_data[3], connection_data[0], connection_data[1], connection_data[4])
@@ -127,9 +121,15 @@ class PgSqlDbAdapter(Adapter):
 class MySqlDbAdapter(Adapter):
     """ Адаптер для работы с MySQL """
     # noinspection PyDocstring
-    class TooManyConnectionsError(mysql.connector.errors.DatabaseError): pass
+    import mysql.connector.errors
+
+    class TooManyConnectionsError(mysql.connector.errors.DatabaseError):
+        """ Превышение ограничения количества соединений с MySQL """
+        pass
 
     def __init__(self):
+        import mysql.connector.errors
+
         super().__init__()
         mysql.connector.errors.custom_error_exception(1040, MySqlDbAdapter.TooManyConnectionsError)
         self.dublicate_record_exception = mysql.connector.errors.IntegrityError
@@ -146,6 +146,8 @@ class MySqlDbAdapter(Adapter):
         :param connection_data: Данные для подключение к СУБД
         :return:               Экземпляр соединения
         """
+        import mysql.connector
+
         try:
             return mysql.connector.connect(
                 host=connection_data[0], port=connection_data[1],
@@ -227,6 +229,8 @@ class MySqlDbAdapter(Adapter):
 class MsSqlDbAdapter(Adapter):
     """ Адаптер для работы с MSSQL """
     def __init__(self):
+        import pyodbc
+
         super().__init__()
         self.dublicate_record_exception = pyodbc.IntegrityError
 
@@ -242,6 +246,8 @@ class MsSqlDbAdapter(Adapter):
         :param connection_data: Данные для подключение к СУБД
         :return:               Экземпляр соединения
         """
+        import pyodbc
+
         # noinspection PyUnresolvedReferences
         return pyodbc.connect(
             'DSN=egServer70;DATABASE='+connection_data[4]+';UID='+connection_data[2]+';PWD='+connection_data[3],
@@ -332,6 +338,8 @@ class MongoDbAdapter(AdapterLogger):
     """ Адаптер для работы с MongoDB """
 
     def __init__(self):
+        import pymongo.errors
+
         super().__init__()
         self.db = None
 
@@ -342,6 +350,9 @@ class MongoDbAdapter(AdapterLogger):
         """ Выполняет подключение к СУБД по переданным реквизитам
         @param connection_data: host, port, database
         """
+        import pymongo
+        import pymongo.errors
+
         try:
             self.db = pymongo.MongoClient(connection_data[0], connection_data[1])[connection_data[2]]
             return self
@@ -452,6 +463,8 @@ class MongoDbAdapter(AdapterLogger):
         @param val: Значение для конвертации (может быть tuple или list of tuples)
         @return:
         """
+        import pymongo
+
         fixer = lambda v: pymongo.DESCENDING if v.upper() == "DESC" else pymongo.ASCENDING
         if type(val) is tuple:
             val = val[0], fixer(val[1])
