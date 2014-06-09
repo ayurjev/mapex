@@ -5,6 +5,7 @@ from abc import ABCMeta, abstractmethod
 from mapex.core.Exceptions import TableModelException, EmbeddedObjectFactoryException
 from mapex.core.Common import TrackChangesValue, ValueInside
 import weakref
+import re
 
 
 class TableModel(object):
@@ -16,10 +17,11 @@ class TableModel(object):
             raise TableModelException("No mapper for %s model" % self)
         # noinspection PyCallingNonCallable
         self.object_boundaries = None
-        if len(boundaries) > 0:
+        if boundaries and len(boundaries) > 0:
             self.object_boundaries = {}
             for b in boundaries:
-                self.object_boundaries.update(b)
+                if b:
+                    self.object_boundaries.update(b)
         # noinspection PyCallingNonCallable
         self.mapper = self.__class__.mapper()
 
@@ -530,6 +532,25 @@ class RecordModel(ValueInside, TrackChangesValue):
                 if properties is None or additional_key in properties:
                     data[additional_key] = additional_data[additional_key]
         return data
+
+    def fetch(self, path):
+        """
+        Возвращает из источника данных значение по переданному пути path
+        @param path: Путь для получения значение
+        @return: Значение запрашиваемого значения
+        """
+        def get_level(last_known_source, path_list):
+            name, path_list = path_list[0], path_list[1:]
+            elem_num_found = re.search(".+\[(\d+)\]", name)
+            if elem_num_found:
+                elem_num = int(elem_num_found.group(1))
+                name = name.replace("[%d]" % elem_num, "")
+                value = last_known_source.__getattribute__(name)[elem_num]
+            else:
+                value = last_known_source.__getattribute__(name)
+            return get_level(value, path_list) if len(path_list) else value
+
+        return get_level(self, path.split(".")) if path else None
 
     def get_data_for_write_operation(self) -> dict:
         """
