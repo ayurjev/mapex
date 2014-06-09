@@ -11,11 +11,15 @@ class TableModel(object):
     """ Класс создания моделей таблиц БД """
     mapper = None
 
-    def __init__(self, boundaries=None):
+    def __init__(self, *boundaries):
         if self.__class__.mapper is None:
             raise TableModelException("No mapper for %s model" % self)
         # noinspection PyCallingNonCallable
-        self.object_boundaries = boundaries
+        self.object_boundaries = None
+        if len(boundaries) > 0:
+            self.object_boundaries = {}
+            for b in boundaries:
+                self.object_boundaries.update(b)
         # noinspection PyCallingNonCallable
         self.mapper = self.__class__.mapper()
 
