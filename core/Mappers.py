@@ -837,6 +837,19 @@ class FieldTypes(object):
             # Сохраняем данные из модели до удаления из базы, на случай, если она заряжена lazy_load:
             old_stored_data = item.get_data() if item else {}
 
+            def lazy_deep(data):
+                if isinstance(data, RecordModel):
+                    data.exec_lazy_loading()
+                    data.mark_as_changed()
+                elif isinstance(data, list):
+                    [lazy_deep(v) for v in data]
+                elif isinstance(data, dict):
+                    for key, val in data.items():
+                        if isinstance(val, FieldValues.ListValue):
+                            data[key] = [v for v in val]
+                        lazy_deep(val)
+            lazy_deep(old_stored_data)
+
             main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
             self.items_collection_mapper.delete(
                 {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record.primary.get_value()}
@@ -880,7 +893,7 @@ class FieldTypes(object):
             for obj in filter(None, items):
                 if self.items_collection_mapper.primary.autoincremented:
                     obj.primary.set_value(FieldValues.NoneValue())
-                item_data = obj.get_data_for_write_operation()
+                item_data = obj.get_data()
                 item_data[main_record_key] = main_record_obj
                 copy = obj.get_new_collection().get_new_item()
                 copy.load_from_array(item_data)
