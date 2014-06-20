@@ -533,7 +533,7 @@ class RecordModel(ValueInside, TrackChangesValue):
                         None if isinstance(item, RecordModel) else item
                     ) for item in value
                 ]
-            data[property_name] = value
+            data[property_name] = "" if value is None or isinstance(value, FieldValues.NoneValue) else value
         if type(additional_data) is dict:
             for additional_key in additional_data:
                 if properties is None or additional_key in properties:

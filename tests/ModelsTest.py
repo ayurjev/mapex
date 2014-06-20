@@ -1971,33 +1971,33 @@ class RecordModelTest(unittest.TestCase):
         # Теперь проверим метод stringify:
         self.assertEqual(
             {
-                "uid": None,
+                "uid": "",
                 "name": "Андрей",
                 "age": 99,
                 "custom_property_obj": '10',
                 'new_property': 9900,               # Здесь обращаем внимание на новое поле, которого нет в маппере
-                "is_system": None,
-                "latitude": None,
+                "is_system": "",
+                "latitude": "",
                 "register_date": date(2013, 9, 8),
-                "register_time": None,
-                "register_datetime": None,
-                'account': {"email": "andrey.yurjev@gmail.com", 'id': None, 'phone': None, "profile": None},
+                "register_time": "",
+                "register_datetime": "",
+                'account': {"email": "andrey.yurjev@gmail.com", 'id': "", 'phone': "", "profile": ""},
                 'tags': [
-                    {"id": None, "name": "FirstTag", "weight": None},
-                    {"id": None, "name": "SecondTag", "weight": None}
+                    {"id": "", "name": "FirstTag", "weight": ""},
+                    {"id": "", "name": "SecondTag", "weight": ""}
                 ],
-                "profile": None,
+                "profile": "",
                 "statuses": [],
                 "documents": [],
                 "documents_not_ai": [],
-                "passport": None
+                "passport": ""
             },
             user.stringify())
 
         # Теперь проверим ограничение полей при стрингификации:
         self.assertEqual(
             {
-                "uid": None,
+                "uid": "",
                 "name": "Андрей",
                 "age": 99,
             },
