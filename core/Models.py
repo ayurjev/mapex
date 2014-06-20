@@ -506,6 +506,7 @@ class RecordModel(ValueInside, TrackChangesValue):
         if type(properties) is tuple:
             properties, embeded_models_properties = properties
 
+        from mapex.core.Mappers import FieldValues
         for property_name in self.get_data(properties):
             value = self.__dict__[property_name]
             if isinstance(value, RecordModel):
@@ -516,6 +517,8 @@ class RecordModel(ValueInside, TrackChangesValue):
                     )
                 else:
                     value = None
+            elif not isinstance(value, FieldValues.NoneValue) and isinstance(value, EmbeddedObject):
+                value = str(value)
             elif isinstance(value, list):
                 value = [
                     item.stringify(
@@ -634,6 +637,9 @@ class EmbeddedObject(ValueInside, metaclass=ABCMeta):
         @return: Тип значения, которое будует храниться в БД в качестве идентификатора данной модели
         """
         return self.value_type
+
+    def __str__(self):
+        return str(self.get_value())
 
     def __eq__(self, other):
         return isinstance(other, EmbeddedObject)\

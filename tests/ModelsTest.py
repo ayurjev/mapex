@@ -1927,6 +1927,7 @@ class RecordModelTest(unittest.TestCase):
         tag2.name = "SecondTag"
         user.tags = [tag1, tag2]
         user.garbage_garbage_garbage = "garbage everywhere!"
+        user.custom_property_obj = CustomPropertyFactory(10)
 
         # Проверим базовый режим работы метода get_data()
         # Он должен возвращать вложенные объекты в виде объектов
@@ -1948,7 +1949,7 @@ class RecordModelTest(unittest.TestCase):
                 "uid": None,
                 "name": "Андрей",
                 "age": 99,
-                "custom_property_obj": None,
+                "custom_property_obj": CustomPropertyFactory(10),
                 "documents": [],
                 "documents_not_ai": [],
                 "passport": None,
@@ -1973,7 +1974,7 @@ class RecordModelTest(unittest.TestCase):
                 "uid": None,
                 "name": "Андрей",
                 "age": 99,
-                "custom_property_obj": None,
+                "custom_property_obj": '10',
                 'new_property': 9900,               # Здесь обращаем внимание на новое поле, которого нет в маппере
                 "is_system": None,
                 "latitude": None,
