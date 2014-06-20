@@ -49,6 +49,10 @@ class TableModel(object):
             conditions = self.mapper.boundaries
         return conditions
 
+    def get_bounds(self):
+        """ Возвращает все известыне объекту ограничения выборки """
+        return self.mix_boundaries()
+
     def count(self, conditions=None):
         """
         Выполняет подсчет объектов в коллекции по заданным условиям
@@ -543,6 +547,8 @@ class RecordModel(ValueInside, TrackChangesValue):
         @return: Значение запрашиваемого значения
         """
         def get_level(last_known_source, path_list):
+            if not last_known_source:
+                return None
             name, path_list = path_list[0], path_list[1:]
             elem_num_found = re.search(".+\[(\d+)\]", name)
             if elem_num_found:
