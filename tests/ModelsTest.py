@@ -1915,19 +1915,18 @@ class RecordModelTest(unittest.TestCase):
         Проверим метод формирования словаря для передачи мапперу
         Какие бы не были определены аттрибуты у объекта, в маппер должны идти только те, которые определены у маппера
         """
-        user = dbms_fw.get_new_user_instance()
-        user.name = "Андрей"
-        user.age = 99
-        user.register_date = date(2013, 9, 8)
-        user.account = dbms_fw.get_new_account_instance()
-        user.account.email = "andrey.yurjev@gmail.com"
-        tag1 = dbms_fw.get_new_tag_instance()
-        tag1.name = "FirstTag"
-        tag2 = dbms_fw.get_new_tag_instance()
-        tag2.name = "SecondTag"
-        user.tags = [tag1, tag2]
-        user.garbage_garbage_garbage = "garbage everywhere!"
-        user.custom_property_obj = CustomPropertyFactory(10)
+        tag1 = dbms_fw.get_new_tag_instance({"name": "FirstTag"})
+        tag2 = dbms_fw.get_new_tag_instance({"name": "SecondTag"})
+
+        user = dbms_fw.get_new_user_instance({
+            "name": "Андрей",
+            "age": 99,
+            "register_date": date(2013, 9, 8),
+            "garbage_garbage_garbage": "garbage everywhere!",
+            "custom_property_obj": CustomPropertyFactory(10),
+            "tags": [tag1, tag2]
+        })
+        user.account = dbms_fw.get_new_account_instance({"email": "andrey.yurjev@gmail.com"})
 
         # Проверим базовый режим работы метода get_data()
         # Он должен возвращать вложенные объекты в виде объектов
@@ -1971,49 +1970,36 @@ class RecordModelTest(unittest.TestCase):
         # Теперь проверим метод stringify:
         self.assertEqual(
             {
-                "uid": "",
+                "uid": None,
                 "name": "Андрей",
                 "age": 99,
-                "custom_property_obj": '10',
-                'new_property': 9900,               # Здесь обращаем внимание на новое поле, которого нет в маппере
-                "is_system": "",
-                "latitude": "",
+                "custom_property_obj": "10",
+                "is_system": None,
+                "latitude": None,
                 "register_date": date(2013, 9, 8),
-                "register_time": "",
-                "register_datetime": "",
-                'account': {"email": "andrey.yurjev@gmail.com", 'id': "", 'phone': "", "profile": ""},
+                "register_time": None,
+                "register_datetime": None,
+                'account': {"email": "andrey.yurjev@gmail.com", 'id': None, 'phone': None, "profile": None},
                 'tags': [
-                    {"id": "", "name": "FirstTag", "weight": ""},
-                    {"id": "", "name": "SecondTag", "weight": ""}
+                    {"id": None, "name": "FirstTag", "weight": None},
+                    {"id": None, "name": "SecondTag", "weight": None}
                 ],
-                "profile": "",
+                "profile": None,
                 "statuses": [],
                 "documents": [],
                 "documents_not_ai": [],
-                "passport": ""
+                "passport": None
             },
-            user.stringify())
-
-        # Теперь проверим ограничение полей при стрингификации:
-        self.assertEqual(
-            {
-                "uid": "",
-                "name": "Андрей",
-                "age": 99,
-            },
-            user.stringify(["uid", "name", "age"])
-        )
-        self.assertEqual(
-            {
-                "name": "Андрей",
-                "account": {"email": "andrey.yurjev@gmail.com"},
-                "new_property": 9900,
-                'tags': [
-                    {"name": "FirstTag"},
-                    {"name": "SecondTag"}
-                ]
-            },
-            user.stringify((["name", "account", "tags", "new_property"], {"account": ["email"], "tags": ["name"]}))
+            user.stringify([
+                "uid", "name", "age", "custom_property_obj", "is_system", "latitude",
+                "register_date", "register_time", "register_datetime",
+                "account.email", "account.id", "account.phone", "account.profile",
+                "profile", "documents", "documents_not_ai", "passport",
+                {
+                    "tags": ["id", "name", "weight"],
+                    "statuses": []
+                }
+            ])
         )
 
     @for_all_dbms

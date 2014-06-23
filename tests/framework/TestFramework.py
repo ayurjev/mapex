@@ -98,7 +98,7 @@ class DbMock(object, metaclass=ABCMeta):
         """ Возвращает экземпляр EmbeddedLink из usersTable на housesTable """
 
     @abstractmethod
-    def get_new_account_instance(self):
+    def get_new_account_instance(self, data=None):
         """ Возвращает новый экземпляр класса аккаунта пользователя """
 
     @abstractmethod
@@ -106,7 +106,7 @@ class DbMock(object, metaclass=ABCMeta):
         """ Возвращает новый экземпляр коллекции аккаунтов пользователей """
 
     @abstractmethod
-    def get_new_tag_instance(self):
+    def get_new_tag_instance(self, data=None):
         """ Возвращает новый экземпляр класса тегов """
 
     @abstractmethod
@@ -270,17 +270,17 @@ class SqlDbMock(DbMock):
         """ Возвращает новый экземпляр коллекции пользователей с границами """
         return SqlUsersWithBoundaries()
 
-    def get_new_account_instance(self):
+    def get_new_account_instance(self, data=None):
         """ Возвращает новый экземпляр класса аккаунта пользователя """
-        return SqlAccount()
+        return SqlAccount(data)
 
     def get_new_accounts_collection_instance(self):
         """ Возвращает новый экземпляр коллекции аккаунтов пользователей """
         return SqlAccounts()
 
-    def get_new_tag_instance(self):
+    def get_new_tag_instance(self, data=None):
         """ Возвращает новый экземпляр класса тегов """
-        return SqlTag()
+        return SqlTag(data)
 
     def get_new_tags_collection_instance(self):
         """ Возвращает новый экземпляр коллекции тегов """
@@ -433,17 +433,17 @@ class NoSqlDbMock(DbMock):
         """ Возвращает новый экземпляр коллекции пользователей с границами """
         return NoSqlUsersWithBoundaries()
 
-    def get_new_account_instance(self):
+    def get_new_account_instance(self, data=None):
         """ Возвращает новый экземпляр класса аккаунта пользователя """
-        return NoSqlAccount()
+        return NoSqlAccount(data)
 
     def get_new_accounts_collection_instance(self):
         """ Возвращает новый экземпляр коллекции аккаунтов пользователей """
         return NoSqlAccounts()
 
-    def get_new_tag_instance(self):
+    def get_new_tag_instance(self, data=None):
         """ Возвращает новый экземпляр класса тегов """
-        return NoSqlTag()
+        return NoSqlTag(data)
 
     def get_new_tags_collection_instance(self):
         """ Возвращает новый экземпляр коллекции тегов """
@@ -791,11 +791,6 @@ class SqlUser(RecordModel):
     def validate(self):
         if self.age == 42:
             raise Exception("Свойство age не может быть равно 42")
-
-    def stringify(self, properties=None, stringify_depth=None, additional_data=None):
-        return super().stringify(properties, stringify_depth=stringify_depth, additional_data={
-            "new_property": self.age * 100 if self.age is not None else None
-        })
 
 
 class SqlUserWithBoundaries(SqlUser):

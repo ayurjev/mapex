@@ -4,6 +4,7 @@
 from abc import ABCMeta, abstractmethod
 from mapex.core.Exceptions import TableModelException, EmbeddedObjectFactoryException
 from mapex.core.Common import TrackChangesValue, ValueInside
+from mapex.utils import do_dict, merge_dict
 import weakref
 import re
 
@@ -491,54 +492,24 @@ class RecordModel(ValueInside, TrackChangesValue):
         properties = list(set(mapper_properties) & set(properties)) if properties else mapper_properties
         return {property_name: self.__dict__.get(property_name) for property_name in properties}
 
-    def stringify(self, properties: list=None, stringify_depth: tuple=None, additional_data: dict=None) -> dict:
+    def stringify(self, properties: list=None) -> dict:
         """
         Возвращает подготовленное для шаблонизатора представление модели.
         @param properties: Список полей основной модели, которые требуется получить
         @type properties: list
-        @param stringify_depth: Глубина преобразования (Текущий уровень (для итерации), Максимальный уровень)
-        @type stringify_depth: tuple
-        @param additional_data: Данные, которые необходимо добавить к полученному словарю
-        @type additional_data: dict
-        @return: Подготовленное к использованию в шаблонизаторе представление модели
         @rtype : dict
-
         """
-        data = {}
-        stringify_depth, stringify_level_max = stringify_depth if stringify_depth else (0, 1)
-        embeded_models_properties = {}
-        if type(properties) is tuple:
-            properties, embeded_models_properties = properties
-
-        from mapex.core.Mappers import FieldValues
-        for property_name in self.get_data(properties):
-            value = self.__dict__[property_name]
-            if isinstance(value, RecordModel):
-                if stringify_depth < stringify_level_max:
-                    value = value.stringify(
-                        embeded_models_properties.get(property_name),
-                        stringify_depth=(stringify_depth + 1, stringify_level_max)
-                    )
-                else:
-                    value = None
-            elif not isinstance(value, FieldValues.NoneValue) and isinstance(value, EmbeddedObject):
-                value = str(value)
-            elif isinstance(value, list):
-                value = [
-                    item.stringify(
-                        embeded_models_properties.get(property_name),
-                        stringify_depth=(stringify_depth + 1, stringify_level_max)
-                    )
-                    if isinstance(item, RecordModel) and stringify_depth < stringify_level_max else (
-                        None if isinstance(item, RecordModel) else item
-                    ) for item in value
-                ]
-            data[property_name] = "" if value is None or isinstance(value, FieldValues.NoneValue) else value
-        if type(additional_data) is dict:
-            for additional_key in additional_data:
-                if properties is None or additional_key in properties:
-                    data[additional_key] = additional_data[additional_key]
-        return data
+        dicts = []
+        for prop in properties:
+            if isinstance(prop, dict):
+                for real_prop, fields in prop.items():
+                    dicts.append(do_dict(real_prop, [obj.stringify(fields) for obj in self.fetch(real_prop)]))
+            else:
+                fetch_prop = self.fetch(prop)
+                if fetch_prop != None and isinstance(fetch_prop, EmbeddedObject):
+                    fetch_prop = str(fetch_prop)
+                dicts.append(do_dict(prop, fetch_prop))
+        return merge_dict(*dicts)
 
     def fetch(self, path):
         """
