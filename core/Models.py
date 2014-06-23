@@ -506,7 +506,10 @@ class RecordModel(ValueInside, TrackChangesValue):
                     dicts.append(do_dict(real_prop, [obj.stringify(fields) for obj in self.fetch(real_prop)]))
             else:
                 fetch_prop = self.fetch(prop)
-                if fetch_prop != None and isinstance(fetch_prop, EmbeddedObject):
+                # noinspection PyComparisonWithNone
+                if fetch_prop == None:
+                    fetch_prop = None
+                elif isinstance(fetch_prop, EmbeddedObject):
                     fetch_prop = str(fetch_prop)
                 dicts.append(do_dict(prop, fetch_prop))
         return merge_dict(*dicts)
