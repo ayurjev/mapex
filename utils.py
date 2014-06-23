@@ -10,3 +10,13 @@ def partition(predicate, iterable):
     """
     predicate = bool if predicate is None else predicate
     return filter(predicate, iterable), filterfalse(predicate, iterable)
+
+
+def do_dict(notation, value) -> dict:
+    """ Рекурсивно строит многомерный словарь по предоставленной точечной нотации
+    @param notation: точечная нотация (Пример: user.profile.email)
+    @param value: значение поля (Пример: test@test.com)
+    @return: словарь с записанным в него значением value (Пример: {"user": {"profile": {"email": "test@test.com"}}})
+    """
+    head, _, tail = notation.partition(".")
+    return {head: do_dict(tail, value)} if tail else {head: value}
