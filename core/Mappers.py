@@ -2255,6 +2255,8 @@ class FieldValues(object):
             self.changed = False
 
         def __getattribute__(self, item):
+            if item == "__class__":
+                return object.__getattribute__(self, "__class__")
             raise AttributeError("'NoneType' object has no attribute '%s'" % item)
 
         # noinspection PyMethodMayBeStatic
