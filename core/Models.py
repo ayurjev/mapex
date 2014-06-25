@@ -499,6 +499,8 @@ class RecordModel(ValueInside, TrackChangesValue):
         @type properties: list
         @rtype : dict
         """
+        if not properties or not len(properties):
+            return {}
         dicts = []
         for prop in properties:
             if isinstance(prop, dict):
