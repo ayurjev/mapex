@@ -392,7 +392,7 @@ class FieldTypes(object):
             if issubclass(self.model, EmbeddedObject):
                 model = self.model
             elif issubclass(self.model, EmbeddedObjectFactory):
-                model = self.model.get_instance(v.get_value())
+                model = self.model.get_instance(v.get_value()).__class__
             else:
                 return False
 

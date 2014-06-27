@@ -614,11 +614,12 @@ class EmbeddedObject(ValueInside, metaclass=ABCMeta):
         """
         return self.value
 
-    def get_value_type(self):
+    @classmethod
+    def get_value_type(cls):
         """
         @return: Тип значения, которое будует храниться в БД в качестве идентификатора данной модели
         """
-        return self.value_type
+        return cls.value_type
 
     def __str__(self):
         return str(self.get_value())
