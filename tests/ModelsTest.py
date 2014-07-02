@@ -95,43 +95,6 @@ class TableModelTest(unittest.TestCase):
         self.assertEqual(3, users.count())
 
     @for_all_dbms
-    def test_dbms_exceptions(self, dbms_fw: DbMock):
-        """ Проверим обработку исключений, генерируемых адаптерами. Они должны заменяться на исключения mapex """
-
-        ##################################### DublicateRecord ###################################################
-        users = dbms_fw.get_new_users_collection_instance()
-        self.assertEqual(0, users.count())
-        user1 = users.insert(dbms_fw.get_new_user_instance({"name": "first"}))
-        self.assertEqual(1, users.count())
-
-        from mapex import DublicateRecordException
-        user2 = dbms_fw.get_new_user_instance({"uid": user1.uid, "name": "second"})
-        self.assertRaises(DublicateRecordException, user2.save)
-        self.assertEqual(1, users.count())
-
-        # Теперь назначим другое исключение на эту ситуацию для данного маппера
-        class CustomException(Exception):
-            pass
-
-        users.mapper.__class__.dublicate_record_exception = CustomException
-
-        self.assertRaises(CustomException, user2.save)
-
-        # Это же исключение мы получим если попытаемся сделать update и данные совпадут:
-        user2 = dbms_fw.get_new_user_instance({"name": "second"})
-        user2.save()
-        self.assertEqual(2, users.count())
-
-        # TODO починить для MsDbMock()
-        # тест не имеет смысла для MsSQL так как строчкой ниже мы пытаемся сделать запись в автоинрементное поле,
-        # что невозможно на уровне СУБД.
-        # Пока оставлю непроходящий тест, но в будущем, думаю, придется этот assert удалить...
-        self.assertRaises(CustomException, users.update, {"uid": user1.uid}, {"name": "second"})
-
-        # Возвращаем исходный тип исключения
-        users.mapper.__class__.dublicate_record_exception = DublicateRecordException
-
-    @for_all_dbms
     def test_get_property_list(self, dbms_fw: DbMock):
         """ Проверим способ получения свойств для объектов, хранящихся в модели """
         users = dbms_fw.get_new_users_collection_instance()

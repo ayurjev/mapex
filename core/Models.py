@@ -94,7 +94,7 @@ class TableModel(object):
             model.primary.set_value(last_record)
             with UpdateLock(model):
                 self.mapper.link_all_list_objects(
-                    lists_objects, model.load_from_array(model.get_data(), loaded_from_db=True)
+                    lists_objects, model.load_from_array(model.get_data(), consider_as_unchanged=True)
                 )
                 model.up_to_date()
         return model
@@ -192,7 +192,7 @@ class TableModel(object):
         arrays, items = [], []
         for row in generator:
             arrays.append(row)
-            item = self.mapper.factory_method(self.get_new_item().load_from_array(row, True))
+            item = self.mapper.factory_method(self.get_new_item().load_from_array(row, consider_as_unchanged=True))
             items.append(item)
         cache.cache(arrays)
         return items
@@ -208,7 +208,7 @@ class TableModel(object):
             raise TableModelException("Collection mapper and collection item mapper should be equal")
 
         for row in self.mapper.generate_rows([], self.mix_boundaries(bounds), params):
-            yield self.mapper.factory_method(self.get_new_item().load_from_array(row, True))
+            yield self.mapper.factory_method(self.get_new_item().load_from_array(row, consider_as_unchanged=True))
 
 
 class Primary(ValueInside):
@@ -331,7 +331,7 @@ class RecordModel(ValueInside, TrackChangesValue):
         # noinspection PyCallingNonCallable
         self.set_mapper(self.__class__.mapper())
         if data:
-            self.load_from_array(data.get_data() if isinstance(data, RecordModel) else data, loaded_from_db)
+            self.load_from_array(data.get_data() if isinstance(data, RecordModel) else data, consider_as_unchanged=loaded_from_db)
 
     def get_value(self, deep=False):
         return self.primary.get_value(deep)
@@ -381,6 +381,18 @@ class RecordModel(ValueInside, TrackChangesValue):
 
         self.primary.ensure_exists()
         if not self._loaded_from_db:
+            if self.get_value(deep=True) and self.mapper.primary.autoincremented and self.get_new_collection().count(self.primary.to_dict(origin=True)):
+                # Если объект уже находится в состоянии сохранения или объект не был изменен
+                # то выходим, чтобы разорвать рекурсию
+                if self._updating or not self.is_changed():
+                    return self
+
+                self.validate()
+                with UpdateLock(self):
+                    to_be_written = self.get_data_for_write_operation()
+                    self.get_new_collection().update(to_be_written, self.primary.to_dict(origin=True), model=self)
+                    self.up_to_date()
+                return self
             try:
                 self._loaded_from_db = True
                 self.get_new_collection().insert(self)
@@ -441,16 +453,24 @@ class RecordModel(ValueInside, TrackChangesValue):
         self._changed = False
         return self
 
-    def load_from_array(self, data, loaded_from_db=False):
+    def load_from_array(self, data, consider_as_unchanged=None):
         """
         Инициализирует объект данными из словаря
         :param data:    Словарь с данными
         """
         for key in data:
             self.__setattr__(key, data[key])
-        self._loaded_from_db = loaded_from_db
-        self.up_to_date() if loaded_from_db else self.mark_as_changed()
+
+        if consider_as_unchanged:
+            self._loaded_from_db = True
+            self.up_to_date()
+        else:
+            self.mark_as_changed()
         return self
+
+    def set_primary(self, value):
+        self.primary.set_value(value)
+        self._loaded_from_db = True
 
     def normal_load(self):
         """
@@ -460,7 +480,7 @@ class RecordModel(ValueInside, TrackChangesValue):
 
         """
         data = self.mapper.get_row([], self.primary.to_dict())
-        return self.load_from_array(data, True) if data else None
+        return self.load_from_array(data, consider_as_unchanged=True) if data else None
 
     def cache_load(self, cache):
         """
@@ -471,7 +491,7 @@ class RecordModel(ValueInside, TrackChangesValue):
 
         """
         data = cache.get(self.mapper, self.primary.value)
-        return self.load_from_array(data, True) if data else None
+        return self.load_from_array(data, consider_as_unchanged=True) if data else None
 
     def exec_lazy_loading(self):
         """ Если объект проиницилиазирован отложенно - вызывает инициализацию """

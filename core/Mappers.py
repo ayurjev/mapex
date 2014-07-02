@@ -859,6 +859,7 @@ class FieldTypes(object):
                 # Если item - это модель которую мы только что удалили то она не сохранится. т.к. loaded_from_db
                 # Поэтому пересобираем модель с помощью load_from_array()
                 item.load_from_array(old_stored_data)
+                item._loaded_from_db = False
                 item.__setattr__(main_record_key, main_record)
                 item.save()
 
@@ -1545,7 +1546,7 @@ class SqlMapper(metaclass=ABCMeta):
         """
         actual_copy = self.get_new_collection().get_item(model.primary.to_dict())
         #TODO вместо следующей строчки сделать прямую заливку: model = actual_copy
-        model.load_from_array(actual_copy.get_data(), loaded_from_db=True)
+        model.load_from_array(actual_copy.get_data(), consider_as_unchanged=True)
         return model
 
     def count(self, conditions: dict=None) -> int:
@@ -2503,7 +2504,7 @@ class FieldTypesConverter(object):
     @staticmethod
     def from_embedded(mf, v):
         return mf.get_new_item().load_from_array(
-            mf.get_new_item().mapper.translate_and_convert(v, "database2mapper"), True
+            mf.get_new_item().mapper.translate_and_convert(v, "database2mapper"), consider_as_unchanged=True
         ) if v else FNone()
 
     @staticmethod
