@@ -321,11 +321,8 @@ class MsSqlDbAdapter(Adapter):
         """ Возвращает словарь соответствий типов полей СУБД и типов полей, используемых маппером """
         return {
             FieldTypes.String: ["nchar", "nvarchar", "ntext", "char", "varchar", "text"],
-            FieldTypes.Int: [
-                "tinyint", "smallint", "bigint", "mediumint", "int",
-                "money", "Decimal", "decimal", "numeric", "smallmoney"
-            ],
-            FieldTypes.Float: ["real", "float"],
+            FieldTypes.Int: ["tinyint", "smallint", "bigint", "mediumint", "int"],
+            FieldTypes.Float: ["real", "float", "money", "numeric", "smallmoney", "Decimal", "decimal"],
             FieldTypes.Bool: ["bit"],
             FieldTypes.Date: ["date"],
             FieldTypes.DateTime: ["datetime", "datetime2"],

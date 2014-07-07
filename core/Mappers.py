@@ -2295,7 +2295,7 @@ class FieldTypesConverter(object):
         ("Int", "Time"): lambda v, mf, cache, s: FieldTypesConverter.int2time(v) if v else FNone(),
         ("Int", "Bool"): lambda v, mf, cache, s: v != 0,
         ("Int", "Link"): lambda v, mf, cache, s: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
-        ("String", "String"): lambda v, mf, cache, s: v.strip() if v else FNone(),
+        ("String", "String"): lambda v, mf, cache, s: str(v) if v else FNone(),
         ("String", "Int"): lambda v, mf, cache, s: int(v.strip()) if v else FNone(),
         ("String", "Float"): lambda v, mf, cache, s: float(v.strip()) if v else FNone(),
         ("String", "Date"): lambda v, mf, cache, s: FieldTypesConverter.str2date(v) if v else FNone(),
