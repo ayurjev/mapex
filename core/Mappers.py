@@ -108,6 +108,21 @@ class Primary(object):
         return res
 
 
+def lazy_deep(data):
+    if isinstance(data, RecordModel):
+        data.exec_lazy_loading()
+        data.mark_as_changed()
+    elif isinstance(data, list):
+        [lazy_deep(v) for v in data]
+    elif isinstance(data, FieldValues.ListValue):
+        [lazy_deep(v) for v in data]
+    elif isinstance(data, dict):
+        for key, val in data.items():
+            if isinstance(val, FieldValues.ListValue):
+                data[key] = [v for v in val]
+            lazy_deep(val)
+
+
 class FieldTypes(object):
     """ Коллекция типов полей, которые могут использоваться мапперами """
 
@@ -837,17 +852,6 @@ class FieldTypes(object):
             # Сохраняем данные из модели до удаления из базы, на случай, если она заряжена lazy_load:
             old_stored_data = item.get_data() if item else {}
 
-            def lazy_deep(data):
-                if isinstance(data, RecordModel):
-                    data.exec_lazy_loading()
-                    data.mark_as_changed()
-                elif isinstance(data, list):
-                    [lazy_deep(v) for v in data]
-                elif isinstance(data, dict):
-                    for key, val in data.items():
-                        if isinstance(val, FieldValues.ListValue):
-                            data[key] = [v for v in val]
-                        lazy_deep(val)
             lazy_deep(old_stored_data)
 
             main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
@@ -887,14 +891,20 @@ class FieldTypes(object):
             @type main_record_obj: RecordModel
 
             """
+
+            # Сохраняем данные из модели до удаления из базы, на случай, если она заряжена lazy_load:
+            old_stored_data = {id(item): item.get_data() for item in items}
+            lazy_deep(old_stored_data)
+
             main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
             self.items_collection_mapper.delete(
                 {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.primary.get_value()}
             )
+
             for obj in filter(None, items):
                 if self.items_collection_mapper.primary.autoincremented:
                     obj.primary.set_value(FieldValues.NoneValue())
-                item_data = obj.get_data()
+                item_data = old_stored_data.get(id(obj))
                 item_data[main_record_key] = main_record_obj
                 copy = obj.get_new_collection().get_new_item()
                 copy.load_from_array(item_data)
@@ -2258,11 +2268,11 @@ class FieldValues(object):
         def __getattribute__(self, item):
             if item == "__class__":
                 return object.__getattribute__(self, "__class__")
-            raise AttributeError("'NoneType' object has no attribute '%s'" % item)
+            raise AttributeError("'NoneValue' object has no attribute '%s'" % item)
 
         # noinspection PyMethodMayBeStatic
         def __setattribute__(self, item, value):
-            raise AttributeError("'NoneType' object has no attribute '%s'" % item)
+            raise AttributeError("'NoneValue' object has no attribute '%s'" % item)
 
         def __eq__(self, other):
             return other is None or isinstance(other, FieldValues.NoneValue)
