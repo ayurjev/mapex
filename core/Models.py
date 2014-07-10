@@ -7,6 +7,7 @@ from mapex.core.Common import TrackChangesValue, ValueInside
 from mapex.utils import do_dict, merge_dict
 import weakref
 import re
+import json
 
 
 class TableModel(object):
@@ -232,7 +233,9 @@ class Primary(ValueInside):
         value = self.model.mapper.primary.grab_value_from(self.model.__dict__)
         if deep:
             if isinstance(value, ValueInside):
-                value = value.get_value()
+                value = value.get_value(deep)
+            elif isinstance(value, dict):
+                value = {key: value[key].get_value(deep) if isinstance(value[key], ValueInside) else value[key] for key in value}
         return value
 
     def set_value(self, value):
@@ -241,12 +244,19 @@ class Primary(ValueInside):
         @param value: Значение первичного ключа
         @return: Установленное значение первичного ключа
         """
-        if not self.model.mapper.primary.compound:
-            primary_mf = self.model.mapper.get_property(self.model.mapper.primary.name())
+        def try_to_create_model(mp, raw_value):
+            primary_mf = self.model.mapper.get_property(mp)
             if self.model.mapper.is_embedded_object(primary_mf):
-                value = primary_mf.model(value) if not isinstance(value, EmbeddedObject) else value
-            if self.model.mapper.is_rel(primary_mf) and not isinstance(value, RecordModel):
-                value = primary_mf.get_new_item().load_by_primary(value)
+                raw_value = primary_mf.model(raw_value) if not isinstance(raw_value, EmbeddedObject) else raw_value
+            if self.model.mapper.is_rel(primary_mf) and not isinstance(raw_value, RecordModel):
+                raw_value = primary_mf.get_new_item().load_by_primary(raw_value)
+            return raw_value
+
+        if not self.model.mapper.primary.compound:
+            value = try_to_create_model(self.model.mapper.primary.name(), value)
+        else:
+            for key in value:
+                value[key] = try_to_create_model(key, value[key])
 
         if type(value) is dict:
             self.model.__dict__.update(value)
@@ -490,7 +500,7 @@ class RecordModel(ValueInside, TrackChangesValue):
         @rtype : RecordModel
 
         """
-        data = cache.get(self.mapper, self.primary.value)
+        data = cache.get(self.mapper, self.primary.get_value(deep=True))
         return self.load_from_array(data, consider_as_unchanged=True) if data else None
 
     def exec_lazy_loading(self):
@@ -686,13 +696,13 @@ class TableModelCache(object):
         :param model_type:   Тип модели
         :param primary_id:   Значение первичного ключа
         """
-        primary_id = primary_id.get_value() if isinstance(primary_id, ValueInside) else primary_id
+        primary_id = primary_id.get_value(deep=True) if isinstance(primary_id, ValueInside) else primary_id
         model_cache = self._cache.get(model_type)
         if model_cache:
             if type(model_cache) is not dict:
                 self._cache[model_type] = self._cache[model_type](model_type)
-                return self._cache[model_type].get(primary_id)
-            return model_cache.get(primary_id)
+                return self._cache[model_type].get(json.dumps(primary_id) if isinstance(primary_id, dict) else primary_id)
+            return model_cache.get(json.dumps(primary_id) if isinstance(primary_id, dict) else primary_id)
 
     def cache(self, rows):
         """
@@ -711,10 +721,10 @@ class TableModelCache(object):
             for field_name in field_names_for_cache.keys():
                 if None != row.get(field_name):
                     if isinstance(row[field_name], ValueInside):
-                        cache[field_names_for_cache[field_name]["mapper"]].append(row[field_name].get_value(deep=True))
+                        cache[field_names_for_cache[field_name]["mapper"]].append(row[field_name].get_value())
                     elif self._mapper.is_list(field_names_for_cache[field_name]["mapper_field"]):
                         for obj in row[field_name]:
-                            cache[field_names_for_cache[field_name]["mapper"]].append(obj.primary.get_value(deep=True))
+                            cache[field_names_for_cache[field_name]["mapper"]].append(obj.primary.get_value())
 
         for mapper in cache:
             if len(cache[mapper]) > 0:
@@ -724,9 +734,12 @@ class TableModelCache(object):
     def _get_mapper_cache(self, m):
         """ Собирает кэш маппера из внешней переменной cache """
         mapper_cache = {}
-        for item in m.get_new_collection().get_items({m.primary.name(): ("in", self._ids_cache[m])}):
-            key = item.primary.get_value()
-            if isinstance(key, ValueInside):
-                key = key.get_value()
-            mapper_cache[key] = item.get_data()
+        if m.primary.compound:
+            for item in m.get_new_collection().get_items({"or": self._ids_cache[m]}):
+                key = item.primary.get_value(deep=True)
+                mapper_cache[json.dumps(key)] = item.get_data()
+        else:
+            for item in m.get_new_collection().get_items({m.primary.name(): ("in", self._ids_cache[m])}):
+                key = item.primary.get_value(deep=True)
+                mapper_cache[key] = item.get_data()
         return mapper_cache

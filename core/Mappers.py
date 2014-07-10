@@ -13,6 +13,7 @@ from mapex.core.Common import TrackChangesValue, ValueInside
 from mapex.core.Sql import SqlBuilder
 from mapex.utils import partition
 
+
 class Primary(object):
     """ Класс для представления первичных ключей мапперов """
 
