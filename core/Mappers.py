@@ -1485,10 +1485,11 @@ class SqlMapper(metaclass=ABCMeta):
         params = self.translate_params(params)
 
         # Выполняем запрос и начинаем отдавать результаты, переводя их в формат маппера на лету:
-        for row in self.pool.db.select_query(self.table_name, fields, conditions, params, joins, "get_rows"):
-            yield self.translate_and_convert(
-                {fields[it]: row[it] for it in range(len(fields))}, "database2mapper", cache
-            )
+        with self.pool as db:
+            for row in db.select_query(self.table_name, fields, conditions, params, joins, "get_rows"):
+                yield self.translate_and_convert(
+                    {fields[it]: row[it] for it in range(len(fields))}, "database2mapper", cache
+                )
 
     def get_value(self, field_name: str, conditions: dict=None):
         """
