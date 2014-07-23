@@ -902,6 +902,7 @@ class FieldTypes(object):
                 {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.primary.get_value()}
             )
 
+            #TODO сохранение списка не работает в MsSql из-за записи в первичный ключ
             for obj in filter(None, items):
                 if self.items_collection_mapper.primary.autoincremented:
                     obj.primary.set_value(FieldValues.NoneValue())
