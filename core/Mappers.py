@@ -1336,7 +1336,7 @@ class SqlMapper(metaclass=ABCMeta):
             proxy_fields[pf.split(".")[0]].append(".".join(pf.split(".")[1:]))
 
         # Определяем список свойств маппера, через которые идут обращения к другим свойствам (только они имеют смысл)
-        fields = [f.split(".")[0] if f.find(".") > -1 else f for f in fields]
+        fields = [f.split(".")[0] for f in fields if f.find(".") > -1 or self.is_list(self.get_property(f))]
         props = list(set(filter(lambda p: self.is_rel(p), [self.get_property(f) for f in fields])))
 
         joined_directly = []    # Непосредственные джойны к основному мапперу
@@ -1487,7 +1487,7 @@ class SqlMapper(metaclass=ABCMeta):
 
         # Выполняем запрос и начинаем отдавать результаты, переводя их в формат маппера на лету:
         with self.pool as db:
-            for row in db.select_query(self.table_name, fields, conditions, params, joins, "get_rows"):
+            for row in db.select_query(self.table_name, fields, conditions, params, joins, "get_rows", self.primary):
                 yield self.translate_and_convert(
                     {fields[it]: row[it] for it in range(len(fields))}, "database2mapper", cache
                 )

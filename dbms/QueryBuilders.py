@@ -189,6 +189,11 @@ class MySqlBuilder(SqlBuilder):
         """
         return "CONVERT(GROUP_CONCAT(DISTINCT(%s)) USING utf8)" % field
 
+    @property
+    def group_method(self):
+        """ Метод группировки полей при использовании GROUP_CONCAT аггрегации """
+        return "primary_key"
+
     def concat_ws_function(self, field: str, table: str, separator: str):
         """
         Возвращает функцию конкатенации полей через разделитель

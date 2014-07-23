@@ -240,6 +240,11 @@ class SqlBuilder(object, metaclass=ABCMeta):
                 [self.wrap_ordering_cmd(ord_option, main_table) for ord_option in order_data]
             ))
 
+    @property
+    def group_method(self):
+        """ Метод группировки полей при использовании GROUP_CONCAT аггрегации """
+        return "all_keys"
+
     @abstractmethod
     def wrap_table(self, table: str) -> str:
         """
@@ -580,6 +585,10 @@ class SelectQuery(ConditionsMixin, JoinMixin, BaseSqlQuery):
         need_to_group = len(list(filter(lambda f: f.endswith("]"), self.fields))) > 0
         if not need_to_group:
             return ""
+
+        if self.builder.group_method == "primary_key" and self.primary is not None:
+            return self.builder.wrap_field(self.primary if self.primary else "")
+
         fields = list(filter(lambda f: f.endswith("]") is False, self.fields))
         fields_from_order = self.params.get("order") or []
         if type(fields_from_order) is tuple:
@@ -1080,7 +1089,7 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
         query.set_joins(joins if joins else [])
         return self.get_value(*query.build())
 
-    def select_query(self, table_name, fields, conditions, params=None, joins=None, adapter_method=None):
+    def select_query(self, table_name, fields, conditions, params=None, joins=None, adapter_method=None, primary_key=None):
         """
         Выполняет запрос на получение строк из таблицы помощью указанного метода адаптера
         :param table_name:      Имя таблицы
@@ -1095,6 +1104,7 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
         query.set_table_name(table_name)
         query.set_fields(fields)
         query.set_joins(joins)
+        query.set_primary(primary_key.db_name() if primary_key.exists() else None)
         query.set_conditions(conditions)
         query.set_params(params)
         res = query.build()
