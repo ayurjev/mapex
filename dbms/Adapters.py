@@ -127,6 +127,10 @@ class MySqlDbAdapter(Adapter):
         """ Превышение ограничения количества соединений с MySQL """
         pass
 
+    class LostConnectionError(mysql.connector.errors.InterfaceError, mysql.connector.errors.OperationalError):
+        """ Потерянное соединение с базой данных """
+        pass
+
     def __init__(self):
         import mysql.connector.errors
 
@@ -168,7 +172,12 @@ class MySqlDbAdapter(Adapter):
         @param sql: Текст sql-сценария
         @return: Результат выполнения
         """
-        cursor = self.connection.cursor()
+        try:
+            cursor = self.connection.cursor()
+        except self.LostConnectionError:
+            self.reconnect()
+            cursor = self.connection.cursor()
+
         result = list(cursor.execute(sql, multi=True))
         cursor.close()
         return result
@@ -180,7 +189,12 @@ class MySqlDbAdapter(Adapter):
         :param sql:         SQL-Запрос
         :param params:      Параметры для плейсхолдеров запроса
         """
-        cursor = self.connection.cursor()
+        try:
+            cursor = self.connection.cursor()
+        except self.LostConnectionError:
+            self.reconnect()
+            cursor = self.connection.cursor()
+
         try:
             cursor.execute(sql, params if params is not None else [])
             if cursor.with_rows:
@@ -191,10 +205,8 @@ class MySqlDbAdapter(Adapter):
         except self.dublicate_record_exception as err:
             raise DublicateRecordException(err)
         finally:
-            # noinspection PyProtectedMember
-            if self.connection._unread_result:
+            if self.connection.unread_result:
                 self.connection.get_rows()
-
             cursor.close()
 
     def get_table_fields(self, table_name):
