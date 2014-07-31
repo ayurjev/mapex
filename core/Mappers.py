@@ -1618,10 +1618,7 @@ class SqlMapper(metaclass=ABCMeta):
                     self.primary.grab_value_from(chid) for chid in self.get_rows(self.primary.name(), conditions)
                 ]
             else:                           # Если он обычный
-                if self.primary.name() in list(conditions.keys()) and len(list(conditions.keys())) == 1:
-                    changed_records_ids = list(conditions.values())
-                else:
-                    changed_records_ids = list(self.get_column(self.primary.name(), conditions))
+                changed_records_ids = list(self.get_column(self.primary.name(), conditions))
         else:
             changed_records_ids = []
         if data != {}:
