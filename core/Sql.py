@@ -48,8 +48,8 @@ class SqlBuilder(object, metaclass=ABCMeta):
 
         """
         return ", ".join([
-            self.field(field, main_table, main_table, joins, conditions) if type(field) == str else "%s as %s" % (
-                self.field(field[0], main_table, joins, conditions), self.wrap_alias(field[1]), main_table
+            self.field(field, main_table, joins, conditions) if type(field) == str else "%s as %s" % (
+                self.field(field[0], main_table, joins, conditions), self.wrap_alias(field[1])
             ) for field in field_list
         ])
 
@@ -127,36 +127,35 @@ class SqlBuilder(object, metaclass=ABCMeta):
                             values.append(value)
         return "(%s)" % " AND ".join(conditions), values
 
-    def field(self, field: str, current_table: str=None, main_table: str=None, joins: list=None, conditions=None) -> str:
+    def field(self, field: str, table: str=None, joins: list=None, conditions=None) -> str:
         """
         Обрабатывает переданное имя поля и таблицы в соответствии с синтаксисом SQL
         @param field:
         @type field: str
-        @param current_table:
-        @type current_table: str
+        @param table:
+        @type table: str
         @return : Обработанное обращение к полю таблицы
         @rtype : str
 
         """
-        if current_table and not main_table:
-            main_table = current_table
+
         if field.find(".") > -1:
             path = field.split(".")
             field = path.pop()
-            current_table = "_".join(path)
+            table = "_".join(path)
         if field.find("+") > -1:
             return "%s as %s" % (
-                self.aggregate_function(self.concat_ws_function(field, current_table, "$!"), main_table, joins, conditions),
+                self.aggregate_function(self.concat_ws_function(field, table, "$!"), table, joins, conditions),
                 self.wrap_alias(field)
             )
         if field.endswith("]"):
             field = field.split("[")
             alias = "%s_%s" % (field[1].replace("]", ""), field[0])
             return "%s as %s" % (
-                self.aggregate_function(self.field(field[0], current_table), main_table, joins, conditions),
+                self.aggregate_function(self.field(field[0], table), table, joins, conditions),
                 self.wrap_alias(alias)
             )
-        return "%s.%s" % (self.wrap_table(current_table), self.wrap_field(field)) if current_table else "%s" % self.wrap_field(field)
+        return "%s.%s" % (self.wrap_table(table), self.wrap_field(field)) if table else "%s" % self.wrap_field(field)
 
     def placeholder_controller(self, value, placeholders_counter: PlaceHoldersCounter) -> str:
         """
