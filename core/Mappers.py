@@ -2471,6 +2471,7 @@ class FieldTypesConverter(object):
         @rtype : FieldValues.ListValue
 
         """
+        print(v, mf.get_name())
         v = FieldTypesConverter.handle_none_value_for_list_types(v, mf)
         if mf.get_items_collection_mapper().primary.compound:
             v = [

@@ -286,6 +286,7 @@ class MsSqlDbAdapter(Adapter):
         :param sql:         SQL-Запрос
         :param params:      Параметры для плейсхолдеров запроса
         """
+        print(sql, params)
         cursor = self.connection.cursor()
         try:
             cursor.execute(sql, params if params is not None else [])
@@ -295,6 +296,7 @@ class MsSqlDbAdapter(Adapter):
             return
         elif cursor.rowcount == -1:
             for res in cursor:
+                print(">>>", res)
                 yield res
         else:
             yield cursor.execute('''SELECT @@IDENTITY''').fetchone()

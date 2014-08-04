@@ -27,7 +27,7 @@ class PgSqlBuilder(SqlBuilder):
         """
         return '''"%s"''' % alias
 
-    def aggregate_function(self, field: str, table: str, joins: list=None) -> str:
+    def aggregate_function(self, field: str, table: str, joins: list=None, conditions: dict=None) -> str:
         """
         Возвращает имя аггрегатной функции для группирования строк
         @param field: Имя поля для группировки значений в массив
@@ -178,7 +178,7 @@ class MySqlBuilder(SqlBuilder):
         """
         return '''`%s`''' % alias
 
-    def aggregate_function(self, field: str, table: str, joins: list=None) -> str:
+    def aggregate_function(self, field: str, table: str, joins: list=None, conditions: dict=None) -> str:
         """
         Возвращает имя аггрегатной функции для группирования строк
         @param field: Имя поля для группировки значений в массив
@@ -328,7 +328,7 @@ class MsSqlBuilder(SqlBuilder):
         """
         return '''"%s"''' % alias
 
-    def aggregate_function(self, field: str, table: str, joins: list=None) -> str:
+    def aggregate_function(self, field: str, table: str, joins: list=None, conditions=None) -> str:
         """
         Возвращает имя аггрегатной функции для группирования строк
         @param field: Имя поля для группировки значений в массив
@@ -337,15 +337,14 @@ class MsSqlBuilder(SqlBuilder):
         @rtype : str
 
         """
-
+        conditions = conditions()
         # Для MS SQL коллизия алиасов и имен полей недопустима, поэтому возвращаем имена таблиц
         for j in joins:
             if table == j.alias:
                 table = j.foreign_table_name
-
-        conditions = " ".join([j.stringify(self) for j in joins])
-        return '''STUFF((SELECT DISTINCT ',' + CAST(%s as VARCHAR(MAX)) FROM %s %s FOR XML PATH('')), 1, 1, '')''' % (
-            field, self.wrap_table(table), conditions
+        join_conditions = " ".join([j.stringify(self) for j in joins])
+        return '''STUFF((SELECT DISTINCT ',' + CAST(%s as VARCHAR(MAX)) FROM %s %s %s FOR XML PATH('')), 1, 1, '')''' % (
+            field, self.wrap_table(table), join_conditions, ("WHERE %s" % conditions) if conditions else ""
         )
 
     def concat_ws_function(self, field: str, table: str, separator: str):
@@ -359,9 +358,19 @@ class MsSqlBuilder(SqlBuilder):
         @type separator: str
 
         """
+
+        def get_alias_from_field(f: str):
+            if f.endswith("]"):
+                f = f.split("[")
+                return f[1].replace("]", "")
+            else:
+                return table
+
         return "STUFF(%s, 1, 2, '')" % (
             " + ".join([
-                '''COALESCE('%s' + CAST(%s as VARCHAR(MAX)), '')''' % (separator, self.field(f.split("[")[0], table))
+                '''COALESCE('%s' + CAST(%s as VARCHAR(MAX)), '')''' % (
+                    separator, self.field(f.split("[")[0], get_alias_from_field(f))
+                )
                 for f in field.split("+")]
             )
         )
@@ -404,7 +413,8 @@ class MsSqlBuilder(SqlBuilder):
         groupby = query.get_groupby_section()
         return '''SELECT %s %s FROM %s %s %s %s %s ''' % (
             query.get_limit_section(),
-            query.get_fields_section(), query.get_table_name(),
+            query.get_fields_section(),
+            query.get_table_name(),
             query.get_join_section(),
             "WHERE %s" % conditions if conditions else "",
             "GROUP BY %s" % groupby if len(groupby) > 0 else "",
