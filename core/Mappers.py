@@ -2316,6 +2316,7 @@ class FieldTypesConverter(object):
         ("String", "ReversedLink"): lambda v, mf, cache, s:  FieldTypesConverter.to_reversed_link(mf, v, cache),
         ("Float", "Float"): lambda v, mf, cache, s: v,
         ("Float", "String"): lambda v, mf, cache, s: str(v) if v else FNone(),
+        ("Float", "Int"): lambda v, mf, cache, s: int(v),
         ("Bool", "Bool"): lambda v, mf, cache, s: v if v else FNone(),
         ("Bool", "Int"): lambda v, mf, cache, s: 1 if v else 0,
         ("Date", "Date"): lambda v, mf, cache, s: v,
