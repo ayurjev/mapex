@@ -121,14 +121,10 @@ class PgSqlDbAdapter(Adapter):
 class MySqlDbAdapter(Adapter):
     """ Адаптер для работы с MySQL """
     # noinspection PyDocstring
-    import mysql.connector.errors
+    from mysql.connector.errors import DatabaseError
 
-    class TooManyConnectionsError(mysql.connector.errors.DatabaseError):
+    class TooManyConnectionsError(DatabaseError):
         """ Превышение ограничения количества соединений с MySQL """
-        pass
-
-    class LostConnectionError(mysql.connector.errors.InterfaceError, mysql.connector.errors.OperationalError):
-        """ Потерянное соединение с базой данных """
         pass
 
     def __init__(self):
@@ -137,6 +133,7 @@ class MySqlDbAdapter(Adapter):
         super().__init__()
         mysql.connector.errors.custom_error_exception(1040, MySqlDbAdapter.TooManyConnectionsError)
         self.dublicate_record_exception = mysql.connector.errors.IntegrityError
+        self.lost_connection_error = mysql.connector.errors.IntegrityError, mysql.connector.errors.OperationalError
 
     # noinspection PyMethodMayBeStatic
     def get_query_builder(self):
@@ -174,7 +171,7 @@ class MySqlDbAdapter(Adapter):
         """
         try:
             cursor = self.connection.cursor()
-        except self.LostConnectionError:
+        except self.lost_connection_error:
             self.reconnect()
             cursor = self.connection.cursor()
 
@@ -191,7 +188,7 @@ class MySqlDbAdapter(Adapter):
         """
         try:
             cursor = self.connection.cursor()
-        except self.LostConnectionError:
+        except self.lost_connection_error:
             self.reconnect()
             cursor = self.connection.cursor()
 
