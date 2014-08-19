@@ -329,7 +329,8 @@ class FieldTypes(object):
             @rtype : bool
 
             """
-            return str(v).isdigit()
+            str_v = str(v)
+            return str_v.isdigit() or str_v.startswith("-") and str_v[1:].isdigit()
 
     class NoSqlInt(Int, NoSqlBaseField):
         pass
