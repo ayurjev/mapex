@@ -2315,7 +2315,7 @@ class FieldTypesConverter(object):
         ('String', 'Link'): lambda v, mf, cache, s: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
         ("String", "List"): lambda v, mf, cache, s: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
         ("String", "ReversedLink"): lambda v, mf, cache, s:  FieldTypesConverter.to_reversed_link(mf, v, cache),
-        ("Float", "Float"): lambda v, mf, cache, s: v,
+        ("Float", "Float"): lambda v, mf, cache, s: float(v) if v else FNone(),
         ("Float", "String"): lambda v, mf, cache, s: str(v) if v else FNone(),
         ("Float", "Int"): lambda v, mf, cache, s: int(v),
         ("Bool", "Bool"): lambda v, mf, cache, s: v if v else FNone(),

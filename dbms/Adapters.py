@@ -227,7 +227,7 @@ class MySqlDbAdapter(Adapter):
         return {
             FieldTypes.String: ["char", "varchar", "text", "tinytext", "mediumtext", "longtext"],
             FieldTypes.Int: ["tinyint", "smallint", "bigint", "mediumint", "int"],
-            FieldTypes.Float: ["double", "float"],
+            FieldTypes.Float: ["double", "float", "decimal"],
             FieldTypes.Bool: ["boolean", "bool"],
             FieldTypes.Date: ["date"],
             FieldTypes.DateTime: ["datetime"],
