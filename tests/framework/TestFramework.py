@@ -581,7 +581,7 @@ class MsDbMock(SqlDbMock):
 
     def get_dsn(self) -> tuple:
         """ Возвращает DSN информацию для подключения к БД """
-        return "MSSQL_HOST", 1433, "ka_user", "NHxq98S72vVSn", "orm_db"
+        return "egServer70", "ka_user", "NHxq98S72vVSn", "orm_db"
 
     def __init__(self):
         super().__init__()

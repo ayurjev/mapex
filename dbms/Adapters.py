@@ -258,10 +258,7 @@ class MsSqlDbAdapter(Adapter):
         import pyodbc
 
         # noinspection PyUnresolvedReferences
-        return pyodbc.connect(
-            'DSN=egServer70;DATABASE='+connection_data[4]+';UID='+connection_data[2]+';PWD='+connection_data[3],
-            autocommit=True
-        )
+        return pyodbc.connect('DSN=%s;UID=%s;PWD=%s;DATABASE=%s' % connection_data, autocommit=True)
 
     def close_connection(self):
         """ Закрывает соединение с базой данных """
