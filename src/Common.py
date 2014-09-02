@@ -1,5 +1,5 @@
 
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 
 
 class TrackChangesValue(object):

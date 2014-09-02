@@ -1,6 +1,6 @@
 from queue import Queue, Empty
 from threading import local
-from mapex.core.Sql import Adapter
+from mapex.src.Sql import Adapter
 
 
 class TooManyConnectionsError(Exception):

@@ -3,10 +3,10 @@
 import unittest
 import re
 from collections import OrderedDict
-from mapex.dbms.QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder,  \
+from mapex.src.QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder,  \
     SelectQuery, DeleteQuery, InsertQuery, UpdateQuery
-from mapex.core.Sql import PlaceHoldersCounter
-from mapex.core.Mappers import Join
+from mapex.src.Sql import PlaceHoldersCounter
+from mapex.src.Mappers import Join
 
 
 class QueryBuildersTest(unittest.TestCase):

@@ -3,14 +3,22 @@
 Уровень моделей предметной области
 
 """
-
+import sys
+import os
 import unittest
 from datetime import date
 
 from mapex.tests.framework.TestFramework import for_all_dbms, CustomProperty, CustomPropertyFactory, \
     CustomPropertyPositive, CustomPropertyNegative, DbMock,\
     CustomPropertyWithNoneFactory, CustomPropertyWithoutNoneFactory
-from mapex.core.Exceptions import TableModelException, TableMapperException, EmbeddedObjectFactoryException
+
+
+from mapex.tests.framework.TestFramework import AModel, BModel, CModel, ACollection, BCollection, CCollection
+from mapex.tests.framework.TestFramework import MyDbMock
+
+
+from mapex.src.Exceptions import TableModelException, TableMapperException, \
+    EmbeddedObjectFactoryException, DublicateRecordException
 
 
 class TableModelTest(unittest.TestCase):
@@ -511,7 +519,6 @@ class TableModelTest(unittest.TestCase):
         """ Проверим возможность запросов к коллекции с условиями, включающими обращения к полям типа List """
         users = dbms_fw.get_new_users_collection_instance()
         tags = dbms_fw.get_new_tags_collection_instance()
-        accounts = dbms_fw.get_new_accounts_collection_instance()
 
          # Поле tags маппера объявлено типом List.
          # В него нельзя писать ничего кроме списков экземпляров класса dbms_fw.get_new_tag_instance().__class__
@@ -1168,7 +1175,6 @@ class TableModelTest(unittest.TestCase):
             # Копирование списка из модели в модель вызывает исключение т.к. нарушает уникальность первичного ключа
             # Первичный ключ не автоинкрементный, а значит при переносе документов из модели в модель не сбрасывается
             user1.documents_not_ai = list(user2.documents_not_ai)
-            from mapex import DublicateRecordException
             self.assertRaises(DublicateRecordException, user1.save)
 
             # Но можно создать новый список если он не нарушает уникальность
@@ -2089,10 +2095,6 @@ class RecordModelTest(unittest.TestCase):
 
         user = users.get_item({"name": "Иннокентий"})
         self.assertEqual(user.name, user.origin.name)
-
-
-from tests.framework.TestFramework import AModel, BModel, CModel, ACollection, BCollection, CCollection
-from tests.framework.TestFramework import MyDbMock
 
 
 class RecordModelTestMySqlOnly(unittest.TestCase):

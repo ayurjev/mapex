@@ -3,10 +3,10 @@
 """
 
 from abc import ABCMeta, abstractmethod
-from mapex.dbms.Adapters import PgSqlDbAdapter, MySqlDbAdapter, MsSqlDbAdapter, MongoDbAdapter
-from mapex.core.Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
-from mapex.core.Mappers import SqlMapper, FieldTypes, NoSqlMapper
-from mapex.dbms.Pool import Pool
+from mapex.src.Adapters import PgSqlDbAdapter, MySqlDbAdapter, MsSqlDbAdapter, MongoDbAdapter
+from mapex.src.Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
+from mapex.src.Mappers import SqlMapper, FieldTypes, NoSqlMapper
+from mapex.src.Pool import Pool
 
 import time
 import re

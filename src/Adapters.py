@@ -1,10 +1,10 @@
 """ Модуль с адаптерами для подключения к СУБД """
 
-from mapex.core.Exceptions import AdapterException, DublicateRecordException
-from mapex.core.Sql import Adapter, PgDbField, MySqlDbField, MsSqlDbField
-from mapex.core.Mappers import FieldTypes
-from mapex.dbms.QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder
-from mapex.core.Sql import AdapterLogger
+from mapex.src.Exceptions import AdapterException, DublicateRecordException
+from mapex.src.Sql import Adapter, PgDbField, MySqlDbField, MsSqlDbField
+from mapex.src.Mappers import FieldTypes
+from mapex.src.QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder
+from mapex.src.Sql import AdapterLogger
 
 
 class PgSqlDbAdapter(Adapter):

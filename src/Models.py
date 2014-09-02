@@ -1,10 +1,10 @@
 
 """ Модуль для работы с БД """
 
-from abc import ABCMeta, abstractmethod
-from mapex.core.Exceptions import TableModelException, EmbeddedObjectFactoryException
-from mapex.core.Common import TrackChangesValue, ValueInside
-from mapex.utils import do_dict, merge_dict
+from abc import ABCMeta
+from mapex.src.Exceptions import TableModelException, EmbeddedObjectFactoryException
+from mapex.src.Common import TrackChangesValue, ValueInside
+from mapex.src.Utils import do_dict, merge_dict
 import weakref
 import re
 import json
@@ -302,6 +302,7 @@ class RecordModelLock(object):
         self.model.__setattr__(self.flag, True)
         return self
 
+    # noinspection PyUnusedLocal
     def __exit__(self, etype, value, traceback):
         self.model.__setattr__(self.flag, False)
 
@@ -681,6 +682,7 @@ class EmbeddedObjectFactory(object):
             if obj.get_value() == value:
                 return obj
 
+        # noinspection PyComparisonWithNone
         if value != None:
             raise EmbeddedObjectFactoryException('There are no factory for "%s"' % value)
 

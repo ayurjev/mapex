@@ -1,6 +1,6 @@
 """ Тесты библиотеки утилит """
 import unittest
-from mapex.utils import merge_dict, do_dict
+from mapex.src.Utils import merge_dict, do_dict
 
 
 class UtilsTests(unittest.TestCase):

@@ -7,11 +7,11 @@ from abc import abstractmethod, ABCMeta
 from collections import OrderedDict
 from collections import defaultdict
 
-from mapex.core.Exceptions import TableModelException, TableMapperException, DublicateRecordException
-from mapex.core.Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
-from mapex.core.Common import TrackChangesValue, ValueInside
-from mapex.core.Sql import SqlBuilder
-from mapex.utils import partition
+from mapex.src.Exceptions import TableModelException, TableMapperException, DublicateRecordException
+from mapex.src.Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
+from mapex.src.Common import TrackChangesValue, ValueInside
+from mapex.src.Sql import SqlBuilder
+from mapex.src.Utils import partition
 
 
 class Primary(object):
