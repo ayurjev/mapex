@@ -3,7 +3,7 @@ from mapex.src.Mappers import SqlMapper, NoSqlMapper
 from mapex.src.Models import TableModel as CollectionModel, RecordModel as EntityModel
 from mapex.src.Models import EmbeddedObject, EmbeddedObjectFactory
 from mapex.src.Exceptions import DublicateRecordException
-from mapex.src.Pool import Pool, Contours, Database
+from mapex.src.Pool import Pool
 
 from mapex.src.Adapters import MySqlDbAdapter as MySqlClient, PgSqlDbAdapter as PgSqlClient, \
     MsSqlDbAdapter as MsSqlClient, MongoDbAdapter as MongoClient

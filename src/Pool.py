@@ -4,37 +4,6 @@ from mapex.src.Sql import Adapter
 from mapex.src.Mappers import SqlMapper
 
 
-class Contours(object):
-    PRODUCTION = 9
-    BETA = 5
-    UNITTESTS = 0
-
-
-class Database(object):
-    def __init__(self, adapter, connection_tuples_map: dict):
-        self.adapter = adapter
-        # noinspection PyDictCreation
-        self.map = {}
-        self.map[Contours.PRODUCTION] = connection_tuples_map.get(Contours.PRODUCTION)
-        self.map[Contours.BETA] = connection_tuples_map.get(Contours.BETA, self.map[Contours.PRODUCTION])
-        self.map[Contours.UNITTESTS] = connection_tuples_map.get(Contours.UNITTESTS, self.map[Contours.BETA])
-
-        self.pool = None
-        self.init_pool(Contours.UNITTESTS)
-        self.mappers = []
-
-    def init_pool(self, c: int):
-        self.pool = Pool(self.adapter, self.map.get(c))
-
-    def register_mapper(self, mapper: SqlMapper):
-        mapper.pool = self.pool
-        self.mappers.append(mapper)
-
-    def switch(self, c: int):
-        self.init_pool(c)
-        for mapper in self.mappers:
-            mapper.pool = self.pool
-
 class TooManyConnectionsError(Exception):
     """ Нет возможности создать подключение к базе данных из-за превышения ограничения на количество соединений с БД """
 
