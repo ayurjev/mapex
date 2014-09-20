@@ -1068,14 +1068,14 @@ class SqlMapper(metaclass=ABCMeta):
     ###################################### Mapper Initialization ###################################################
 
     dublicate_record_exception = DublicateRecordException
+    item_class = RecordModel
+    item_collection_class = TableModel
 
     def __init__(self):
         if not self.__class__._inited:
             for dep in self.__class__.dependencies:
                 dep()
             self.__class__._inited = True
-            self.item_class = RecordModel
-            self.item_collection_class = TableModel
             self.table_name = None                      # Имя основной таблицы
             self.db_fields = {}
             self.db_primary_key = ""
@@ -1171,6 +1171,14 @@ class SqlMapper(metaclass=ABCMeta):
 
         """
 
+    @classmethod
+    def up(cls):
+        pass
+
+    @classmethod
+    def down(cls):
+        pass
+
     def set_map(self, mapper_fields: list):
         """
         Устанавливает список полей маппера
@@ -1212,8 +1220,13 @@ class SqlMapper(metaclass=ABCMeta):
         @type table_name: str
         @deprecated
         """
+        from mapex.src.Adapters import NoTableFound
         self.table_name = table_name
-        self.db_fields, self.db_primary_key = self.pool.db.get_table_fields(self.table_name)
+        try:
+            self.db_fields, self.db_primary_key = self.pool.db.get_table_fields(self.table_name)
+        except NoTableFound:
+            self.up()
+            self.db_fields, self.db_primary_key = self.pool.db.get_table_fields(self.table_name)
 
     def set_collection_name(self, collection_name: str):
         """

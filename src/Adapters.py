@@ -7,6 +7,10 @@ from mapex.src.QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder
 from mapex.src.Sql import AdapterLogger
 
 
+class NoTableFound(Exception):
+    pass
+
+
 class PgSqlDbAdapter(Adapter):
     """ Адаптер для работы с PostgreSQL """
     def __init__(self):
@@ -80,7 +84,7 @@ class PgSqlDbAdapter(Adapter):
             FROM "information_schema"."columns" WHERE "table_name" = $1
         ''', [table_name]))
         if len(schema) == 0:
-            raise AdapterException("there is no table with name '%s' in current database" % table_name)
+            raise NoTableFound("there is no table with name '%s' in current database" % table_name)
         for field in schema:
             fields[field[0]] = PgDbField(*field)
 
@@ -134,6 +138,7 @@ class MySqlDbAdapter(Adapter):
         mysql.connector.errors.custom_error_exception(1040, MySqlDbAdapter.TooManyConnectionsError)
         self.dublicate_record_exception = mysql.connector.errors.IntegrityError
         self.lost_connection_error = mysql.connector.errors.IntegrityError, mysql.connector.errors.OperationalError
+        self.no_table_connection = mysql.connector.errors.ProgrammingError
 
     # noinspection PyMethodMayBeStatic
     def get_query_builder(self):
@@ -212,9 +217,13 @@ class MySqlDbAdapter(Adapter):
         :param table_name:   Имя таблицы
         :return: :raise:    AdapterException
         """
+        import mysql.connector.errors
         fields = {}
         primary = None
-        schema = list(self.get_rows('''DESCRIBE %s''' % table_name))
+        try:
+            schema = list(self.get_rows('''DESCRIBE %s''' % table_name))
+        except self.no_table_connection as err:
+            raise NoTableFound(err)
         for field in schema:
             fields[field[0]] = MySqlDbField(*field)
             if field[3] == "PRI":
