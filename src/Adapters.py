@@ -317,7 +317,7 @@ class MsSqlDbAdapter(Adapter):
         INFORMATION_SCHEMA.COLUMNS.DATA_TYPE,
         INFORMATION_SCHEMA.COLUMNS.CHARACTER_MAXIMUM_LENGTH,
         INFORMATION_SCHEMA.COLUMNS.COLUMN_DEFAULT,
-        INFORMATION_SCHEMA.KEY_COLUMN_USAGE.COLUMN_NAME,
+        INFORMATION_SCHEMA.KEY_COLUMN_USAGE.CONSTRAINT_NAME,
         COLUMNPROPERTY(object_id(INFORMATION_SCHEMA.COLUMNS.TABLE_NAME), INFORMATION_SCHEMA.COLUMNS.COLUMN_NAME, 'IsIdentity')
         FROM INFORMATION_SCHEMA.COLUMNS
         LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE ON (
@@ -327,7 +327,7 @@ class MsSqlDbAdapter(Adapter):
         WHERE INFORMATION_SCHEMA.COLUMNS.TABLE_NAME = '%s' ''' % table_name))
         for field in schema:
             fields[field[0]] = MsSqlDbField(*field)
-            if field[5] == field[0]:
+            if field[5] and field[5].find("PK__") > -1:
                 primary = field[0]
         return fields, primary
 

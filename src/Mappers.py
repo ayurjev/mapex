@@ -910,6 +910,13 @@ class FieldTypes(object):
                 item_data = old_stored_data.get(id(obj))
                 item_data[main_record_key] = main_record_obj
                 copy = obj.get_new_collection().get_new_item()
+
+
+                # Решая проблему, которая описана выше (MsSql):
+                # Раз это EmbeddedList, то можно и терять значение AI поля - оно не должно быть важным.
+                if self.items_collection_mapper.primary.autoincremented:
+                    item_data = {f: item_data[f] for f in item_data if f != self.items_collection_mapper.primary.name()}
+
                 copy.load_from_array(item_data)
                 copy.save()
 
@@ -1611,7 +1618,7 @@ class SqlMapper(metaclass=ABCMeta):
         except DublicateRecordException as err:
             raise self.__class__.dublicate_record_exception(err)
         return self.primary.grab_value_from(
-            last_record if self.primary.defined_by_user is False and last_record != 0 else data
+            last_record if self.primary.defined_by_user is False and last_record and last_record != 0 else data
         )
 
     def update(self, data: dict, conditions: dict=None):
