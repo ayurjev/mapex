@@ -252,6 +252,9 @@ class FieldTypes(object):
                     self.check_value(converted)
                 return converted
 
+        def from_string(self, value):
+            return FieldTypesConverter.converters.get(("String", self.ident))(value, None, None, None)
+
         def translate(self, name, direction):
             """
             Конвертирует обращение к полю маппера в обращение к полю таблицы или наоборот в зависимости от direction

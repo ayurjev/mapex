@@ -250,6 +250,8 @@ class Primary(ValueInside):
                 raw_value = primary_mf.model(raw_value) if not isinstance(raw_value, EmbeddedObject) else raw_value
             if self.model.mapper.is_rel(primary_mf) and not isinstance(raw_value, RecordModel):
                 raw_value = primary_mf.get_new_item().load_by_primary(raw_value)
+
+            raw_value = primary_mf.from_string(raw_value) if isinstance(raw_value, str) else raw_value
             return raw_value
 
         if not self.model.mapper.primary.compound:
@@ -505,9 +507,14 @@ class RecordModel(ValueInside, TrackChangesValue):
 
         """
         data = cache.get(self.mapper, self.primary.get_value(deep=True))
+
         # Первичный ключ не перезагружается чтобы не потерять изменения если ключ - это модель другой коллекции
-        if data and self.mapper.primary.exists() and self.mapper.primary.name() in data:
-            del data[self.mapper.primary.name()]
+        if data and self.mapper.primary.exists():
+            if self.mapper.primary.compound:
+                for pkey in self.mapper.primary.name():
+                    del data[pkey]
+            elif self.mapper.primary.name() in data:
+                del data[self.mapper.primary.name()]
         return self.load_from_array(data, consider_as_unchanged=True) if data else None
 
     def exec_lazy_loading(self):
