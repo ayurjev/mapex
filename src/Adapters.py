@@ -325,6 +325,8 @@ class MsSqlDbAdapter(Adapter):
             INFORMATION_SCHEMA.COLUMNS.TABLE_NAME = INFORMATION_SCHEMA.KEY_COLUMN_USAGE.TABLE_NAME
         )
         WHERE INFORMATION_SCHEMA.COLUMNS.TABLE_NAME = '%s' ''' % table_name))
+        if schema == []:
+            raise NoTableFound()
         for field in schema:
             fields[field[0]] = MsSqlDbField(*field)
             if field[5] and field[5].find("PK__") > -1:
