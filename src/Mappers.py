@@ -1211,11 +1211,10 @@ class SqlMapper(metaclass=ABCMeta):
         self.primary = Primary(self, name_in_db=self.db_primary_key)
         self._analyze_map()
 
-    def set_primary(self, field_name: str):
+    def set_primary(self, field_name):
         """
         Переопределяет первичный ключ таблицы на уровне маппера
         @param field_name: Имя поля маппера, которое должно считаться первичным ключом
-        @type field_name: str
 
         """
         self.primary = Primary(self, name_in_mapper=field_name)
