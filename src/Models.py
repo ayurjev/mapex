@@ -14,7 +14,8 @@ class TableModel(object):
     """ Класс создания моделей таблиц БД """
     mapper = None
 
-    def __init__(self, *boundaries):
+    def __init__(self, *boundaries, pool=None):
+        self.pool = pool
         if self.__class__.mapper is None:
             raise TableModelException("No mapper for %s model" % self)
         # noinspection PyCallingNonCallable
@@ -34,7 +35,7 @@ class TableModel(object):
         то есть обычный RecordModel, но с маппером текущей модели
         :return: type
         """
-        return self.mapper.get_new_item()
+        return self.mapper.get_new_item(self.pool)
 
     def mix_boundaries(self, conditions: dict=None):
         if self.object_boundaries and conditions and self.mapper.boundaries:
@@ -60,7 +61,7 @@ class TableModel(object):
         Выполняет подсчет объектов в коллекции по заданным условиям
         :param conditions: Условия подсчета строк в коллекции
         """
-        return self.mapper.count(self.mix_boundaries(conditions))
+        return self.mapper.count(self.mix_boundaries(conditions), self.pool)
 
     def check_incoming_data(self, data):
         """
@@ -90,12 +91,12 @@ class TableModel(object):
         model = item
 
         flat_data, lists_objects = self.mapper.split_data_by_relation_type(model_data)
-        last_record = self.mapper.insert(flat_data)
+        last_record = self.mapper.insert(flat_data, model_pool=self.pool)
         if self.mapper.primary.exists():
             model.primary.set_value(last_record)
             with UpdateLock(model):
                 self.mapper.link_all_list_objects(
-                    lists_objects, model.load_from_array(model.get_data(), consider_as_unchanged=True)
+                    lists_objects, model.load_from_array(model.get_data(), consider_as_unchanged=True), model_pool=self.pool
                 )
                 model.up_to_date()
         return model
@@ -105,7 +106,7 @@ class TableModel(object):
         Удаляет записи из коллекции в соответствии с переданными условиями
         :param conditions:  Условия удаления записей из таблицы
         """
-        return self.mapper.delete(self.mix_boundaries(conditions))
+        return self.mapper.delete(self.mix_boundaries(conditions), model_pool=self.pool)
 
     def update(self, data, conditions=None, model=None):
         """ Обновляет записи в коллекции
@@ -128,7 +129,7 @@ class TableModel(object):
                 flat_data = {key: flat_data[key] for key in flat_data if conditions.get(key, "&bzx") != flat_data[key]}
 
         # Сохраняем записи в основной таблице
-        changed_models_pkeys = self.mapper.update(flat_data, conditions)
+        changed_models_pkeys = self.mapper.update(flat_data, conditions, model_pool=self.pool)
 
         if len(changed_models_pkeys) > 0:
             if model:
@@ -141,7 +142,7 @@ class TableModel(object):
 
             if lists_objects != {}:
                 for updated_item in items_to_update:
-                    self.mapper.link_all_list_objects(lists_objects, updated_item)
+                    self.mapper.link_all_list_objects(lists_objects, updated_item, self.pool)
             return items_to_update
         else:
             return []
@@ -154,7 +155,7 @@ class TableModel(object):
         :param conditions:          Условия выборки записей
         :param params:              Параметры выборки записей
         """
-        for item in self.mapper.get_column(property_name, self.mix_boundaries(conditions), params):
+        for item in self.mapper.get_column(property_name, self.mix_boundaries(conditions), params, model_pool=self.pool):
             yield item
 
     def get_properties_list(self, properties_names: list, conditions=None, params=None):
@@ -164,7 +165,7 @@ class TableModel(object):
         :param conditions:          Условия выборки записей
         :param params:              Параметры выборки записей
         """
-        for item in self.mapper.get_rows(properties_names, self.mix_boundaries(conditions), params):
+        for item in self.mapper.get_rows(properties_names, self.mix_boundaries(conditions), params, model_pool=self.pool):
             yield item
 
     def get_item(self, unique_bounds):
@@ -187,7 +188,7 @@ class TableModel(object):
         :return: :raise:            TableModelException
         """
         cache = TableModelCache(self.mapper)
-        generator = self.mapper.get_rows([], self.mix_boundaries(bounds), params, cache)
+        generator = self.mapper.get_rows([], self.mix_boundaries(bounds), params, cache, model_pool=self.pool)
         if isinstance(self.get_new_item().mapper, self.mapper.__class__) is False:
             raise TableModelException("Collection mapper and collection item mapper should be equal")
         arrays, items = [], []
@@ -208,7 +209,7 @@ class TableModel(object):
         if isinstance(self.get_new_item().mapper, self.mapper.__class__) is False:
             raise TableModelException("Collection mapper and collection item mapper should be equal")
 
-        for row in self.mapper.generate_rows([], self.mix_boundaries(bounds), params):
+        for row in self.mapper.generate_rows([], self.mix_boundaries(bounds), params, model_pool=self.pool):
             yield self.mapper.factory_method(self.get_new_item().load_from_array(row, consider_as_unchanged=True))
 
 
@@ -251,7 +252,7 @@ class Primary(ValueInside):
             if self.model.mapper.is_rel(primary_mf) and not isinstance(raw_value, RecordModel):
                 raw_value = primary_mf.get_new_item().load_by_primary(raw_value)
 
-            raw_value = primary_mf.cast_to_field_type(raw_value)
+            raw_value = primary_mf.cast_to_field_type(raw_value, self.model.pool)
             return raw_value
 
         if not self.model.mapper.primary.compound:
@@ -329,7 +330,8 @@ class RecordModel(ValueInside, TrackChangesValue):
     """ Класс создания моделей записей в таблицах БД """
     mapper = None
 
-    def __init__(self, data=None, loaded_from_db=False):
+    def __init__(self, data=None, loaded_from_db=False, pool=None):
+        self.pool = pool
         self._lazy_load = False
         self._changed = True
         # weakref.proxy решает проблему циклической связанности между экземплярами Primary и RecordModel
@@ -384,7 +386,7 @@ class RecordModel(ValueInside, TrackChangesValue):
         @return: Модель коллекции
         @rtype : TableModel
         """
-        return self.mapper.get_new_collection()
+        return self.mapper.get_new_collection(self.pool)
 
     def save(self):
         """ Сохраняет текущее состояние модели в БД """
@@ -435,7 +437,7 @@ class RecordModel(ValueInside, TrackChangesValue):
     def refresh(self):
         """ Обновляет состояние модели в соответствии с состоянием в БД """
         self.primary.ensure_exists()
-        self.mapper.refresh(self)
+        self.mapper.refresh(self, model_pool=self.pool)
 
     def up_to_date(self):
         """ Пересоздает объект Origin для модели """

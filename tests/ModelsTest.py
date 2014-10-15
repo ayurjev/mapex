@@ -10,8 +10,7 @@ from datetime import date
 
 from mapex.tests.framework.TestFramework import for_all_dbms, CustomProperty, CustomPropertyFactory, \
     CustomPropertyPositive, CustomPropertyNegative, DbMock,\
-    CustomPropertyWithNoneFactory, CustomPropertyWithoutNoneFactory
-
+    CustomPropertyWithNoneFactory, CustomPropertyWithoutNoneFactory, MyDbMock2
 
 from mapex.tests.framework.TestFramework import AModel, BModel, CModel, ACollection, BCollection, CCollection
 from mapex.tests.framework.TestFramework import MyDbMock
@@ -2100,13 +2099,16 @@ class RecordModelTest(unittest.TestCase):
 class RecordModelTestMySqlOnly(unittest.TestCase):
     """ Некоторые тесты, которые не имеет смысла запускть для всех СУБД """
     def setUp(self):
+        self.m2 = MyDbMock2()
+        MyDbMock2().up()
         MyDbMock().up()
-        self.a_collection = ACollection()
-        self.b_collection = BCollection()
+        self.a_users = ACollection()
+        self.b_users = BCollection()
         self.c_collection = CCollection()
 
     def tearDown(self):
         MyDbMock().down()
+        MyDbMock2().down()
 
     def test_changed(self):
         """ Проверим, как фиксируются изменения моделей любых уровней вложенности """
@@ -2118,8 +2120,8 @@ class RecordModelTestMySqlOnly(unittest.TestCase):
         self.assertTrue(b1.is_changed())
         self.assertTrue(a1.is_changed())
         a1.save()
-        self.assertEqual(1, self.a_collection.count())
-        self.assertEqual(1, self.b_collection.count())
+        self.assertEqual(1, self.a_users.count())
+        self.assertEqual(1, self.b_users.count())
         self.assertEqual(1, self.c_collection.count())
         self.assertFalse(c1.is_changed())
         self.assertFalse(b1.is_changed())
@@ -2140,6 +2142,97 @@ class RecordModelTestMySqlOnly(unittest.TestCase):
         self.assertFalse(c2.is_changed())
         self.assertTrue(b1.is_changed())
         self.assertTrue(a1.is_changed())
+
+    def test_changing_pool_on_model_level(self):
+        """ Проверим, что можно менять пул коннектов к базе на уровне модели """
+        # m2 = MyDbMock2()
+        # m2.up()
+        # m1 = MyDbMock()
+        # m1.up()             # Такая последовательность вызовов up позволит оставить пулы исходных мапперов на m1.
+
+        from mapex.tests.framework.TestFramework import SqlUser, SqlUsers, SqlAccount, SqlAccounts, SqlTag, SqlTags
+
+
+        a_users = SqlUsers()
+        a_user = SqlUser({"name": "Andrey1", "age": 22})
+        a_user2 = a_users.get_new_item()
+        a_user2.name = "Alexey1"
+        a_user2.age = 16
+        a_users2 = a_user2.get_new_collection()
+
+        b_users = SqlUsers(pool=self.m2.pool)
+        b_user = SqlUser({"name": "Andrey2", "age": 26}, pool=self.m2.pool)
+        b_user2 = b_users.get_new_item()
+        b_user2.name = "Alexey2"
+        b_user2.age = 36
+        b_users2 = b_user2.get_new_collection()
+
+        self.assertEqual(0, a_users.count())
+        self.assertEqual(0, b_users.count())
+
+        a_user.save()
+        self.assertEqual(1, a_users.count())
+        self.assertEqual(0, b_users.count())
+        b_user.save()
+        self.assertEqual(1, a_users.count())
+        self.assertEqual(1, b_users.count())
+
+        b_user2.save()
+        self.assertEqual(1, a_users2.count())
+        self.assertEqual(2, b_users2.count())
+        a_user2.save()
+        self.assertEqual(2, a_users2.count())
+        self.assertEqual(2, b_users2.count())
+
+        a_users.insert(SqlUser({"name": "Anton1", "age": 16}))
+        self.assertEqual(3, a_users2.count())
+        self.assertEqual(2, b_users2.count())
+        b_users.insert(SqlUser({"name": "Anton2", "age": 61}, pool=self.m2.pool))
+        self.assertEqual(3, a_users2.count())
+        self.assertEqual(3, b_users2.count())
+
+        a_user_saved1 = a_users.get_item({"name": "Anton1"})
+        self.assertIsNotNone(a_user_saved1)
+        a_user_saved1 = b_users.get_item({"name": "Anton1"})
+        self.assertIsNone(a_user_saved1)
+
+        b_user_saved1 = a_users.get_item({"name": "Anton2"})
+        self.assertIsNone(b_user_saved1)
+        b_user_saved1 = b_users.get_item({"name": "Anton2"})
+        self.assertIsNotNone(b_user_saved1)
+
+        a_accounts = SqlAccounts()
+        b_accounts = SqlAccounts(pool=self.m2.pool)
+
+        self.assertEqual(0, a_accounts.count())
+        self.assertEqual(0, b_accounts.count())
+
+        a_user.account = SqlAccount({"email": "email_a"})
+        a_user.save()
+        self.assertEqual(1, a_accounts.count())
+        self.assertEqual(0, b_accounts.count())
+
+        b_user.account = SqlAccount({"email": "email_b"}, pool=self.m2.pool)
+        b_user.save()
+        self.assertEqual(1, a_accounts.count())
+        self.assertEqual(1, b_accounts.count())
+
+        a_users.update({"age": 99})
+        self.assertEqual(3, a_users.count({"age": 99}))
+        self.assertEqual(0, b_users.count({"age": 99}))
+
+        a_user.refresh()
+        self.assertEqual(99, a_user.age)
+
+        b_user.remove()
+
+        self.assertEqual(3, a_users2.count())
+        self.assertEqual(2, b_users2.count())
+
+        b_users.delete()
+        self.assertEqual(3, a_users2.count())
+        self.assertEqual(0, b_users2.count())
+
 
 
 class EmbeddedObjectsFactoryUnittests(unittest.TestCase):

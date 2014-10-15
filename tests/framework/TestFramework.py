@@ -547,6 +547,11 @@ class MyDbMock(SqlDbMock):
         self.up_script = "framework/my-up.sql"
         self.down_script = "framework/my-down.sql"
 
+class MyDbMock2(MyDbMock):
+    def get_dsn(self) -> tuple:
+        """ Возвращает DSN информацию для подключения к БД """
+        return "localhost", 3306, "unittests", "", "unittests2"
+
 
 class MsDbMock(SqlDbMock):
     """ Класс для создания тестовой инфраструктуры при работе с MsSql """
@@ -580,6 +585,7 @@ class MongoDbMock(NoSqlDbMock):
 
 
 mysql_mock, pgsql_mock, mongo_mock = MyDbMock(), PgDbMock(), MongoDbMock()
+mysql_mock2 = MyDbMock2()
 #mssql_mock = MsDbMock()
 
 def for_all_dbms(test_function):

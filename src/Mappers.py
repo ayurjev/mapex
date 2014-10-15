@@ -225,7 +225,7 @@ class FieldTypes(object):
                     )
                 )
 
-        def convert(self, value, direction, cache, save_unsaved):
+        def convert(self, value, direction, cache, save_unsaved, model_pool=None):
             """
             Конвертирует значение от формата маппера к формату базы данных или наоборот в зависимости от direction
             @param value: Значение для конвертации
@@ -237,7 +237,7 @@ class FieldTypes(object):
             # noinspection PyDocstring
             def try_convert(s, d):
                 try:
-                    return FieldTypesConverter.converters[(s, d)](value, self, cache, save_unsaved)
+                    return FieldTypesConverter.converters[(s, d)](value, self, cache, save_unsaved, model_pool)
                 except KeyError:
                     raise TableMapperException("\ncan't convert value %s from %s to %s" % (value, s, d))
 
@@ -252,7 +252,7 @@ class FieldTypes(object):
                     self.check_value(converted)
                 return converted
 
-        def cast_to_field_type(self, raw_value):
+        def cast_to_field_type(self, raw_value, model_pool):
             source_type = None
             if isinstance(raw_value, str):
                 source_type = "String"
@@ -277,9 +277,10 @@ class FieldTypes(object):
             if not source_type:
                 return raw_value
             try:
-                return FieldTypesConverter.converters.get((source_type, self.ident))(raw_value, self, None, None)
-            except TypeError:
+                return FieldTypesConverter.converters.get((source_type, self.ident))(raw_value, self, None, None, model_pool)
+            except TypeError as err:
                 print((source_type, self.ident))
+                raise err
 
 
         def translate(self, name, direction):
@@ -591,13 +592,13 @@ class FieldTypes(object):
         def is_primary_required():
             return True
 
-        def get_new_item(self):
+        def get_new_item(self, model_pool=None):
             """
             Возвращает новый экземпляр класса значения для этого поля
             @return: Новый экземпляр класса значения для этого поля
 
             """
-            return self.item_class()
+            return self.item_class(pool=model_pool)
 
         def get_items_collection_mapper(self):
             """ Возвращает маппер прилинкованной модели """
@@ -650,7 +651,7 @@ class FieldTypes(object):
 
     class BaseForeignCollectionList(BaseList):
 
-        def save_items(self, items: list, main_record_obj: RecordModel):
+        def save_items(self, items: list, main_record_obj: RecordModel, model_pool=None):
             """
             Сохраняет все привязанные к основному объекту объекты
             @param items: Список объектов
@@ -662,13 +663,16 @@ class FieldTypes(object):
             main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
             self.items_collection_mapper.update(
                 {"%s" % main_record_key: None},
-                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.primary.get_value()}
+                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.primary.get_value()},
+                model_pool=model_pool
             )
             for obj in filter(None, items):
                 obj.__setattr__(main_record_key, main_record_obj)
+                if model_pool:
+                    obj.__setattr__("pool", model_pool)
                 obj.save()
 
-        def clear_dependencies_from(self, main_records_ids: list):
+        def clear_dependencies_from(self, main_records_ids: list, model_pool=None):
             """
             Очищает зависимость присоединенных записей, от тех записей основной таблицы, которые были удалены и
             перечислены в main_records_ids
@@ -679,7 +683,8 @@ class FieldTypes(object):
             main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
             self.items_collection_mapper.update(
                 {main_record_key: None},
-                {"%s.%s" % (main_record_key, self.mapper.primary.name()): ("in", main_records_ids)}
+                {"%s.%s" % (main_record_key, self.mapper.primary.name()): ("in", main_records_ids)},
+                model_pool=model_pool
             )
 
     class BaseReversedLink(BaseList):
@@ -702,7 +707,7 @@ class FieldTypes(object):
             """
             return FieldValues.NoneValue()
 
-        def save_items(self, item: RecordModel, main_record: RecordModel):
+        def save_items(self, item: RecordModel, main_record: RecordModel, model_pool=None):
             """
             Сохраняет все привязанные к основному объекту объекты
             @param item: Привязанная модель
@@ -714,10 +719,13 @@ class FieldTypes(object):
             main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
             self.items_collection_mapper.update(
                 {"%s" % main_record_key: None},
-                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record.primary.get_value()}
+                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record.primary.get_value()},
+                model_pool=model_pool
             )
             if item:
                 item.__setattr__(main_record_key, main_record)
+                if model_pool:
+                    item.__setattr__("pool", model_pool)
                 item.save()
 
     class NoSqlRelationField(RelationField, NoSqlBaseField):
@@ -784,7 +792,7 @@ class FieldTypes(object):
                 mapper_field_name
             )
 
-        def save_items(self, items: list, main_record_obj: RecordModel):
+        def save_items(self, items: list, main_record_obj: RecordModel, model_pool=None):
             """
             Сохраняет все привязанные к основному объекту объекты
             @param items: Список объектов
@@ -796,11 +804,15 @@ class FieldTypes(object):
             main_record_key = self.rel_mapper.get_property_that_is_link_for(self.mapper).get_name()
             second_record_key = self.rel_mapper.get_property_that_is_link_for(self.items_collection_mapper).get_name()
             self.rel_mapper.delete(
-                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.primary.get_value()}
+                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.primary.get_value()},
+                model_pool=model_pool
             )
-            self.rel_mapper.insert([{main_record_key: main_record_obj, second_record_key: obj} for obj in items])
+            self.rel_mapper.insert(
+                [{main_record_key: main_record_obj, second_record_key: obj} for obj in items],
+                model_pool=model_pool
+            )
 
-        def clear_dependencies_from(self, main_records_ids: list):
+        def clear_dependencies_from(self, main_records_ids: list, model_pool=None):
             """
             Очищает зависимость присоединенных записей, от тех записей основной таблицы, которые были удалены и
             перечислены в main_records_ids
@@ -810,7 +822,8 @@ class FieldTypes(object):
             """
             main_record_key = self.rel_mapper.get_property_that_is_link_for(self.mapper).get_name()
             self.rel_mapper.delete(
-                {"%s.%s" % (main_record_key, self.mapper.primary.name()): ("in", main_records_ids)}
+                {"%s.%s" % (main_record_key, self.mapper.primary.name()): ("in", main_records_ids)},
+                model_pool=model_pool
             )
 
         def get_relations_mapper(self):
@@ -889,7 +902,7 @@ class FieldTypes(object):
                 )
 
     class SqlEmbeddedLink(BaseReversedLink, SqlListWithoutRelationsTable):
-        def save_items(self, item: RecordModel, main_record: RecordModel):
+        def save_items(self, item: RecordModel, main_record: RecordModel, model_pool=None):
             """
             Сохраняет все привязанные к основному объекту объекты
             @param item: Привязанная модель
@@ -905,7 +918,8 @@ class FieldTypes(object):
 
             main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
             self.items_collection_mapper.delete(
-                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record.primary.get_value()}
+                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record.primary.get_value()},
+                model_pool=model_pool
             )
 
             if item:
@@ -914,9 +928,11 @@ class FieldTypes(object):
                 item.load_from_array(old_stored_data)
                 item._loaded_from_db = False
                 item.__setattr__(main_record_key, main_record)
+                if model_pool:
+                    item.__setattr__("pool", model_pool)
                 item.save()
 
-        def clear_dependencies_from(self, main_records_ids: list):
+        def clear_dependencies_from(self, main_records_ids: list, model_pool=None):
             """
             Очищает зависимость присоединенных записей, от тех записей основной таблицы, которые были удалены и
             перечислены в main_records_ids
@@ -926,12 +942,13 @@ class FieldTypes(object):
             """
             main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
             self.items_collection_mapper.delete(
-                {"%s.%s" % (main_record_key, self.mapper.primary.name()): ("in", main_records_ids)}
+                {"%s.%s" % (main_record_key, self.mapper.primary.name()): ("in", main_records_ids)},
+                model_pool=model_pool
             )
 
     class SqlEmbeddedList(SqlListWithoutRelationsTable):
 
-        def save_items(self, items: list, main_record_obj: RecordModel):
+        def save_items(self, items: list, main_record_obj: RecordModel, model_pool=None):
             """
             Сохраняет все привязанные к основному объекту объекты
             @param items: Список объектов
@@ -947,7 +964,8 @@ class FieldTypes(object):
 
             main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
             self.items_collection_mapper.delete(
-                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.primary.get_value()}
+                {"%s.%s" % (main_record_key, self.mapper.primary.name()): main_record_obj.primary.get_value()},
+                model_pool=model_pool
             )
 
             #TODO сохранение списка не работает в MsSql из-за записи в первичный ключ
@@ -961,13 +979,15 @@ class FieldTypes(object):
 
                 # Решая проблему, которая описана выше (MsSql):
                 # Раз это EmbeddedList, то можно и терять значение AI поля - оно не должно быть важным.
+
+                # P.S. 16.10.2014 - на MSSQL вроде все работает. Надо приглядеться к MySQL
                 if self.items_collection_mapper.primary.autoincremented:
                     item_data = {f: item_data[f] for f in item_data if f != self.items_collection_mapper.primary.name()}
 
                 copy.load_from_array(item_data)
                 copy.save()
 
-        def clear_dependencies_from(self, main_records_ids: list):
+        def clear_dependencies_from(self, main_records_ids: list, model_pool=None):
             """
             Очищает зависимость присоединенных записей, от тех записей основной таблицы, которые были удалены и
             перечислены в main_records_ids
@@ -977,7 +997,8 @@ class FieldTypes(object):
             """
             main_record_key = self.items_collection_mapper.get_property_that_is_link_for(self.mapper).get_name()
             self.items_collection_mapper.delete(
-                {"%s.%s" % (main_record_key, self.mapper.primary.name()): ("in", main_records_ids)}
+                {"%s.%s" % (main_record_key, self.mapper.primary.name()): ("in", main_records_ids)},
+                model_pool=model_pool
             )
 
     ############################################## NoSql ###########################################################
@@ -1208,14 +1229,14 @@ class SqlMapper(metaclass=ABCMeta):
     def set_new_collection(self, collection_class):
         self.item_collection_class = collection_class
 
-    def get_new_item(self):
-        item = self.item_class()
+    def get_new_item(self, model_pool=None):
+        item = self.item_class(pool=model_pool)
         if not item.set_mapper(self):
             item.mapper = self
         return item
 
-    def get_new_collection(self):
-        collection = self.item_collection_class()
+    def get_new_collection(self, model_pool=None):
+        collection = self.item_collection_class(pool=model_pool)
         if not collection.mapper:
             collection.mapper = self
         return collection
@@ -1528,7 +1549,7 @@ class SqlMapper(metaclass=ABCMeta):
             return [f[0] for f in order]
         return []
 
-    def generate_rows(self, fields: list=None, conditions: dict=None, params: dict=None, cache=None):
+    def generate_rows(self, fields: list=None, conditions: dict=None, params: dict=None, cache=None, model_pool=None):
         """
         Делаем выборку данных, осуществляя функции маппинга строк (названия полей + формат значений)
         @param fields: Список полей для получения
@@ -1551,18 +1572,18 @@ class SqlMapper(metaclass=ABCMeta):
         )
 
         # Переводим имена объектов в формат СУБД:
-        fields = self.translate_and_convert(fields)
-        conditions = self.translate_and_convert(conditions, save_unsaved=False)
+        fields = self.translate_and_convert(fields, model_pool=model_pool)
+        conditions = self.translate_and_convert(conditions, save_unsaved=False, model_pool=model_pool)
         params = self.translate_params(params)
 
         # Выполняем запрос и начинаем отдавать результаты, переводя их в формат маппера на лету:
-        with self.pool as db:
+        with (model_pool if model_pool else self.pool) as db:
             for row in db.select_query(self.table_name, fields, conditions, params, joins, "get_rows", self.primary):
                 yield self.translate_and_convert(
-                    {fields[it]: row[it] for it in range(len(fields))}, "database2mapper", cache
+                    {fields[it]: row[it] for it in range(len(fields))}, "database2mapper", cache, model_pool=model_pool
                 )
 
-    def get_value(self, field_name: str, conditions: dict=None):
+    def get_value(self, field_name: str, conditions: dict=None, model_pool=None):
         """
         Возвращает значение поля записи, соответствующей условиям выборки
         @param field_name: Имя поля
@@ -1571,10 +1592,10 @@ class SqlMapper(metaclass=ABCMeta):
         @type conditions: dict
         @return: Значение искомого поля
         """
-        result = list(self.get_rows([field_name], conditions))
+        result = list(self.get_rows([field_name], conditions, model_pool))
         return result[0].get(field_name) if len(result) > 0 else None
 
-    def get_column(self, column_name: str, conditions: dict=None, params: dict=None) -> list:
+    def get_column(self, column_name: str, conditions: dict=None, params: dict=None, model_pool=None) -> list:
         """
         Возвращает список значений одной из колонок таблицы в соответствии с условиями и параметрами выборки
         @param column_name: Имя колонки таблицы
@@ -1587,11 +1608,11 @@ class SqlMapper(metaclass=ABCMeta):
         @rtype : dict
 
         """
-        for row in self.generate_rows([column_name], conditions, params):
+        for row in self.generate_rows([column_name], conditions, params, model_pool=model_pool):
             if None != row.get(column_name):
                 yield row.get(column_name)
 
-    def get_row(self, fields: list=None, conditions: dict=None) -> dict:
+    def get_row(self, fields: list=None, conditions: dict=None, model_pool=None) -> dict:
         """
         Возвращает словарь с данными для одной записи, удовлетворяющей условиям выборки
         @param fields: Список полей
@@ -1602,10 +1623,10 @@ class SqlMapper(metaclass=ABCMeta):
         @rtype : dict
 
         """
-        result = list(self.get_rows(fields, conditions))
+        result = list(self.get_rows(fields, conditions, model_pool))
         return result[0] if len(result) == 1 else None
 
-    def get_rows(self, fields: list=None, conditions: dict=None, params: dict=None, cache=None) -> list:
+    def get_rows(self, fields: list=None, conditions: dict=None, params: dict=None, cache=None, model_pool=None) -> list:
         """
         Возвращает список записей (в виде словарей), соответствующих условиям выборки
         @param fields: Список полей для получения
@@ -1619,20 +1640,20 @@ class SqlMapper(metaclass=ABCMeta):
         @rtype: list
 
         """
-        for row in self.generate_rows(fields, conditions, params, cache):
+        for row in self.generate_rows(fields, conditions, params, cache, model_pool):
             yield row
 
-    def refresh(self, model):
+    def refresh(self, model, model_pool=None):
         """ Обновляет данные в модели свежими
         @param model: Модель для обновления
         @return: Обновленная модель
         """
-        actual_copy = self.get_new_collection().get_item(model.primary.to_dict())
+        actual_copy = self.get_new_collection(model_pool).get_item(model.primary.to_dict())
         #TODO вместо следующей строчки сделать прямую заливку: model = actual_copy
         model.load_from_array(actual_copy.get_data(), consider_as_unchanged=True)
         return model
 
-    def count(self, conditions: dict=None) -> int:
+    def count(self, conditions: dict=None, model_pool=None) -> int:
         """
         Выполняем подсчет записей в коллекции по условию
         @param conditions: Условия подсчета строк
@@ -1642,10 +1663,10 @@ class SqlMapper(metaclass=ABCMeta):
         """
         conditions = conditions or {}
         joins = self.get_joins(self.get_fields_from_conditions(conditions))
-        conditions = self.translate_and_convert(conditions, save_unsaved=False)
-        return self.pool.db.count_query(self.table_name, conditions, joins)
+        conditions = self.translate_and_convert(conditions, save_unsaved=False, model_pool=model_pool)
+        return (model_pool if model_pool else self.pool).db.count_query(self.table_name, conditions, joins)
 
-    def insert(self, data: list or dict):
+    def insert(self, data: list or dict, model_pool=None):
         """
         Выполняет вставку новой записи в таблицу
         Для вставки одной записи параметр data должен быть словарем, для вставки нескольких - списком словарей
@@ -1655,7 +1676,7 @@ class SqlMapper(metaclass=ABCMeta):
         
         """
         if type(data) is list:
-            return [self.insert(it) for it in data]
+            return [self.insert(it, model_pool) for it in data]
 
         if not isinstance(data, dict):
             raise TableMapperException("Insert failed: unknown item format")
@@ -1663,14 +1684,16 @@ class SqlMapper(metaclass=ABCMeta):
             raise TableModelException("Can't insert an empty record")
 
         try:
-            last_record = self.pool.db.insert_query(self.table_name, self.translate_and_convert(data), self.primary)
+            last_record = (model_pool if model_pool else self.pool).db.insert_query(
+                self.table_name, self.translate_and_convert(data, model_pool=model_pool), self.primary
+            )
         except DublicateRecordException as err:
             raise self.__class__.dublicate_record_exception(err)
         return self.primary.grab_value_from(
             last_record if self.primary.defined_by_user is False and last_record and last_record != 0 else data
         )
 
-    def update(self, data: dict, conditions: dict=None):
+    def update(self, data: dict, conditions: dict=None, model_pool=None):
         """
         Выполняет обновление существующих в таблице записей
         @param data: Новые данные
@@ -1685,17 +1708,18 @@ class SqlMapper(metaclass=ABCMeta):
             if self.primary.compound:       # Если он составной
                 # noinspection PyTypeChecker
                 changed_records_ids = [
-                    self.primary.grab_value_from(chid) for chid in self.get_rows(self.primary.name(), conditions)
+                    self.primary.grab_value_from(chid)
+                    for chid in self.get_rows(self.primary.name(), conditions, model_pool=model_pool)
                 ]
             else:                           # Если он обычный
-                changed_records_ids = list(self.get_column(self.primary.name(), conditions))
+                changed_records_ids = list(self.get_column(self.primary.name(), conditions, model_pool=model_pool))
         else:
             changed_records_ids = []
         if data != {}:
             try:
-                self.pool.db.update_query(
-                    self.table_name, self.translate_and_convert(data),
-                    self.translate_and_convert(conditions, save_unsaved=False),
+                (model_pool if model_pool else self.pool).db.update_query(
+                    self.table_name, self.translate_and_convert(data, model_pool=model_pool),
+                    self.translate_and_convert(conditions, save_unsaved=False, model_pool=model_pool),
                     self.get_joins(self.get_fields_from_conditions(conditions)),
                     self.primary
                 )
@@ -1703,7 +1727,7 @@ class SqlMapper(metaclass=ABCMeta):
                 raise self.__class__.dublicate_record_exception(err)
         return changed_records_ids
 
-    def delete(self, conditions: dict=None):
+    def delete(self, conditions: dict=None, model_pool=None):
         """
         Подсчитывает количество строк в таблице, в соответствии с условиями (если они переданы)
         @param conditions: Параметры выборки для удаления строки из таблицы
@@ -1714,19 +1738,19 @@ class SqlMapper(metaclass=ABCMeta):
         if self.primary.exists() and self.primary.compound is False:           # Если, конечно, первичный ключ определен
             changed_records_ids = [
                 i.get_value() if isinstance(i, ValueInside) else i
-                for i in self.get_column(self.primary.name(), conditions)
+                for i in self.get_column(self.primary.name(), conditions, model_pool=model_pool)
             ]
             if len(changed_records_ids) > 0:
-                self.unlink_objects(changed_records_ids)
-                self.pool.db.delete_query(
+                self.unlink_objects(changed_records_ids, model_pool)
+                (model_pool if model_pool else self.pool).db.delete_query(
                     self.table_name,
-                    self.translate_and_convert({self.primary.name(): ("in", changed_records_ids)}, save_unsaved=False)
+                    self.translate_and_convert({self.primary.name(): ("in", changed_records_ids)}, save_unsaved=False, model_pool=model_pool)
                 )
                 return changed_records_ids
         else:
             joins = self.get_joins(self.get_fields_from_conditions(conditions)) if conditions else None
-            conditions = self.translate_and_convert(conditions, save_unsaved=False) if conditions else None
-            self.pool.db.delete_query(self.table_name, conditions, joins)
+            conditions = self.translate_and_convert(conditions, save_unsaved=False, model_pool=model_pool) if conditions else None
+            (model_pool if model_pool else self.pool).db.delete_query(self.table_name, conditions, joins)
 
     def split_data_by_relation_type(self, data: dict) -> (dict, dict):
         """
@@ -1743,7 +1767,7 @@ class SqlMapper(metaclass=ABCMeta):
         return {field: data[field] for field in flats}, {self.get_property(field): data[field] for field in lists}
 
     @staticmethod
-    def link_all_list_objects(data: dict, main_record_obj: RecordModel):
+    def link_all_list_objects(data: dict, main_record_obj: RecordModel, model_pool=None):
         """
         Сохраняет связь основной записи таблицы и других объектов, если они связаны как многие-ко-многим
         @param data: Привязанные объекты
@@ -1753,17 +1777,17 @@ class SqlMapper(metaclass=ABCMeta):
 
         """
         for mapper_field in data:
-            mapper_field.save_items(data[mapper_field], main_record_obj)
+            mapper_field.save_items(data[mapper_field], main_record_obj, model_pool)
 
-    def unlink_objects(self, changed_records_ids):
+    def unlink_objects(self, changed_records_ids, model_pool=None):
         for mapper_field_name in self.get_properties():
             mapper_field = self.get_property(mapper_field_name)
             if self.is_list_with_dependencies(mapper_field):
                 # noinspection PyUnresolvedReferences
-                mapper_field.clear_dependencies_from(changed_records_ids)
+                mapper_field.clear_dependencies_from(changed_records_ids, model_pool)
 
     ##################################################################################################################
-    def translate_and_convert(self, value, direction: str="mapper2database", cache=None, save_unsaved=True):
+    def translate_and_convert(self, value, direction: str="mapper2database", cache=None, save_unsaved=True, model_pool=None):
         """
         Осуществляет непосредственное конвертирование данных из формата маппера в формат бд и наоборот
         @param value: Объект для конвертации (может быть простым значением, списком, словарем)
@@ -1773,14 +1797,14 @@ class SqlMapper(metaclass=ABCMeta):
         @return: Конвертированный объект
         """
         if type(value) is list:
-            return [self.translate_and_convert(newvalue, direction, cache, save_unsaved) for newvalue in value]
+            return [self.translate_and_convert(newvalue, direction, cache, save_unsaved, model_pool) for newvalue in value]
         elif type(value) is dict:
             converted = {}
             for field in value:
                 if field in ["or", "and"]:
-                    converted[field] = self.translate_and_convert(value[field], direction, cache, save_unsaved)
+                    converted[field] = self.translate_and_convert(value[field], direction, cache, save_unsaved, model_pool)
                 else:
-                    translted_field = self.translate_and_convert(field, direction, cache, save_unsaved)
+                    translted_field = self.translate_and_convert(field, direction, cache, save_unsaved, model_pool)
                     if type(value[field]) is tuple:
                         if value[field][0] in ["in", "nin"]:
                             converted[translted_field] = (
@@ -1793,7 +1817,7 @@ class SqlMapper(metaclass=ABCMeta):
                             converted[translted_field] = value[field]
                     else:
                         mapper_field = self.get_mapper_field(field, direction)
-                        converted[translted_field] = mapper_field.convert(value[field], direction, cache, save_unsaved)
+                        converted[translted_field] = mapper_field.convert(value[field], direction, cache, save_unsaved, model_pool)
             return converted
         elif type(value) is str:
             return self.translate(value, direction)
@@ -1853,7 +1877,7 @@ class SqlMapper(metaclass=ABCMeta):
         res = self._reversed_map.get(field_name)
         return res if res else self.get_property(field_name)
 
-    def translate_params(self, params: dict) -> dict:
+    def translate_params(self, params: dict, model_pool=None) -> dict:
         """
         Маппинг имен полей, используемых в параметрах выборки
         @param params: Параметры выборки
@@ -1864,9 +1888,9 @@ class SqlMapper(metaclass=ABCMeta):
         """
         if params is not None:
             if type(params.get("order")) is tuple:
-                params["order"] = (self.translate_and_convert(params["order"][0]), params["order"][1])
+                params["order"] = (self.translate_and_convert(params["order"][0], model_pool=model_pool), params["order"][1])
             elif type(params.get("order")) is list:
-                params["order"] = [(self.translate_and_convert(ordOpt[0]), ordOpt[1]) for ordOpt in params["order"]]
+                params["order"] = [(self.translate_and_convert(ordOpt[0], model_pool=model_pool), ordOpt[1]) for ordOpt in params["order"]]
         return params
 
     @staticmethod
@@ -1985,7 +2009,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
                 flat[mapperFieldName] = data[mapperFieldName]
         return flat, lists
 
-    def generate_rows(self, fields: list=None, conditions: dict=None, params: dict=None, cache=None):
+    def generate_rows(self, fields: list=None, conditions: dict=None, params: dict=None, cache=None, model_pool=None):
         """
         Делаем выборку данных, осуществляя функции маппинга строк (названия полей + формат значений)
         @param fields: Список полей для получения
@@ -2001,13 +2025,13 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
         main_collection_fields = [field.split(".")[0] for field in fields]
         reversed_collections = [key for key in self.get_properties() if self.is_reversed_list(self.get_property(key))]
         embedded_collections = [key for key in main_collection_fields if self.is_real_embedded(self.get_property(key))]
-        main_collection_fields = self.translate_and_convert(main_collection_fields)
+        main_collection_fields = self.translate_and_convert(main_collection_fields, model_pool=model_pool)
         if len(main_collection_fields) > 0:
             main_collection_fields.append("_id")
             reversed_collections = list(set(reversed_collections) & set(main_collection_fields))
 
         # Разбиваем условия выборки на группы в соответствии с коллекцией:
-        collection_conditions = {"self": self.translate_and_convert(conditions, save_unsaved=False)}
+        collection_conditions = {"self": self.translate_and_convert(conditions, save_unsaved=False, model_pool=model_pool)}
         if conditions:
             for key in conditions:
                 if key.find(".") > -1 and self.is_rel(self.get_property(key.split(".")[0])):
@@ -2020,14 +2044,14 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
         rows_primaries = []
         foreign_models_primaries = defaultdict(list)
         foreign_models_by_row = {field: defaultdict(list) for field in main_collection_fields}
-        generator = self.pool.db.select_query(
+        generator = (model_pool if model_pool else self.pool).db.select_query(
             self.table_name, main_collection_fields, collection_conditions["self"], params
         )
         for row in generator:
             rows.append(row)
             rows_primaries.append(row.get("_id"))
             for key in row:
-                key_in_mapper = self.translate_and_convert(key, "database2mapper")
+                key_in_mapper = self.translate_and_convert(key, "database2mapper", model_pool=model_pool)
                 mf = self.get_property(key_in_mapper)
                 if mf and self.is_rel(mf) and not self.is_real_embedded(mf):
                     if type(row[key]) is list:
@@ -2052,10 +2076,11 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
             rev_collection_condtions = {main_record_key.get_db_name(): {"$in": rows_primaries}}
             if collection_conditions.get(prop):
                 rev_collection_condtions.update(
-                    linked_mapper.translate_and_convert(collection_conditions.get(prop), save_unsaved=False)
+                    linked_mapper.translate_and_convert(collection_conditions.get(prop), save_unsaved=False, model_pool=model_pool),
+                    model_pool=model_pool
                 )
             requested_fields = ["_id", main_record_key.get_db_name()]
-            generator = linked_mapper.pool.db.select_query(
+            generator = (model_pool if model_pool else linked_mapper.pool).db.select_query(
                 linked_mapper.table_name, requested_fields, rev_collection_condtions
             )
             for reversed_model in generator:
@@ -2089,19 +2114,19 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
 
                     # Создаем список для заполнения полей выбираемых моделей
                     requested_fields = [field.split(".")[1] for field in fields if field.split(".")[0] == key]
-                    db_fields = linked_mapper.translate_and_convert(requested_fields)
+                    db_fields = linked_mapper.translate_and_convert(requested_fields, model_pool=model_pool)
                     db_fields.append("_id")
 
                     # Заполняем модели
                     foreign_models = {}
-                    generator = linked_mapper.pool.db.select_query(
+                    generator = (model_pool if model_pool else linked_mapper.pool).db.select_query(
                         linked_mapper.table_name, db_fields, basic_conditions
                     )
                     for row in generator:
                         foreign_models[row["_id"]] = row
 
                     for main_record in rows:
-                        main_record_for_yield = self.translate_and_convert(main_record, "database2mapper", cache)
+                        main_record_for_yield = self.translate_and_convert(main_record, "database2mapper", cache, model_pool=model_pool)
                         main_record_for_yield = {
                             key: main_record_for_yield[key] for key in main_record_for_yield if key in fields
                         }
@@ -2125,7 +2150,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
             # Если свойства запрошены у вложенных документов основных записей
             elif len(embedded_collections) > 0:
                 for row in rows:
-                    row = self.translate_and_convert(row, "database2mapper", cache)
+                    row = self.translate_and_convert(row, "database2mapper", cache, model_pool=model_pool)
                     for subcollection in row:
                         if self.is_real_embedded(self.get_property(subcollection)):
                             if not isinstance(row[subcollection], list):
@@ -2147,7 +2172,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
                 row.update(reversed_model_trait)
             if not self.get_property_by_db_name("_id") or (len(fields) > 0 and self.primary.name() not in fields):
                 del row["_id"]
-            yield self.translate_and_convert(row, "database2mapper", cache)
+            yield self.translate_and_convert(row, "database2mapper", cache, model_pool=model_pool)
 
     @staticmethod
     def document_match(model, property_name, conditions):
@@ -2235,7 +2260,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
                 new_conditions[key] = conditions[key]
         return new_conditions
 
-    def translate_and_convert(self, value, direction: str="mapper2database", cache=None, save_unsaved=True):
+    def translate_and_convert(self, value, direction: str="mapper2database", cache=None, save_unsaved=True, model_pool=None):
         """
         Осуществляет непосредственное конвертирование данных из формата маппера в формат бд и наоборот
         @param value: Объект для конвертации (может быть простым значением, списком, словарем)
@@ -2248,11 +2273,11 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
             return value
 
         if type(value) is dict:
-            value = super().translate_and_convert(value, direction, cache, save_unsaved)
+            value = super().translate_and_convert(value, direction, cache, save_unsaved, model_pool=model_pool)
             value = self.convert_conditions_to_one_collection(value)
             value = self.to_mongo_conditions_format(value)
         else:
-            value = super().translate_and_convert(value, direction, cache, save_unsaved)
+            value = super().translate_and_convert(value, direction, cache, save_unsaved, model_pool=model_pool)
         return value
 
     @staticmethod
@@ -2371,90 +2396,90 @@ class FieldTypesConverter(object):
     """ Конвертер значений разных типов полей маппера """
 
     converters = {
-        ("Int", "Int"): lambda v, mf, cache, s: int(v) if None != v else FNone(),
-        ("Int", "String"): lambda v, mf, cache, s: str(v) if v else FNone(),
-        ("Int", "Date"): lambda v, mf, cache, s: date.fromtimestamp(v) if v else FNone(),
-        ("Int", "DateTime"): lambda v, mf, cache, s: datetime.fromtimestamp(v) if v else FNone(),
-        ("Int", "Time"): lambda v, mf, cache, s: FieldTypesConverter.int2time(v) if v else FNone(),
-        ("Int", "Bool"): lambda v, mf, cache, s: v != 0,
-        ("Int", "Link"): lambda v, mf, cache, s: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
-        ("String", "String"): lambda v, mf, cache, s: str(v) if v else FNone(),
-        ("String", "Int"): lambda v, mf, cache, s: int(v.strip()) if v else FNone(),
-        ("String", "Float"): lambda v, mf, cache, s: float(v.strip()) if v else FNone(),
-        ("String", "Date"): lambda v, mf, cache, s: FieldTypesConverter.str2date(v) if v else FNone(),
-        ("String", "Time"): lambda v, mf, cache, s: FieldTypesConverter.str2time(v) if v else FNone(),
-        ("String", "DateTime"): lambda v, mf, cache, s: FieldTypesConverter.str2datetime(v) if v else FNone(),
-        ('String', 'Link'): lambda v, mf, cache, s: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
-        ("String", "List"): lambda v, mf, cache, s: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
-        ("String", "ReversedLink"): lambda v, mf, cache, s:  FieldTypesConverter.to_reversed_link(mf, v, cache),
-        ("String", "ObjectID"): lambda v, mf, cache, s:  s,
-        ("Bytes", "Bytes"): lambda v, mf, cache, s: v,
-        ("Float", "Float"): lambda v, mf, cache, s: float(v) if v else FNone(),
-        ("Float", "String"): lambda v, mf, cache, s: str(v) if v else FNone(),
-        ("Float", "Int"): lambda v, mf, cache, s: int(v),
-        ("Bool", "Bool"): lambda v, mf, cache, s: v if v else FNone(),
-        ("Bool", "Int"): lambda v, mf, cache, s: 1 if v else 0,
-        ("Date", "Date"): lambda v, mf, cache, s: v,
-        ("Date", "Int"): lambda v, mf, cache, s: int(time.mktime(v.timetuple())) if v else FNone(),
-        ("Date", "String"): lambda v, mf, cache, s: v.isoformat() if v else FNone(),
-        ("Date", "DateTime"): lambda v, mf, cache, s: datetime(v.year, v.month, v.day) if v else FNone(),
-        ("Time", "Time"): lambda v, mf, cache, s: v,
-        ("Time", "Int"): lambda v, mf, cache, s: (v.hour * 3600 + v.minute*60 + v.second) if v else FNone(),
-        ("Time", "String"): lambda v, mf, cache, s: v.strftime("%H:%M:%S") if v else FNone(),
-        ("DateTime", "DateTime"): lambda v, mf, cache, s: v if v else FNone(),
-        ("DateTime", "String"): lambda v, mf, cache, s: v.strftime("%Y-%m-%d %H:%M:%S") if v else FNone(),
-        ("DateTime", "Int"): lambda v, mf, cache, s: int(time.mktime(v.timetuple())) if v else FNone(),
-        ("DateTime", "Date"): lambda v, mf, cache, s: date(v.year, v.month, v.day) if v else FNone(),
-        ("Link", "Int"): lambda v, mf, cache, s:
+        ("Int", "Int"): lambda v, mf, cache, s, p: int(v) if None != v else FNone(),
+        ("Int", "String"): lambda v, mf, cache, s, p: str(v) if v else FNone(),
+        ("Int", "Date"): lambda v, mf, cache, s, p: date.fromtimestamp(v) if v else FNone(),
+        ("Int", "DateTime"): lambda v, mf, cache, s, p: datetime.fromtimestamp(v) if v else FNone(),
+        ("Int", "Time"): lambda v, mf, cache, s, p: FieldTypesConverter.int2time(v) if v else FNone(),
+        ("Int", "Bool"): lambda v, mf, cache, s, p: v != 0,
+        ("Int", "Link"): lambda v, mf, cache, s, p: mf.get_new_item(p).load_by_primary(v, cache) if v else FNone(),
+        ("String", "String"): lambda v, mf, cache, s, p: str(v) if v else FNone(),
+        ("String", "Int"): lambda v, mf, cache, s, p: int(v.strip()) if v else FNone(),
+        ("String", "Float"): lambda v, mf, cache, s, p: float(v.strip()) if v else FNone(),
+        ("String", "Date"): lambda v, mf, cache, s, p: FieldTypesConverter.str2date(v) if v else FNone(),
+        ("String", "Time"): lambda v, mf, cache, s, p: FieldTypesConverter.str2time(v) if v else FNone(),
+        ("String", "DateTime"): lambda v, mf, cache, s, p: FieldTypesConverter.str2datetime(v) if v else FNone(),
+        ('String', 'Link'): lambda v, mf, cache, s, p: mf.get_new_item(p).load_by_primary(v, cache) if v else FNone(),
+        ("String", "List"): lambda v, mf, cache, s, p: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache, p),
+        ("String", "ReversedLink"): lambda v, mf, cache, s, p:  FieldTypesConverter.to_reversed_link(mf, v, cache, p),
+        ("String", "ObjectID"): lambda v, mf, cache, s, p:  v,
+        ("Bytes", "Bytes"): lambda v, mf, cache, s, p: v,
+        ("Float", "Float"): lambda v, mf, cache, s, p: float(v) if v else FNone(),
+        ("Float", "String"): lambda v, mf, cache, s, p: str(v) if v else FNone(),
+        ("Float", "Int"): lambda v, mf, cache, s, p: int(v),
+        ("Bool", "Bool"): lambda v, mf, cache, s, p: v if v else FNone(),
+        ("Bool", "Int"): lambda v, mf, cache, s, p: 1 if v else 0,
+        ("Date", "Date"): lambda v, mf, cache, s, p: v,
+        ("Date", "Int"): lambda v, mf, cache, s, p: int(time.mktime(v.timetuple())) if v else FNone(),
+        ("Date", "String"): lambda v, mf, cache, s, p: v.isoformat() if v else FNone(),
+        ("Date", "DateTime"): lambda v, mf, cache, s, p: datetime(v.year, v.month, v.day) if v else FNone(),
+        ("Time", "Time"): lambda v, mf, cache, s, p: v,
+        ("Time", "Int"): lambda v, mf, cache, s, p: (v.hour * 3600 + v.minute*60 + v.second) if v else FNone(),
+        ("Time", "String"): lambda v, mf, cache, s, p: v.strftime("%H:%M:%S") if v else FNone(),
+        ("DateTime", "DateTime"): lambda v, mf, cache, s, p: v if v else FNone(),
+        ("DateTime", "String"): lambda v, mf, cache, s, p: v.strftime("%Y-%m-%d %H:%M:%S") if v else FNone(),
+        ("DateTime", "Int"): lambda v, mf, cache, s, p: int(time.mktime(v.timetuple())) if v else FNone(),
+        ("DateTime", "Date"): lambda v, mf, cache, s, p: date(v.year, v.month, v.day) if v else FNone(),
+        ("Link", "Int"): lambda v, mf, cache, s, p:
         (v.save().primary.get_value(deep=True) if s else v.primary.get_value(deep=True)) if v else FNone(),
-        ("Link", "String"): lambda v, mf, cache, s:
+        ("Link", "String"): lambda v, mf, cache, s, p:
         str((v.save().primary.get_value(deep=True) if s else v.primary.get_value(deep=True))) if v else FNone(),
-        ("Link", "Link"): lambda v, mf, cache, s: v if v else FNone(),
-        ("Link", "ObjectID"): lambda v, mf, cache, s:
+        ("Link", "Link"): lambda v, mf, cache, s, p: v if v else FNone(),
+        ("Link", "ObjectID"): lambda v, mf, cache, s, p:
         (v.save().primary.get_value(deep=True) if s else v.primary.get_value(deep=True)) if v else FNone(),
-        ("List", "String"): lambda v, mf, cache, s: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
-        ("List", "ObjectID"): lambda v, mf, cache, s:
+        ("List", "String"): lambda v, mf, cache, s, p: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache, p),
+        ("List", "ObjectID"): lambda v, mf, cache, s, p:
         [(it.save().primary.get_value(deep=True) if s else it.primary.get_value(deep=True))
          for it in v] if v is not None else [],
-        ("EmbeddedLink", "EmbeddedDocument"): lambda v, mf, cache, s: FieldTypesConverter.embedded(mf, v),
-        ("EmbeddedDocument", "EmbeddedLink"): lambda v, mf, cache, s: FieldTypesConverter.from_embedded(mf, v),
-        ("EmbeddedList", "EmbeddedDocument"): lambda v, mf, cache, s:
-        [FieldTypesConverter.embedded(mf, i) for i in v] if v else [],
-        ("EmbeddedDocument", "EmbeddedList"): lambda v, mf, cache, s:
-        FieldValues.ListValue([FieldTypesConverter.from_embedded(mf, i) for i in v] if v else []),
-        ("ObjectID", "List"): lambda v, mf, cache, s: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
-        ("ObjectID", "Link"): lambda v, mf, cache, s: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
-        ("ObjectID", "ReversedLink"): lambda v, mf, cache, s: FieldTypesConverter.to_reversed_link(mf, v, cache),
-        ("ObjectID", "ObjectID"): lambda v, mf, cache, s: v,
-        ("Unknown", "String"): lambda v, mf, cache, s: str(v),
-        ("Int", "Repr"): lambda v, mf, cache, s: str(v),
-        ("String", "Repr"): lambda v, mf, cache, s: str(v),
-        ("Float", "Repr"): lambda v, mf, cache, s: str(v),
-        ("Bool", "Repr"): lambda v, mf, cache, s: str(v),
-        ("Date", "Repr"): lambda v, mf, cache, s: str(v),
-        ("Time", "Repr"): lambda v, mf, cache, s: str(v),
-        ("DateTime", "Repr"): lambda v, mf, cache, s: str(v),
-        ("DateTime", "Repr"): lambda v, mf, cache, s: str(v),
-        ("Link", "Repr"): lambda v, mf, cache, s: str(v),
-        ("List", "Repr"): lambda v, mf, cache, s: str(v),
-        ("EmbeddedLink", "Repr"): lambda v, mf, cache, s: str(v),
-        ("EmbeddedDocument", "Repr"): lambda v, mf, cache, s: str(v),
-        ("EmbeddedList", "Repr"): lambda v, mf, cache, s: str(v),
-        ("ObjectID", "Repr"): lambda v, mf, cache, s: str(v),
-        ("Unknown", "Repr"): lambda v, mf, cache, s: str(v),
-        ("EmbeddedObject", "Int"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Int"),
-        ("EmbeddedObject", "String"): lambda v, mf, cache, s:
-        FieldTypesConverter.custom_types(v, mf, cache, s, "String"),
-        ("EmbeddedObject", "Float"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Float"),
-        ("EmbeddedObject", "Bool"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Bool"),
-        ("EmbeddedObject", "Date"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Date"),
-        ("EmbeddedObject", "Time"): lambda v, mf, cache, s: FieldTypesConverter.custom_types(v, mf, cache, s, "Time"),
-        ("EmbeddedObject", "DateTime"): lambda v, mf, cache, s:
-        FieldTypesConverter.custom_types(v, mf, cache, s, "DateTime"),
+        ("EmbeddedLink", "EmbeddedDocument"): lambda v, mf, cache, s, p: FieldTypesConverter.embedded(mf, v, p),
+        ("EmbeddedDocument", "EmbeddedLink"): lambda v, mf, cache, s, p: FieldTypesConverter.from_embedded(mf, v, p),
+        ("EmbeddedList", "EmbeddedDocument"): lambda v, mf, cache, s, p:
+        [FieldTypesConverter.embedded(mf, i, p) for i in v] if v else [],
+        ("EmbeddedDocument", "EmbeddedList"): lambda v, mf, cache, s, p:
+        FieldValues.ListValue([FieldTypesConverter.from_embedded(mf, i, p) for i in v] if v else []),
+        ("ObjectID", "List"): lambda v, mf, cache, s, p: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache, p),
+        ("ObjectID", "Link"): lambda v, mf, cache, s, p: mf.get_new_item(p).load_by_primary(v, cache) if v else FNone(),
+        ("ObjectID", "ReversedLink"): lambda v, mf, cache, s, p: FieldTypesConverter.to_reversed_link(mf, v, cache, p),
+        ("ObjectID", "ObjectID"): lambda v, mf, cache, s, p: v,
+        ("Unknown", "String"): lambda v, mf, cache, s, p: str(v),
+        ("Int", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("String", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("Float", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("Bool", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("Date", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("Time", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("DateTime", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("DateTime", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("Link", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("List", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("EmbeddedLink", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("EmbeddedDocument", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("EmbeddedList", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("ObjectID", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("Unknown", "Repr"): lambda v, mf, cache, s, p: str(v),
+        ("EmbeddedObject", "Int"): lambda v, mf, cache, s, p: FieldTypesConverter.custom_types(v, mf, cache, s, "Int", p),
+        ("EmbeddedObject", "String"): lambda v, mf, cache, s, p:
+        FieldTypesConverter.custom_types(v, mf, cache, s, "String", p),
+        ("EmbeddedObject", "Float"): lambda v, mf, cache, s, p: FieldTypesConverter.custom_types(v, mf, cache, s, "Float", p),
+        ("EmbeddedObject", "Bool"): lambda v, mf, cache, s, p: FieldTypesConverter.custom_types(v, mf, cache, s, "Bool", p),
+        ("EmbeddedObject", "Date"): lambda v, mf, cache, s, p: FieldTypesConverter.custom_types(v, mf, cache, s, "Date", p),
+        ("EmbeddedObject", "Time"): lambda v, mf, cache, s, p: FieldTypesConverter.custom_types(v, mf, cache, s, "Time", p),
+        ("EmbeddedObject", "DateTime"): lambda v, mf, cache, s, p:
+        FieldTypesConverter.custom_types(v, mf, cache, s, "DateTime", p),
         ("EmbeddedObject", "EmbeddedObject"):
-        lambda v, mf, cache, s: None if not v else v.get_value() if isinstance(v, EmbeddedObject) else mf.model(v),
-        ("Int", "EmbeddedObject"): lambda v, mf, cache, s: mf.model(v) if v else None,
-        ("String", "EmbeddedObject"): lambda v, mf, cache, s: mf.model(v) if v else None
+        lambda v, mf, cache, s, p: None if not v else v.get_value() if isinstance(v, EmbeddedObject) else mf.model(v),
+        ("Int", "EmbeddedObject"): lambda v, mf, cache, s, p: mf.model(v) if v else None,
+        ("String", "EmbeddedObject"): lambda v, mf, cache, s, p: mf.model(v) if v else None
     }
 
     @staticmethod
@@ -2512,7 +2537,7 @@ class FieldTypesConverter(object):
         return dtime(int(hours), int(minutes), int(seconds))
 
     @staticmethod
-    def to_reversed_link(mf: FieldTypes.SqlReversedLink, v, cache) -> RecordModel:
+    def to_reversed_link(mf: FieldTypes.SqlReversedLink, v, cache, p) -> RecordModel:
         """
         Конвертирует значение в объект модели в соответствии с типом SqlReversedLink
         @param mf: Поле маппера
@@ -2535,10 +2560,10 @@ class FieldTypesConverter(object):
         elif length == 0:
             return None
         else:
-            return mf.get_new_item().load_by_primary(collection[0], cache)
+            return mf.get_new_item(p).load_by_primary(collection[0], cache)
 
     @staticmethod
-    def from_list_to_special_type_list(mf, v, cache):
+    def from_list_to_special_type_list(mf, v, cache, p):
         """
         Конвертирует значение из списка первичных ключей к списку моделей
         @param mf: Поле маппера
@@ -2561,7 +2586,7 @@ class FieldTypesConverter(object):
         for i in v:
             if i not in unique:
                 unique.append(i)
-        return FieldValues.ListValue([mf.get_new_item().load_by_primary(objid, cache) for objid in unique])
+        return FieldValues.ListValue([mf.get_new_item(p).load_by_primary(objid, cache) for objid in unique])
 
     @staticmethod
     def handle_none_value_for_list_types(v, mf):
@@ -2585,20 +2610,20 @@ class FieldTypesConverter(object):
         return v
 
     @staticmethod
-    def embedded(mf, v):
-        return mf.get_new_item().mapper.translate_and_convert(v.get_data()) if v else FNone()
+    def embedded(mf, v, p):
+        return mf.get_new_item(p).mapper.translate_and_convert(v.get_data(), model_pool=p) if v else FNone()
 
     @staticmethod
-    def from_embedded(mf, v):
-        return mf.get_new_item().load_from_array(
-            mf.get_new_item().mapper.translate_and_convert(v, "database2mapper"), consider_as_unchanged=True
+    def from_embedded(mf, v, p):
+        return mf.get_new_item(p).load_from_array(
+            mf.get_new_item(p).mapper.translate_and_convert(v, "database2mapper", model_pool=p), consider_as_unchanged=True
         ) if v else FNone()
 
     @staticmethod
-    def custom_types(v, mf, cache, s, target_type):
+    def custom_types(v, mf, cache, s, target_type, p):
         if not v:
             return None
         target_lambda = FieldTypesConverter.converters.get(
             (mf.get_value_type_in_mapper_terms(v.get_value_type()).ident, target_type)
         )
-        return target_lambda(v.get_value(), mf, cache, s)
+        return target_lambda(v.get_value(), mf, cache, s, p)
