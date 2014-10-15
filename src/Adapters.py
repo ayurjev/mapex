@@ -118,7 +118,8 @@ class PgSqlDbAdapter(Adapter):
             FieldTypes.Bool: ["boolean", "bool"],
             FieldTypes.Date: ["date"],
             FieldTypes.DateTime: ["timestamp without time zone", "datetime"],
-            FieldTypes.Time: ["time without time zone", "time"]
+            FieldTypes.Time: ["time without time zone", "time"],
+            FieldTypes.Bytes: ["bytea"]
         }
 
 
@@ -240,7 +241,8 @@ class MySqlDbAdapter(Adapter):
             FieldTypes.Bool: ["boolean", "bool"],
             FieldTypes.Date: ["date"],
             FieldTypes.DateTime: ["datetime"],
-            FieldTypes.Time: ["time"]
+            FieldTypes.Time: ["time"],
+            FieldTypes.Bytes: ["binary"]
         }
 
 
@@ -343,7 +345,8 @@ class MsSqlDbAdapter(Adapter):
             FieldTypes.Bool: ["bit"],
             FieldTypes.Date: ["date"],
             FieldTypes.DateTime: ["datetime", "datetime2"],
-            FieldTypes.Time: ["time"]
+            FieldTypes.Time: ["time"],
+            FieldTypes.Bytes: ["varbinary"]
         }
 
 
@@ -404,7 +407,6 @@ class MongoDbAdapter(AdapterLogger):
         @param data: Данные для вставки
         @param primary_key: Первичный ключ коллекции
         """
-
         if self.query_analyzer:
             self.query_analyzer.log("insert", data)
         try:
