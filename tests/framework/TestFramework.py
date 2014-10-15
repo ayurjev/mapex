@@ -28,29 +28,6 @@ class Profiler(object):
         return "Elapsed time: {:.3f} sec".format(time.time() - self._startTime)
 
 
-def for_all_dbms(test_function):
-    """
-    Декоратор вызывающий декорируемую функцию для всех известных СУБД
-    @param test_function: Функция-тест
-    """
-    test_doc = re.sub("  +", "", test_function.__doc__).strip()
-
-    # noinspection PyDocstring
-    def wrapped(*args, **kwargs):
-        print()
-        print("%s..." % test_doc)
-        for test_framework in [MyDbMock(), PgDbMock(), MongoDbMock()]:
-            test_framework.up()
-            try:
-                with Profiler() as p:
-                    test_function(*args, dbms_fw=test_framework, **kwargs)
-                    result = "%s:%sOK (%s)" % (test_framework, " "*(15 - len(str(test_framework))), p.get_amount())
-                    print(result)
-            finally:
-                test_framework.down()
-    return wrapped
-
-
 class DbMock(object, metaclass=ABCMeta):
     """ Базовый класс для создания классов, создающих и уничтожающих инфраструктуру базы данных для тестирования """
 
@@ -600,6 +577,32 @@ class MongoDbMock(NoSqlDbMock):
     def get_dsn(self) -> tuple:
         """ Возвращает DSN информацию для подключения к БД """
         return "localhost", 27017, "test"
+
+
+mysql_mock, pgsql_mock, mongo_mock = MyDbMock(), PgDbMock(), MongoDbMock()
+#mssql_mock = MsDbMock()
+
+def for_all_dbms(test_function):
+    """
+    Декоратор вызывающий декорируемую функцию для всех известных СУБД
+    @param test_function: Функция-тест
+    """
+    test_doc = re.sub("  +", "", test_function.__doc__).strip()
+
+    # noinspection PyDocstring
+    def wrapped(*args, **kwargs):
+        print()
+        print("%s..." % test_doc)
+        for test_framework in [mysql_mock, pgsql_mock, mongo_mock]:
+            test_framework.up()
+            try:
+                with Profiler() as p:
+                    test_function(*args, dbms_fw=test_framework, **kwargs)
+                    result = "%s:%sOK (%s)" % (test_framework, " "*(15 - len(str(test_framework))), p.get_amount())
+                    print(result)
+            finally:
+                test_framework.down()
+    return wrapped
 
 
 ########################################### Основная тестовая коллекция Users #########################################
