@@ -20,6 +20,8 @@ class Pool(object):
         @return: Pool
         """
         assert min_connections >= 0
+        assert dsn
+
         self._pool = Queue()
         self._adapter = adapter
         self._dsn = dsn
