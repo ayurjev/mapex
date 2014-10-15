@@ -251,7 +251,7 @@ class Primary(ValueInside):
             if self.model.mapper.is_rel(primary_mf) and not isinstance(raw_value, RecordModel):
                 raw_value = primary_mf.get_new_item().load_by_primary(raw_value)
 
-            raw_value = primary_mf.from_string(raw_value) if isinstance(raw_value, str) else raw_value
+            raw_value = primary_mf.cast_to_field_type(raw_value)
             return raw_value
 
         if not self.model.mapper.primary.compound:

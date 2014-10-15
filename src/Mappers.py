@@ -252,8 +252,35 @@ class FieldTypes(object):
                     self.check_value(converted)
                 return converted
 
-        def from_string(self, value):
-            return FieldTypesConverter.converters.get(("String", self.ident))(value, None, None, None)
+        def cast_to_field_type(self, raw_value):
+            source_type = None
+            if isinstance(raw_value, str):
+                source_type = "String"
+            elif isinstance(raw_value, datetime):
+                source_type = "DateTime"
+            elif isinstance(raw_value, date):
+                source_type = "Date"
+            elif isinstance(raw_value, bool):
+                source_type = "Bool"
+            elif isinstance(raw_value, float):
+                source_type = "Float"
+            elif isinstance(raw_value, int):
+                source_type = "Int"
+            elif isinstance(raw_value, RecordModel):
+                source_type = "Link"
+            else:
+                try:
+                    int(raw_value)
+                    source_type = "Int"
+                except (ValueError, TypeError):
+                    pass
+            if not source_type:
+                return raw_value
+            try:
+                return FieldTypesConverter.converters.get((source_type, self.ident))(raw_value, self, None, None)
+            except TypeError:
+                print((source_type, self.ident))
+
 
         def translate(self, name, direction):
             """
@@ -352,7 +379,24 @@ class FieldTypes(object):
             """
             return isinstance(v, str)
 
+    class Bytes(BaseField):
+        """ Класс для представления бинарного типа уровная маппера """
+
+        ident = "Bytes"
+
+        def value_assertion(self, v) -> bool:
+            """ Проверка корректности значения
+            @param v: Значение для проверки
+            @return:  Корректно/Некорректно
+            @rtype : bool
+
+            """
+            return isinstance(v, (bytes, bytearray))
+
     class NoSqlString(String, NoSqlBaseField):
+        pass
+
+    class NoSqlBytes(Bytes, NoSqlBaseField):
         pass
 
     class Repr(String):
@@ -1114,6 +1158,9 @@ class SqlMapper(metaclass=ABCMeta):
     def str(self, mapper_field_name, db_field_name):
         return FieldTypes.String(self, mapper_field_name, db_field_name=db_field_name)
 
+    def bytes(self, mapper_field_name, db_field_name):
+        return FieldTypes.Bytes(self, mapper_field_name, db_field_name=db_field_name)
+
     def repr(self, mapper_field_name, db_field_name):
         return FieldTypes.Repr(self, mapper_field_name, db_field_name=db_field_name)
 
@@ -1843,6 +1890,9 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
         return FieldTypes.NoSqlString(self, mapper_field_name, db_field_name=db_field_name,
                                       db_field_type=db_field_type if db_field_type else FieldTypes.NoSqlString)
 
+    def bytes(self, mapper_field_name, db_field_name, db_field_type=None):
+        return FieldTypes.NoSqlBytes(self, mapper_field_name, db_field_name=db_field_name)
+
     def repr(self, mapper_field_name, db_field_name, db_field_type=None):
         return FieldTypes.Repr(self, mapper_field_name, db_field_name=db_field_name,
                                db_field_type=db_field_type if db_field_type else FieldTypes.NoSqlString)
@@ -2337,6 +2387,8 @@ class FieldTypesConverter(object):
         ('String', 'Link'): lambda v, mf, cache, s: mf.get_new_item().load_by_primary(v, cache) if v else FNone(),
         ("String", "List"): lambda v, mf, cache, s: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
         ("String", "ReversedLink"): lambda v, mf, cache, s:  FieldTypesConverter.to_reversed_link(mf, v, cache),
+        ("String", "ObjectID"): lambda v, mf, cache, s:  s,
+        ("Bytes", "Bytes"): lambda v, mf, cache, s: v,
         ("Float", "Float"): lambda v, mf, cache, s: float(v) if v else FNone(),
         ("Float", "String"): lambda v, mf, cache, s: str(v) if v else FNone(),
         ("Float", "Int"): lambda v, mf, cache, s: int(v),
@@ -2357,6 +2409,7 @@ class FieldTypesConverter(object):
         (v.save().primary.get_value(deep=True) if s else v.primary.get_value(deep=True)) if v else FNone(),
         ("Link", "String"): lambda v, mf, cache, s:
         str((v.save().primary.get_value(deep=True) if s else v.primary.get_value(deep=True))) if v else FNone(),
+        ("Link", "Link"): lambda v, mf, cache, s: v if v else FNone(),
         ("Link", "ObjectID"): lambda v, mf, cache, s:
         (v.save().primary.get_value(deep=True) if s else v.primary.get_value(deep=True)) if v else FNone(),
         ("List", "String"): lambda v, mf, cache, s: FieldTypesConverter.from_list_to_special_type_list(mf, v, cache),
