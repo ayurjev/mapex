@@ -242,7 +242,7 @@ class MySqlDbAdapter(Adapter):
             FieldTypes.Date: ["date"],
             FieldTypes.DateTime: ["datetime"],
             FieldTypes.Time: ["time"],
-            FieldTypes.Bytes: ["binary"]
+            FieldTypes.Bytes: ["binary", "varbinary"]
         }
 
 
