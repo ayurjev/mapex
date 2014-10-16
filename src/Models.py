@@ -496,8 +496,12 @@ class RecordModel(ValueInside, TrackChangesValue):
         """
         data = self.mapper.get_row([], self.primary.to_dict())
         # Первичный ключ не перезагружается чтобы не потерять изменения если ключ - это модель другой коллекции
-        if data and self.mapper.primary.exists() and self.mapper.primary.name() in data:
-            del data[self.mapper.primary.name()]
+        if data and self.mapper.primary.exists():
+            if self.mapper.primary.compound:
+                for pkey in self.mapper.primary.name():
+                    del data[pkey]
+            elif self.mapper.primary.name() in data:
+                del data[self.mapper.primary.name()]
         return self.load_from_array(data, consider_as_unchanged=True) if data else None
 
     def cache_load(self, cache):
