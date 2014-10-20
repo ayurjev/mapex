@@ -451,12 +451,13 @@ class MongoDbAdapter(AdapterLogger):
         res = self.db[collection_name].remove(conditions)
         return res
 
-    def update_query(self, collection_name: str, data: dict, conditions: dict, joined_tables, primary_key):
+    def update_query(self, collection_name: str, data: dict, conditions: dict, params: dict, joined_tables, primary_key):
         """
         Выполняет запрос на обновление данных в коллекции
         @param collection_name: Имя коллекции
         @param data: Данные для обновления
         @param conditions: Условия обновления записей
+        @param params: Параметры обновления записей
         @param joined_tables: Список присоединенных таблиц с уловия присоединения (Не используется)
         @param primary_key: Первичный ключ коллекции (Не используется)
         @return:

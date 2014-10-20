@@ -145,11 +145,12 @@ class PgSqlBuilder(SqlBuilder):
         assignment = query.get_values_assignment()
         conditions = query.concat_conditions([query.get_conditions(), query.get_join_conditions()])
         from_tables = ", ".join(query.get_joined_tables())
-        return '''UPDATE %s * SET %s %s %s %s ''' % (
+        return '''UPDATE %s * SET %s %s %s %s %s ''' % (
             query.get_table_name(),
             assignment,
             "FROM %s" % from_tables if len(from_tables) > 0 else "",
             "WHERE %s" % conditions if len(conditions) > 0 else "",
+            query.get_limit_only_section(),
             "RETURNING %s.%s" % (
                 query.get_table_name(), self.wrap_field(query.get_primary())
             ) if query.get_primary() else ""
@@ -298,11 +299,12 @@ class MySqlBuilder(SqlBuilder):
         query.use_table_name_in_set_section()
         assignment = query.get_values_assignment()
         conditions = query.get_conditions()
-        return '''UPDATE %s %s SET %s %s ''' % (
+        return '''UPDATE %s %s SET %s %s %s ''' % (
             query.get_table_name(),
             query.get_join_section(),
             assignment,
-            "WHERE %s" % conditions if conditions else ""
+            "WHERE %s" % conditions if conditions else "",
+            query.get_limit_only_section()
         ), query.get_query_data()
 
 
@@ -465,7 +467,8 @@ class MsSqlBuilder(SqlBuilder):
         query.use_table_name_in_set_section()
         assignment = query.get_values_assignment()
         conditions = query.get_conditions()
-        return '''UPDATE %s SET %s FROM %s %s %s ''' % (
+        return '''UPDATE %s %s SET %s FROM %s %s %s ''' % (
+            query.get_limit_section(),
             query.get_table_name(),
             assignment,
             query.get_table_name(),

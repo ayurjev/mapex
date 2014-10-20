@@ -504,6 +504,9 @@ class ConditionsMixin(BaseSqlQuery):
         """
         super().__init__(builder)
         self.conditions = {}
+        self.params = {
+            "skip": 0, "order": None
+        }
 
     def set_conditions(self, conditions: dict):
         """
@@ -526,6 +529,42 @@ class ConditionsMixin(BaseSqlQuery):
             )
             self.data += conditions_data
             return condition_string
+
+    def set_params(self, params: dict):
+        """
+        Устанавливает параметры выборки
+        @type params: dict
+        @param params: Словарь с параметрами выборки
+
+        """
+        if params:
+            for p in params:
+                self.params[p] = params[p]
+
+    def get_params_section(self) -> str:
+        """
+        Возвращает секцию параметров выборки (sort, limit, offset)
+        @return : Секция запроса с параметрами выборки
+        @rtype : str
+
+        """
+        order_section = self.builder.order_section(self.params.get("order"), self.table_name)
+        limit_skip_section = self.builder.limit_skip_section(self.params.get("limit"), self.params.get("skip"))
+        return "%s %s" % (
+            order_section if self.params.get("order") else "",
+            limit_skip_section
+        )
+
+    def get_limit_section(self) -> str:
+        return self.builder.limit_skip_section(self.params.get("limit"), self.params.get("skip"))
+
+    def get_limit_only_section(self) -> str:
+        return self.builder.limit_section(self.params.get("limit"))
+
+    def get_order_section(self) -> str:
+        """
+        """
+        return self.builder.order_section(self.params.get("order"), self.table_name)
 
     @staticmethod
     def concat_conditions(conditions_list: list) -> str:
@@ -554,9 +593,6 @@ class SelectQuery(ConditionsMixin, JoinMixin, BaseSqlQuery):
         """
         super().__init__(builder)
         self.fields = []
-        self.params = {
-            "skip": 0, "order": None
-        }
 
     def set_fields(self, fields: list):
         """
@@ -599,42 +635,6 @@ class SelectQuery(ConditionsMixin, JoinMixin, BaseSqlQuery):
             if field[0] not in fields:
                 fields.append(field[0])
         return self.builder.fields_enumeration(fields, self.table_name) if len(fields) > 0 else ""
-
-    def set_params(self, params: dict):
-        """
-        Устанавливает параметры выборки
-        @type params: dict
-        @param params: Словарь с параметрами выборки
-
-        """
-        if params:
-            for p in params:
-                self.params[p] = params[p]
-
-    def get_params_section(self) -> str:
-        """
-        Возвращает секцию параметров выборки (sort, limit, offset)
-        @return : Секция запроса с параметрами выборки
-        @rtype : str
-
-        """
-        order_section = self.builder.order_section(self.params.get("order"), self.table_name)
-        limit_skip_section = self.builder.limit_skip_section(self.params.get("limit"), self.params.get("skip"))
-        return "%s %s" % (
-            order_section if self.params.get("order") else "",
-            limit_skip_section
-        )
-
-    def get_limit_section(self) -> str:
-        """
-
-        """
-        return self.builder.limit_skip_section(self.params.get("limit"), self.params.get("skip"))
-
-    def get_order_section(self) -> str:
-        """
-        """
-        return self.builder.order_section(self.params.get("order"), self.table_name)
 
     def build(self) -> str:
         """
@@ -1056,12 +1056,13 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
         res = self.get_value(*query.build())
         return res if primary_key and res not in ["DELETE", "INSERT", "UPDATE"] else 0
 
-    def update_query(self, table_name, data, conditions, joins=None, primary_key=None):
+    def update_query(self, table_name, data, conditions, params=None, joins=None, primary_key=None):
         """
         Выполняет запрос на обновление данных в таблице в соответствии с условиями
         :param table_name:      Имя таблицы
         :param data:            Данные для обновления
         :param conditions:      Условия выборки
+        :param params:          Параметры выборки
         :param joins:           Список join'ов
         :param primary_key:     Первичный ключ таблицы
         :return:
@@ -1070,6 +1071,7 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
         query.set_table_name(table_name)
         query.set_update_data(data)
         query.set_conditions(conditions)
+        query.set_params(params)
         query.set_joins(joins)
         query.set_primary(primary_key.db_name() if primary_key.exists() else None)
         res = self.get_column(*query.build())

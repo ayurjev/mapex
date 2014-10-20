@@ -108,10 +108,11 @@ class TableModel(object):
         """
         return self.mapper.delete(self.mix_boundaries(conditions), model_pool=self.pool)
 
-    def update(self, data, conditions=None, model=None):
+    def update(self, data, conditions=None, params=None, model=None):
         """ Обновляет записи в коллекции
         :param data:        Данные для обновления записей
         :param conditions:  Условия обновления записей в коллекции
+        :param params:      Параметры обновления записей в коллекции
         """
         flat_data, lists_objects = self.mapper.split_data_by_relation_type(data)
         # Отсекаем из массива изменений, то,
@@ -129,7 +130,7 @@ class TableModel(object):
                 flat_data = {key: flat_data[key] for key in flat_data if conditions.get(key, "&bzx") != flat_data[key]}
 
         # Сохраняем записи в основной таблице
-        changed_models_pkeys = self.mapper.update(flat_data, conditions, model_pool=self.pool)
+        changed_models_pkeys = self.mapper.update(flat_data, conditions, params, model_pool=self.pool)
 
         if len(changed_models_pkeys) > 0:
             if model:
@@ -250,7 +251,7 @@ class Primary(ValueInside):
             if self.model.mapper.is_embedded_object(primary_mf):
                 raw_value = primary_mf.model(raw_value) if not isinstance(raw_value, EmbeddedObject) else raw_value
             if self.model.mapper.is_rel(primary_mf) and not isinstance(raw_value, RecordModel):
-                raw_value = primary_mf.get_new_item().load_by_primary(raw_value)
+                raw_value = primary_mf.get_new_item(self.model.pool).load_by_primary(raw_value)
 
             raw_value = primary_mf.cast_to_field_type(raw_value, self.model.pool)
             return raw_value
@@ -494,7 +495,7 @@ class RecordModel(ValueInside, TrackChangesValue):
         @rtype : RecordModel
 
         """
-        data = self.mapper.get_row([], self.primary.to_dict())
+        data = self.mapper.get_row([], self.primary.to_dict(), model_pool=self.pool)
         # Первичный ключ не перезагружается чтобы не потерять изменения если ключ - это модель другой коллекции
         if data and self.mapper.primary.exists():
             if self.mapper.primary.compound:

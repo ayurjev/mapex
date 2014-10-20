@@ -1623,7 +1623,7 @@ class SqlMapper(metaclass=ABCMeta):
         @rtype : dict
 
         """
-        result = list(self.get_rows(fields, conditions, model_pool))
+        result = list(self.get_rows(fields, conditions, model_pool=model_pool))
         return result[0] if len(result) == 1 else None
 
     def get_rows(self, fields: list=None, conditions: dict=None, params: dict=None, cache=None, model_pool=None) -> list:
@@ -1693,7 +1693,7 @@ class SqlMapper(metaclass=ABCMeta):
             last_record if self.primary.defined_by_user is False and last_record and last_record != 0 else data
         )
 
-    def update(self, data: dict, conditions: dict=None, model_pool=None):
+    def update(self, data: dict, conditions: dict=None, params: dict=None, model_pool=None):
         """
         Выполняет обновление существующих в таблице записей
         @param data: Новые данные
@@ -1709,17 +1709,21 @@ class SqlMapper(metaclass=ABCMeta):
                 # noinspection PyTypeChecker
                 changed_records_ids = [
                     self.primary.grab_value_from(chid)
-                    for chid in self.get_rows(self.primary.name(), conditions, model_pool=model_pool)
+                    for chid in self.get_rows(self.primary.name(), conditions, params, model_pool=model_pool)
                 ]
             else:                           # Если он обычный
-                changed_records_ids = list(self.get_column(self.primary.name(), conditions, model_pool=model_pool))
+                changed_records_ids = list(
+                    self.get_column(self.primary.name(), conditions, params, model_pool=model_pool)
+                )
         else:
             changed_records_ids = []
         if data != {}:
             try:
                 (model_pool if model_pool else self.pool).db.update_query(
-                    self.table_name, self.translate_and_convert(data, model_pool=model_pool),
+                    self.table_name,
+                    self.translate_and_convert(data, model_pool=model_pool),
                     self.translate_and_convert(conditions, save_unsaved=False, model_pool=model_pool),
+                    self.translate_params(params),
                     self.get_joins(self.get_fields_from_conditions(conditions)),
                     self.primary
                 )
@@ -2586,6 +2590,7 @@ class FieldTypesConverter(object):
         for i in v:
             if i not in unique:
                 unique.append(i)
+
         return FieldValues.ListValue([mf.get_new_item(p).load_by_primary(objid, cache) for objid in unique])
 
     @staticmethod
