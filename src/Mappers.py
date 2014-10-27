@@ -583,7 +583,6 @@ class FieldTypes(object):
             item = kwargs.get("joined_collection")().get_new_item()
             self.item_class = item.__class__
             self.items_collection_mapper = item.mapper
-
             if item.mapper.binded:
                 if item.mapper.primary.exists() is False and self.is_primary_required():
                     raise TableModelException("There is no primary key in %s" % item.mapper)
