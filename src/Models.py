@@ -188,7 +188,7 @@ class TableModel(object):
         :param params:              Параметры выборки (сортировка, лимит)
         :return: :raise:            TableModelException
         """
-        cache = TableModelCache(self.mapper)
+        cache = TableModelCache(self.mapper, self.pool)
         generator = self.mapper.get_rows([], self.mix_boundaries(bounds), params, cache, model_pool=self.pool)
         if isinstance(self.get_new_item().mapper, self.mapper.__class__) is False:
             raise TableModelException("Collection mapper and collection item mapper should be equal")
@@ -707,8 +707,9 @@ class EmbeddedObjectFactory(object):
 
 class TableModelCache(object):
     """ Класс для кэширования моделей уже проинициализированных моделей """
-    def __init__(self, mapper):
+    def __init__(self, mapper, pool=None):
         self._mapper = mapper
+        self._pool = pool
         self._cache = {}
         self._ids_cache = {}
 
@@ -757,11 +758,11 @@ class TableModelCache(object):
         """ Собирает кэш маппера из внешней переменной cache """
         mapper_cache = {}
         if m.primary.compound:
-            for item in m.get_new_collection().get_items({"or": self._ids_cache[m]}):
+            for item in m.get_new_collection(model_pool=self._pool).get_items({"or": self._ids_cache[m]}):
                 key = item.primary.get_value(deep=True)
                 mapper_cache[json.dumps(key)] = item.get_data()
         else:
-            for item in m.get_new_collection().get_items({m.primary.name(): ("in", self._ids_cache[m])}):
+            for item in m.get_new_collection(model_pool=self._pool).get_items({m.primary.name(): ("in", self._ids_cache[m])}):
                 key = item.primary.get_value(deep=True)
                 mapper_cache[key] = item.get_data()
         return mapper_cache
