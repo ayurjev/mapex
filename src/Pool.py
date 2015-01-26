@@ -10,7 +10,7 @@ class TooManyConnectionsError(Exception):
 
 class Pool(object):
     """ Пул адаптеров баз данных """
-    def __init__(self, adapter: type, dsn: tuple, min_connections: int=0, preopen_connections: bool=True):
+    def __init__(self, adapter: type, dsn: tuple, min_connections: int=1):
         """
         Конструктор пула
         @param adapter: класс адаптера
@@ -19,19 +19,16 @@ class Pool(object):
         @param preopen_connections: надо заполнить пул готовыми соединениями
         @return: Pool
         """
-        assert min_connections >= 0
+        assert min_connections > 0
         assert dsn
 
         self._pool = Queue()
         self._adapter = adapter
         self._dsn = dsn
         self._min_connections = min_connections
-        self._pool_wait_timeout = 1
 
         self._local = local()
-
-        if preopen_connections:
-            self._preopen_connections()
+        self._preopen_connections()
 
     @property
     def _new_connection(self) -> Adapter:
@@ -40,46 +37,18 @@ class Pool(object):
         """
         return self._adapter().connect(self._dsn)
 
-    @property
-    def _connection_from_pool(self):
-        """ Соединение из пула или False
-        @return: Adapter | False
-        """
-        try:
-            return self._pool.get_nowait()
-        except Empty:
-            return False
-
-    @property
-    def _wait_connection_from_pool(self):
-        """ Пытаемся немного подождать соединение из пула """
-        if self._min_connections == 0:
-            raise TooManyConnectionsError()
-
-        try:
-            return self._pool.get(timeout=self._pool_wait_timeout)
-        except Empty:
-            return False
-
     def _get_connection(self) -> Adapter:
-        """ Просит соединение у одного из источников и отправляется на следующий виток если никто ничего не вернул """
-        return self._connection_from_pool\
-            or self._new_connection\
-            or self._wait_connection_from_pool\
-            or self._get_connection()
+        """ Берёт соединение из пула """
+        return self._pool.get()
 
     def _return_connection(self, db: Adapter):
         """ Возвращает соединение в пул если оно ещё нужно иначе закрывает его """
-        if self.size < self._min_connections:
-            self._pool.put(db)
-        else:
-            db.close()
+        self._pool.put(db)
 
-    def _preopen_connections(self, opened=0):
+    def _preopen_connections(self):
         """ Наполняет пул минимальным количеством соединений """
-        if opened < self._min_connections:
-            with self:
-                self._preopen_connections(opened + 1)
+        for i in range(self._min_connections):
+            self._return_connection(self._new_connection)
 
     @property
     def db(self):
