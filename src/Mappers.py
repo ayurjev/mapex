@@ -83,7 +83,7 @@ class Primary(object):
         @raise TableMapperException: Если переданные данные не соответствуют формату первичного ключа
 
         """
-        if type(data) is dict:
+        if isinstance(data, dict):
             return {
                 field: data.get(field) for field in self.primary
             } if self.compound else data.get(self.primary)
@@ -1799,9 +1799,9 @@ class SqlMapper(metaclass=ABCMeta):
         @param cache: Используемый в запросе объект-кэш
         @return: Конвертированный объект
         """
-        if type(value) is list:
+        if isinstance(value, list):
             return [self.translate_and_convert(newvalue, direction, cache, save_unsaved, model_pool) for newvalue in value]
-        elif type(value) is dict:
+        elif isinstance(value, dict):
             converted = {}
             for field in value:
                 if field in ["or", "and"]:
@@ -2275,7 +2275,7 @@ class NoSqlMapper(SqlMapper, metaclass=ABCMeta):
         if direction == "database2mapper" and value == "_id" and self.get_property_by_db_name(value) is None:
             return value
 
-        if type(value) is dict:
+        if isinstance(value, dict):
             value = super().translate_and_convert(value, direction, cache, save_unsaved, model_pool=model_pool)
             value = self.convert_conditions_to_one_collection(value)
             value = self.to_mongo_conditions_format(value)
