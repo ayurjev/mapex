@@ -13,6 +13,19 @@ class PoolTestCase(TestCase):
         self.assertEqual(10, pool.size)
 
     @for_all_dbms
+    def test_open_ondemand(self, dbms_fw: DbMock):
+        """ При необходимости создаётся новое соединение которое потом возвращается в пул """
+        pool = Pool(adapter=dbms_fw.get_adapter(), dsn=dbms_fw.get_dsn(), min_connections=2)
+        self.assertEqual(2, pool.size)
+
+        with pool:
+            with pool:
+                with pool:
+                    # запрошено третье соединение, а в пуле было только два
+                    pass
+        self.assertEqual(3, pool.size)
+
+    @for_all_dbms
     def test_with(self, dbms_fw):
         """ Соединение можно получить в with """
         self.assertEqual(2, dbms_fw.pool.size)

@@ -37,9 +37,19 @@ class Pool(object):
         """
         return self._adapter().connect(self._dsn)
 
+    @property
+    def _connection_from_pool(self):
+        """ Соединение из пула или False
+        @return: Adapter | False
+        """
+        try:
+            return self._pool.get_nowait()
+        except Empty:
+            return False
+
     def _get_connection(self) -> Adapter:
-        """ Берёт соединение из пула """
-        return self._pool.get()
+        """ Берёт соединение из пула или открывает новое если пул пуст """
+        return self._connection_from_pool or self._new_connection
 
     def _return_connection(self, db: Adapter):
         """ Возвращает соединение в пул если оно ещё нужно иначе закрывает его """
