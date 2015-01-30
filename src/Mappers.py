@@ -1,6 +1,7 @@
 """ Модуль для работы с БД """
 import re
 import time
+from enum import Enum, EnumMeta
 from copy import deepcopy
 from datetime import datetime, date, time as dtime
 from abc import abstractmethod, ABCMeta
@@ -254,6 +255,7 @@ class FieldTypes(object):
 
         def cast_to_field_type(self, raw_value, model_pool):
             source_type = None
+
             if isinstance(raw_value, str):
                 source_type = "String"
             elif isinstance(raw_value, datetime):
@@ -379,6 +381,18 @@ class FieldTypes(object):
 
             """
             return isinstance(v, str)
+
+    class Enum(BaseField):
+        """ Класс для представления перечисляемого типа поля уровня маппера """
+        ident = "Enum"
+
+        def __init__(self, mapper, mapper_field_name, model: Enum, **kwargs):
+            assert isinstance(model, EnumMeta)
+            super().__init__(mapper, mapper_field_name, **kwargs)
+            self.model = model
+
+        def value_assertion(self, v) -> bool:
+            return v in self.model
 
     class Bytes(BaseField):
         """ Класс для представления бинарного типа уровная маппера """
@@ -1177,6 +1191,9 @@ class SqlMapper(metaclass=ABCMeta):
 
     def str(self, mapper_field_name, db_field_name):
         return FieldTypes.String(self, mapper_field_name, db_field_name=db_field_name)
+
+    def enum(self, mapper_field_name, db_field_name, model):
+        return FieldTypes.Enum(self, mapper_field_name, db_field_name=db_field_name, model=model)
 
     def bytes(self, mapper_field_name, db_field_name):
         return FieldTypes.Bytes(self, mapper_field_name, db_field_name=db_field_name)
@@ -2482,7 +2499,20 @@ class FieldTypesConverter(object):
         ("EmbeddedObject", "EmbeddedObject"):
         lambda v, mf, cache, s, p: None if not v else v.get_value() if isinstance(v, EmbeddedObject) else mf.model(v),
         ("Int", "EmbeddedObject"): lambda v, mf, cache, s, p: mf.model(v) if v else None,
-        ("String", "EmbeddedObject"): lambda v, mf, cache, s, p: mf.model(v) if v else None
+        ("String", "EmbeddedObject"): lambda v, mf, cache, s, p: mf.model(v) if v else None,
+
+        ("Enum", "Enum"): lambda v, mf, *args: v.value if isinstance(v, Enum) else mf.model(v),
+        ("Enum", "Repr"): lambda v, mf, *args: str(v),
+        ("Enum", "Int"): lambda v, mf, *args: int(v.value),
+        ("Enum", "Bool"): lambda v, mf, *args: bool(v.value),
+        ("Enum", "Float"): lambda v, mf, *args: float(v.value),
+        ("Enum", "String"): lambda v, mf, *args: str(v.value),
+        ("Enum", "Unknown"): lambda v, mf, *args: v.value,
+        ("Int", "Enum"): lambda v, mf, *args: mf.model(v),
+        ("Bool", "Enum"): lambda v, mf, *args: mf.model(v),
+        ("Float", "Enum"): lambda v, mf, *args: mf.model(v),
+        ("String", "Enum"): lambda v, mf, *args: mf.model(v),
+        ("Unknown", "Enum"): lambda v, mf, *args: mf.model(v),
     }
 
     @staticmethod
