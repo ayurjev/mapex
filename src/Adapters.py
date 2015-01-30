@@ -242,7 +242,8 @@ class MySqlDbAdapter(Adapter):
             FieldTypes.Date: ["date"],
             FieldTypes.DateTime: ["datetime"],
             FieldTypes.Time: ["time"],
-            FieldTypes.Bytes: ["binary", "varbinary", "tinyblob", "blob", "mediumblob", "longblob"]
+            FieldTypes.Bytes: ["binary", "varbinary", "tinyblob", "blob", "mediumblob", "longblob"],
+            FieldTypes.Enum: ["enum"]
         }
 
 
