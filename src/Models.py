@@ -5,6 +5,7 @@ from abc import ABCMeta
 from mapex.src.Exceptions import TableModelException, EmbeddedObjectFactoryException
 from mapex.src.Common import TrackChangesValue, ValueInside
 from mapex.src.Utils import do_dict, merge_dict
+from collections import OrderedDict
 import weakref
 import re
 import json
@@ -551,12 +552,12 @@ class RecordModel(ValueInside, TrackChangesValue):
         @rtype : dict
         """
         if not properties or not len(properties):
-            return {}
+            return OrderedDict()
         dicts = []
         for prop in properties:
             if isinstance(prop, dict):
                 for real_prop, fields in prop.items():
-                    dicts.append(do_dict(real_prop, [obj.stringify(fields) for obj in self.fetch(real_prop)]))
+                    dicts.append(OrderedDict([(real_prop, [obj.stringify(fields) for obj in self.fetch(real_prop)])]))
             else:
                 fetch_prop = self.fetch(prop)
                 # noinspection PyComparisonWithNone
@@ -564,7 +565,7 @@ class RecordModel(ValueInside, TrackChangesValue):
                     fetch_prop = None
                 elif isinstance(fetch_prop, EmbeddedObject):
                     fetch_prop = str(fetch_prop)
-                dicts.append(do_dict(prop, fetch_prop))
+                dicts.append(OrderedDict([(prop, fetch_prop)]))
         return merge_dict(*dicts)
 
     def fetch(self, path):
