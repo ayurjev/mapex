@@ -1245,8 +1245,8 @@ class SqlMapper(metaclass=ABCMeta):
     def set_new_collection(self, collection_class):
         self.item_collection_class = collection_class
 
-    def get_new_item(self, model_pool=None):
-        item = self.item_class(pool=model_pool)
+    def get_new_item(self, data=None, model_pool=None):
+        item = self.item_class(data, pool=model_pool)
         if not item.set_mapper(self):
             item.mapper = self
         return item

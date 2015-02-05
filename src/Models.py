@@ -29,14 +29,14 @@ class TableModel(object):
         # noinspection PyCallingNonCallable
         self.mapper = self.__class__.mapper()
 
-    def get_new_item(self):
+    def get_new_item(self, data=None):
         """
         Возвращает тип, которому будут соответствовать все элементы, входящие в состав данной коллеции
         По умолчанию будет некий абстрактный тип TableRecordModel,
         то есть обычный RecordModel, но с маппером текущей модели
         :return: type
         """
-        return self.mapper.get_new_item(self.pool)
+        return self.mapper.get_new_item(data, self.pool)
 
     def mix_boundaries(self, conditions: dict=None):
         if self.object_boundaries and conditions and self.mapper.boundaries:
