@@ -2501,7 +2501,7 @@ class FieldTypesConverter(object):
         ("Int", "EmbeddedObject"): lambda v, mf, cache, s, p: mf.model(v) if v else None,
         ("String", "EmbeddedObject"): lambda v, mf, cache, s, p: mf.model(v) if v else None,
 
-        ("Enum", "Enum"): lambda v, mf, *args: v.value if isinstance(v, Enum) else mf.model(v),
+        ("Enum", "Enum"): lambda v, mf, *args: v.value if isinstance(v, Enum) else (mf.model(v) if v else FNone()),
         ("Enum", "Repr"): lambda v, mf, *args: str(v),
         ("Enum", "Int"): lambda v, mf, *args: int(v.value),
         ("Enum", "Bool"): lambda v, mf, *args: bool(v.value),
