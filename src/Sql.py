@@ -934,6 +934,7 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
 
     def reconnect(self):
         """ Выполняет переподключение к серверу базы данных """
+        self.close()
         self.connect(self.connection_data)
 
     def close(self):

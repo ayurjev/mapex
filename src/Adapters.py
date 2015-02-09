@@ -139,6 +139,7 @@ class MySqlDbAdapter(Adapter):
         mysql.connector.errors.custom_error_exception(1040, MySqlDbAdapter.TooManyConnectionsError)
         self.dublicate_record_exception = mysql.connector.errors.IntegrityError
         self.lost_connection_error = mysql.connector.errors.IntegrityError, mysql.connector.errors.OperationalError
+        self.unread_result_error = mysql.connector.errors.InternalError
         self.no_table_connection = mysql.connector.errors.ProgrammingError
 
     # noinspection PyMethodMayBeStatic
@@ -160,7 +161,7 @@ class MySqlDbAdapter(Adapter):
                 host=connection_data[0], port=connection_data[1],
                 user=connection_data[2], password=connection_data[3],
                 database=connection_data[4],
-                autocommit=True
+                autocommit=True, buffered=True
             )
         except MySqlDbAdapter.TooManyConnectionsError:
             pass
@@ -180,6 +181,9 @@ class MySqlDbAdapter(Adapter):
         except self.lost_connection_error:
             self.reconnect()
             cursor = self.connection.cursor()
+        except self.unread_result_error:
+            self.reconnect()
+            cursor = self.connection.cursor()
 
         result = list(cursor.execute(sql, multi=True))
         cursor.close()
@@ -195,6 +199,9 @@ class MySqlDbAdapter(Adapter):
         try:
             cursor = self.connection.cursor()
         except self.lost_connection_error:
+            self.reconnect()
+            cursor = self.connection.cursor()
+        except self.unread_result_error:
             self.reconnect()
             cursor = self.connection.cursor()
 
