@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from itertools import filterfalse
 
 
@@ -20,7 +21,7 @@ def do_dict(notation, value) -> dict:
     @return: словарь с записанным в него значением value (Пример: {"user": {"profile": {"email": "test@test.com"}}})
     """
     head, _, tail = notation.partition(".")
-    return {head: do_dict(tail, value)} if tail else {head: value}
+    return OrderedDict({head: do_dict(tail, value)}) if tail else OrderedDict({head: value})
 
 
 def merge_dict(dest: dict, *sources: dict) -> dict:

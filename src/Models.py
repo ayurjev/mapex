@@ -552,7 +552,7 @@ class RecordModel(ValueInside, TrackChangesValue):
         for prop in properties:
             if isinstance(prop, dict):
                 for real_prop, fields in prop.items():
-                    dicts.append(OrderedDict([(real_prop, [obj.stringify(fields) for obj in self.fetch(real_prop)])]))
+                    dicts.append(do_dict(real_prop, [obj.stringify(fields) for obj in self.fetch(real_prop)]))
             else:
                 fetch_prop = self.fetch(prop)
                 # noinspection PyComparisonWithNone
@@ -560,7 +560,7 @@ class RecordModel(ValueInside, TrackChangesValue):
                     fetch_prop = None
                 elif isinstance(fetch_prop, EmbeddedObject):
                     fetch_prop = str(fetch_prop)
-                dicts.append(OrderedDict([(prop, fetch_prop)]))
+                dicts.append(do_dict(prop, fetch_prop))
         return merge_dict(*dicts)
 
     def fetch(self, path):
