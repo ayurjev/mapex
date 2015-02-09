@@ -133,7 +133,7 @@ class TableModel(object):
         # Сохраняем записи в основной таблице
         changed_models_pkeys = self.mapper.update(flat_data, conditions, params, model_pool=self.pool)
 
-        if len(changed_models_pkeys) > 0:
+        if len(changed_models_pkeys) > 0 and lists_objects != {}:
             if model:
                 items_to_update = [model]
             elif self.mapper.primary.compound:
@@ -141,13 +141,8 @@ class TableModel(object):
             else:
                 pkeys_raw = [pk.get_value() if isinstance(pk, ValueInside) else pk for pk in changed_models_pkeys]
                 items_to_update = self.get_items({self.mapper.primary.name(): ("in", pkeys_raw)})
-
-            if lists_objects != {}:
-                for updated_item in items_to_update:
-                    self.mapper.link_all_list_objects(lists_objects, updated_item, self.pool)
-            return items_to_update
-        else:
-            return []
+            for updated_item in items_to_update:
+                self.mapper.link_all_list_objects(lists_objects, updated_item, self.pool)
 
     def get_property_list(self, property_name: str, conditions=None, params=None):
         """
