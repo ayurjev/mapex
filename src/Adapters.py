@@ -161,7 +161,7 @@ class MySqlDbAdapter(Adapter):
                 host=connection_data[0], port=connection_data[1],
                 user=connection_data[2], password=connection_data[3],
                 database=connection_data[4],
-                autocommit=True, buffered=True
+                autocommit=True
             )
         except MySqlDbAdapter.TooManyConnectionsError:
             pass
