@@ -473,6 +473,9 @@ class RecordModel(ValueInside, TrackChangesValue):
         for key in data:
             self.__setattr__(key, data[key])
 
+        if self.mapper.primary.exists():
+            self.primary.set_value(self.primary.get_value(deep=True))
+
         if consider_as_unchanged:
             self._loaded_from_db = True
             self.up_to_date()
