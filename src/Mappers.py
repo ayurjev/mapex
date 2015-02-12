@@ -7,6 +7,8 @@ from datetime import datetime, date, time as dtime
 from abc import abstractmethod, ABCMeta
 from collections import OrderedDict
 from collections import defaultdict
+from threading import RLock
+
 
 from mapex.src.Exceptions import TableModelException, TableMapperException, DublicateRecordException
 from mapex.src.Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
@@ -1130,6 +1132,9 @@ class Join(object):
             self.stringify_condition(builder)
         )
 
+_new_lock = RLock()
+_init_lock = RLock()
+
 
 class SqlMapper(metaclass=ABCMeta):
     """Класс создания Mapper'ов к таблицам БД """
@@ -1143,8 +1148,9 @@ class SqlMapper(metaclass=ABCMeta):
     binded = False
 
     def __new__(cls, *a, **kwa):
-        if cls._instance is None:
-            cls._instance = object.__new__(cls)
+        with _new_lock:
+            if cls._instance is None:
+                cls._instance = object.__new__(cls)
         return cls._instance
 
     @classmethod
@@ -1160,22 +1166,23 @@ class SqlMapper(metaclass=ABCMeta):
     item_collection_class = TableModel
 
     def __init__(self):
-        if not self.__class__._inited:
-            for dep in self.__class__.dependencies:
-                dep()
-            self.__class__._inited = True
-            self.table_name = None                      # Имя основной таблицы
-            self.db_fields = {}
-            self.db_primary_key = ""
-            self.primary = Primary(self)                # Объект, представляющий собой первичный ключ маппера
-            self.boundaries = None
-            self._properties = {}
-            self._joined = Joins()
-            self._reversed_map = {}
-            self.is_mock = False
-            self.binded = False
-            self.bind()                     # Запускаем процесс инициализации маппера
-            self.binded = True
+        with _init_lock:
+            if not self.__class__._inited:
+                for dep in self.__class__.dependencies:
+                    dep()
+                self.__class__._inited = True
+                self.table_name = None                      # Имя основной таблицы
+                self.db_fields = {}
+                self.db_primary_key = ""
+                self.primary = Primary(self)                # Объект, представляющий собой первичный ключ маппера
+                self.boundaries = None
+                self._properties = {}
+                self._joined = Joins()
+                self._reversed_map = {}
+                self.is_mock = False
+                self.binded = False
+                self.bind()                     # Запускаем процесс инициализации маппера
+                self.binded = True
 
     @staticmethod
     def factory_method(item):
