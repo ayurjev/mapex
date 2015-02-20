@@ -196,7 +196,7 @@ class TableModel(object):
         cache.cache(arrays)
         return items
 
-    def print_items(self, bounds=None, params=None, properties=None, bytes_len=10):
+    def pretty_print(self, bounds=None, params=None, properties=None, bytes_len=10):
         """
         Pretty print collection items
         :param bounds:     Условия выборки записей
@@ -658,6 +658,43 @@ class RecordModel(ValueInside, TrackChangesValue):
             self.exec_lazy_loading()
             self.mark_as_changed()
         object.__setattr__(self, name, val)
+
+    def pretty_print(self, properties=None, bytes_len=10):
+        """
+        Pretty print collection items
+        :param bounds:     Условия выборки записей
+        :param params:     Параметры выборки (сортировка, лимит)
+        :param properties  Поля которые надо отобразить. Если не заполнено то отобразятся все
+        :param bytes_len   Максимальная длина поля для bytes
+        """
+        from prettytable import PrettyTable
+
+        if not properties:
+            properties = self.mapper.get_properties()
+        properties = sorted(properties)
+
+        # Наполнение таблицы
+        table = PrettyTable()
+
+        data = self.stringify(properties)
+
+        # Имена колонок известны только теперь
+        # т.к. .stringify схлопывает свойства подмодели в одно поле  по имени подмодели
+        if not table.field_names:
+            table.field_names = data.keys()
+
+        for key, value in data.items():
+            data[key] = value[:bytes_len] if isinstance(value, bytes) and bytes_len is not None else str(value)
+
+        table.add_row(data.values())
+
+        # Если в таблице нет данных то выводим пустую
+        if not table.field_names:
+            table.field_names = properties
+
+        # Печать таблицы
+        table.align = 'l'
+        print(str(self.__class__) + '\n' + str(table))
 
     def __getattribute__(self, name):
         """ При любом обращении к полям модели необходимо инициализировать модель """
