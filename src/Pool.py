@@ -19,7 +19,7 @@ class Pool(object):
         @param preopen_connections: надо заполнить пул готовыми соединениями
         @return: Pool
         """
-        assert min_connections > 0
+        assert min_connections >= 0
         assert dsn
 
         self._pool = Queue()
