@@ -9,6 +9,7 @@ from collections import OrderedDict
 import weakref
 import re
 import json
+import base64
 
 
 class TableModel(object):
@@ -600,6 +601,8 @@ class RecordModel(ValueInside, TrackChangesValue):
                     fetch_prop = None
                 elif isinstance(fetch_prop, EmbeddedObject):
                     fetch_prop = str(fetch_prop)
+                elif isinstance(fetch_prop, bytes):
+                    fetch_prop = base64.b64encode(fetch_prop).decode()
                 dicts.append(do_dict(prop, fetch_prop))
         return merge_dict(*dicts)
 
