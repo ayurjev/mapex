@@ -13,7 +13,7 @@ def partition(predicate, iterable):
     return filter(predicate, iterable), filterfalse(predicate, iterable)
 
 
-def do_dict(notation, value) -> dict:
+def do_dict(notation, value, cls=OrderedDict) -> dict:
     """
     Рекурсивно строит многомерный словарь по предоставленной точечной нотации
     @param notation: точечная нотация (Пример: user.profile.email)
@@ -21,10 +21,10 @@ def do_dict(notation, value) -> dict:
     @return: словарь с записанным в него значением value (Пример: {"user": {"profile": {"email": "test@test.com"}}})
     """
     head, _, tail = notation.partition(".")
-    return OrderedDict({head: do_dict(tail, value)}) if tail else OrderedDict({head: value})
+    return cls({head: do_dict(tail, value, cls)}) if tail else cls({head: value})
 
 
-def merge_dict(dest: dict, *sources: dict) -> dict:
+def merge_dict(dest: dict, *sources: dict, cls=dict) -> dict:
     """
     Рекурсивно обновляет словарь приёмник данными из словарей источников
     @param dest: словарь приёмник
@@ -33,6 +33,6 @@ def merge_dict(dest: dict, *sources: dict) -> dict:
     """
     for source in sources:
         for key, value in source.items():
-            dest[key] = merge_dict(dest[key] if key in dest.keys() else {}, value) if isinstance(value, dict) else value
+            dest[key] = merge_dict(dest[key] if key in dest.keys() else cls(), value, cls=cls) if isinstance(value, dict) else value
 
     return dest
