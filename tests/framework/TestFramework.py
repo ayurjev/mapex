@@ -103,7 +103,7 @@ class DbMock(object, metaclass=ABCMeta):
         """ Возвращает новый экземпляр коллекции статусов пользователя """
 
     @abstractmethod
-    def get_new_profile_instance(self):
+    def get_new_profile_instance(self, data=None):
         """ Возвращает новый экземпляр класса профиля пользователя """
 
     @abstractmethod
@@ -275,9 +275,9 @@ class SqlDbMock(DbMock):
         """ Возвращает новый экземпляр коллекции статусов пользователя """
         return SqlStatuses()
 
-    def get_new_profile_instance(self):
+    def get_new_profile_instance(self, data=None):
         """ Возвращает новый экземпляр класса профиля пользователя """
-        return SqlProfile()
+        return SqlProfile(data)
 
     def get_new_profiles_collection_instance(self):
         """ Возвращает новый экземпляр коллекции статусов пользователя """
@@ -438,9 +438,9 @@ class NoSqlDbMock(DbMock):
         """ Возвращает новый экземпляр коллекции статусов пользователя """
         return NoSqlStatuses()
 
-    def get_new_profile_instance(self):
+    def get_new_profile_instance(self, data=None):
         """ Возвращает новый экземпляр класса профиля пользователя """
-        return NoSqlProfile()
+        return NoSqlProfile(data)
 
     def get_new_profiles_collection_instance(self):
         """ Возвращает новый экземпляр коллекции статусов пользователя """
@@ -584,8 +584,10 @@ class MongoDbMock(NoSqlDbMock):
         return "localhost", 27017, "test"
 
 
-mysql_mock, pgsql_mock, mongo_mock = MyDbMock(), PgDbMock(), MongoDbMock()
+mysql_mock = MyDbMock()
 mysql_mock2 = MyDbMock2()
+pgsql_mock = PgDbMock()
+mongo_mock = MongoDbMock()
 #mssql_mock = MsDbMock()
 
 def for_all_dbms(test_function):

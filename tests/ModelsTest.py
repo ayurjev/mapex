@@ -106,7 +106,13 @@ class TableModelTest(unittest.TestCase):
         """ Проверим способ получения свойств для объектов, хранящихся в модели """
         users = dbms_fw.get_new_users_collection_instance()
         users.insert([
-            dbms_fw.get_new_user_instance({"age": 99, "name": "valueForFieldName1"}),
+            dbms_fw.get_new_user_instance({
+                "age": 99,
+                "name": "valueForFieldName1",
+                "account": dbms_fw.get_new_account_instance({
+                    "profile": dbms_fw.get_new_profile_instance({"avatar": "abc"})
+                })
+            }),
             dbms_fw.get_new_user_instance({"age": 999, "name": "valueForFieldName2"}),
             dbms_fw.get_new_user_instance({"age": 9999, "name": "valueForFieldName3"})
         ])
@@ -117,10 +123,10 @@ class TableModelTest(unittest.TestCase):
 
         self.assertCountEqual(
             [
-                {"name": "valueForFieldName1", "age": 99},
-                {"name": "valueForFieldName2", "age": 999}
+                {"name": "valueForFieldName1", "age": 99, "account.profile.avatar": "abc"},
+                {"name": "valueForFieldName2", "age": 999, "account.profile.avatar": None}
             ],
-            users.get_properties_list(["name", "age"], {"age": ("in", [99, 999])})
+            users.get_properties_list(["name", "age", "account.profile.avatar"], {"age": ("in", [99, 999])})
         )
 
     @for_all_dbms

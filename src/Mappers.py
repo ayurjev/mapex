@@ -319,7 +319,7 @@ class FieldTypes(object):
                     return re.search("\[(.+?)\]", name).group(1)
 
                 if name.find(".") > -1:
-                    table_name, field_name = name.split(".")
+                    table_name, field_name = name.split(".", 1)
                     mapper_property = self.mapper.get_property(table_name)
                     return '%s.%s' % (
                         mapper_property.get_name(),
