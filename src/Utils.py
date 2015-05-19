@@ -32,7 +32,8 @@ def merge_dict(dest: dict, *sources: dict, cls=dict) -> dict:
     @return:
     """
     for source in sources:
+        if isinstance(source, OrderedDict) and not isinstance(dest, OrderedDict):
+            dest = OrderedDict(dest)
         for key, value in source.items():
             dest[key] = merge_dict(dest[key] if key in dest.keys() else cls(), value, cls=cls) if isinstance(value, dict) else value
-
     return dest
