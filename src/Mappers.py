@@ -2391,8 +2391,8 @@ class FieldValues(object):
             self.changed = False
 
         def __getattribute__(self, item):
-            if item == "__class__":
-                return object.__getattribute__(self, "__class__")
+            if item in ["__class__", "__deepcopy__"]:
+                return object.__getattribute__(self, item)
             raise AttributeError("'NoneValue' object has no attribute '%s'" % item)
 
         # noinspection PyMethodMayBeStatic
@@ -2413,6 +2413,9 @@ class FieldValues(object):
         
         def __repr__(self):
             return "None"
+
+        def __deepcopy__(self, x, memo=None):
+            pass
 
 
 class FNone(FieldValues.NoneValue):
