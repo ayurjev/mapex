@@ -431,18 +431,19 @@ class RecordModel(ValueInside, TrackChangesValue):
 
         self.primary.ensure_exists()
         if not self._loaded_from_db:
-            if self.get_value(deep=True) and self.mapper.primary.autoincremented and self.get_new_collection().count(self.primary.to_dict(origin=True)):
-                # Если объект уже находится в состоянии сохранения или объект не был изменен
-                # то выходим, чтобы разорвать рекурсию
-                if self._updating or not self.is_changed():
-                    return self
-
-                self.validate()
-                with UpdateLock(self):
-                    to_be_written = self.get_data_for_write_operation()
-                    self.get_new_collection().update(to_be_written, self.primary.to_dict(origin=True), model=self)
-                    self.up_to_date()
-                return self
+            # ИБО НЕХ!
+            # if self.get_value(deep=True) and self.mapper.primary.autoincremented and self.get_new_collection().count(self.primary.to_dict(origin=True)):
+            #     # Если объект уже находится в состоянии сохранения или объект не был изменен
+            #     # то выходим, чтобы разорвать рекурсию
+            #     if self._updating or not self.is_changed():
+            #         return self
+            #
+            #     self.validate()
+            #     with UpdateLock(self):
+            #         to_be_written = self.get_data_for_write_operation()
+            #         self.get_new_collection().update(to_be_written, self.primary.to_dict(origin=True), model=self)
+            #         self.up_to_date()
+            #     return self
             try:
                 self._loaded_from_db = True
                 self.get_new_collection().insert(self)
