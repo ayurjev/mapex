@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS `usersTable` (
     `AccountID` INT(11) DEFAULT NULL,
     `CustomPropertyValue` INT(11) DEFAULT NULL,
     PRIMARY KEY (`ID`)
-) COLLATE='utf8_general_ci' ENGINE=MyISAM;
+) COLLATE='utf8_general_ci' ENGINE=INNODB;
 
 CREATE TABLE IF NOT EXISTS `accountsTable` (
     `AccountID` INT(11) NOT NULL AUTO_INCREMENT,
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS `accountsTable` (
     `PhoneField` VARCHAR(32) DEFAULT NULL,
     `ProfileID` INT(11) DEFAULT NULL,
      PRIMARY KEY (`AccountID`)
-) COLLATE='utf8_general_ci' ENGINE=MyISAM;
+) COLLATE='utf8_general_ci' ENGINE=INNODB;
 
 CREATE TABLE IF NOT EXISTS `tagsTable` (
     `TagID` INT(11) NOT NULL AUTO_INCREMENT,

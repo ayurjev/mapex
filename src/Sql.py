@@ -918,24 +918,27 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
     def __init__(self):
         self.connection_data = (None,)
         self.connection = None
+        self.autocommit = True
+        self.tx = None
         self.dublicate_record_exception = None
         self.query_builder = self.get_query_builder()
         super().__init__()
 
-    def connect(self, connection_data: tuple):
+    def connect(self, connection_data: tuple, autocommit=True):
         """
         Выполняет подключение к СУБД
         @param connection_data: Последовательность данных для подключения к СУБД
         @type connection_data: tuple
         """
         self.connection_data = connection_data
-        self.connection = self.open_connection(connection_data)
+        self.autocommit = autocommit
+        self.connection = self.open_connection(self.connection_data, self.autocommit)
         return self if self.connection else False
 
     def reconnect(self):
         """ Выполняет переподключение к серверу базы данных """
         self.close()
-        self.connect(self.connection_data)
+        self.connect(self.connection_data, self.autocommit)
 
     def close(self):
         """ Закрывает соединение с базой данных """
@@ -1115,7 +1118,7 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
         return self.__getattribute__(adapter_method)(*res)
 
     @abstractmethod
-    def open_connection(self, connection_data):
+    def open_connection(self, connection_data, autocommit=True):
         """
         Открывает соединение с базой данных и возвращает его
         :param connection_data:  Данные для подключение к СУБД
@@ -1154,3 +1157,15 @@ class Adapter(AdapterLogger, metaclass=ABCMeta):
         :param table_name:  Имя таблицы
         :return: :raise:    AdapterException
         """
+
+    @abstractmethod
+    def start_transaction(self):
+        pass
+
+    @abstractmethod
+    def commit(self):
+        pass
+
+    @abstractmethod
+    def rollback(self):
+        pass

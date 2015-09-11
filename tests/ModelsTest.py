@@ -2254,5 +2254,101 @@ class EmbeddedObjectsFactoryUnittests(unittest.TestCase):
         self.assertIsNone(CustomPropertyWithoutNoneFactory(None))
         self.assertRaises(EmbeddedObjectFactoryException, CustomPropertyWithoutNoneFactory, 3)
 
+
+class TransactionTests(unittest.TestCase):
+    @for_all_dbms
+    def test_empty_commit(self, dbms_fw: DbMock):
+        """Коммит пустой транзакции"""
+        users = dbms_fw.get_new_users_collection_instance()
+        with users.pool.transaction:
+            pass
+
+    @for_all_dbms
+    def test_empty_rollback(self, dbms_fw: DbMock):
+        """Откат пустой транзакции"""
+        users = dbms_fw.get_new_users_collection_instance()
+        with users.pool.transaction as tx:
+            tx.rollback()
+
+    @for_all_dbms
+    def test_autocommit(self, dbms_fw: DbMock):
+        """ Транзакция подтверждается автоматически """
+        users = dbms_fw.get_new_users_collection_instance()
+
+        self.assertEqual(0, users.count())
+        with users.pool.transaction:
+            dbms_fw.get_new_user_instance({"name": "Андрей", "age": 26}).save()
+        self.assertEqual(1, users.count())
+
+    @for_all_dbms
+    def test_rollback(self, dbms_fw: DbMock):
+        """ Транзакцию можно откатить """
+        users = dbms_fw.get_new_users_collection_instance()
+        self.assertEqual(0, users.count())
+
+        with users.pool.transaction as tx:
+            dbms_fw.get_new_user_instance({"name": "Андрей", "age": 26}).save()
+            self.assertEqual(1, users.count())
+            tx.rollback()
+        self.assertEqual(0, users.count())
+
+    @for_all_dbms
+    def test_autorollback(self, dbms_fw: DbMock):
+        """ Транзакция автоматически откатывается если возникло исключение """
+        users = dbms_fw.get_new_users_collection_instance()
+        self.assertEqual(0, users.count())
+
+        def tx_with_exception():
+            with users.pool.transaction:
+                dbms_fw.get_new_user_instance({"name": "Андрей", "age": 26}).save()
+                self.assertEqual(1, users.count())
+                raise Exception()
+
+        self.assertRaises(Exception, tx_with_exception)
+        self.assertEqual(0, users.count())
+
+    @for_all_dbms
+    def test_crossmodel(self, dbms_fw: DbMock):
+        """ Транзакция общая для моделей данного пула """
+        users = dbms_fw.get_new_users_collection_instance()
+        accounts = dbms_fw.get_new_accounts_collection_instance()
+        self.assertEqual(0, users.count())
+        self.assertEqual(0, accounts.count())
+
+        with users.pool.transaction as tx:
+            dbms_fw.get_new_user_instance({"name": "Андрей", "age": 26}).save()
+            dbms_fw.get_new_account_instance({"email": "andrey.yurjev@gmail.com"}).save()
+            self.assertEqual(1, users.count())
+            self.assertEqual(1, accounts.count())
+            tx.rollback()
+
+        self.assertEqual(0, users.count())
+        self.assertEqual(0, accounts.count())
+
+    @for_all_dbms
+    def test_inline_usage(self, dbms_fw: DbMock):
+        """ Транзакция без контекста """
+        users = dbms_fw.get_new_users_collection_instance()
+        tx = users.pool.transaction
+        tx.start()
+        dbms_fw.get_new_user_instance({"name": "Андрей", "age": 26}).save()
+        self.assertEqual(1, users.count())
+        tx.rollback()
+        self.assertEqual(0, users.count())
+
+    @for_all_dbms
+    def test_autorollback_inline_tx(self, dbms_fw: DbMock):
+        """ При ручном старте транзакции она автоматически откатывается при удалении объекта транзакции """
+        users = dbms_fw.get_new_users_collection_instance()
+
+        def do_tx():
+            tx = users.pool.transaction
+            tx.start()
+            dbms_fw.get_new_user_instance({"name": "Андрей", "age": 26}).save()
+            self.assertEqual(1, users.count())
+
+        do_tx()
+        self.assertEqual(0, users.count())
+
 if __name__ == "__main__":
     unittest.main()

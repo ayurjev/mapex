@@ -25,7 +25,7 @@ class PgSqlDbAdapter(Adapter):
         return PgSqlBuilder()
 
     # noinspection PyMethodMayBeStatic
-    def open_connection(self, connection_data):
+    def open_connection(self, connection_data, autocommit=True):
         """
         Открывает соединение с базой данных
         :param connection_data: Данные для подключение к СУБД
@@ -122,6 +122,16 @@ class PgSqlDbAdapter(Adapter):
             FieldTypes.Bytes: ["bytea"]
         }
 
+    def start_transaction(self):
+        self.tx = self.connection.xact()
+        self.tx.start()
+
+    def commit(self):
+        self.tx.commit()
+
+    def rollback(self):
+        self.tx.rollback()
+
 
 class MySqlDbAdapter(Adapter):
     """ Адаптер для работы с MySQL """
@@ -148,7 +158,7 @@ class MySqlDbAdapter(Adapter):
         return MySqlBuilder()
 
     # noinspection PyMethodMayBeStatic
-    def open_connection(self, connection_data):
+    def open_connection(self, connection_data, autocommit=True):
         """
         Открывает соединение с базой данных
         :param connection_data: Данные для подключение к СУБД
@@ -161,7 +171,7 @@ class MySqlDbAdapter(Adapter):
                 host=connection_data[0], port=connection_data[1],
                 user=connection_data[2], password=connection_data[3],
                 database=connection_data[4],
-                autocommit=True
+                autocommit=autocommit
             )
         except MySqlDbAdapter.TooManyConnectionsError:
             pass
@@ -196,6 +206,7 @@ class MySqlDbAdapter(Adapter):
         :param sql:         SQL-Запрос
         :param params:      Параметры для плейсхолдеров запроса
         """
+
         try:
             cursor = self.connection.cursor()
         except self.lost_connection_error:
@@ -253,6 +264,18 @@ class MySqlDbAdapter(Adapter):
             FieldTypes.Enum: ["enum"]
         }
 
+    def start_transaction(self):
+        if not self.connection.in_transaction:
+            self.connection.start_transaction()
+
+    def commit(self):
+        if self.connection.in_transaction:
+            self.connection.commit()
+
+    def rollback(self):
+        if self.connection.in_transaction:
+            self.connection.rollback()
+
 
 class MsSqlDbAdapter(Adapter):
     """ Адаптер для работы с MSSQL """
@@ -268,7 +291,7 @@ class MsSqlDbAdapter(Adapter):
         return MsSqlBuilder()
 
     # noinspection PyMethodMayBeStatic
-    def open_connection(self, connection_data):
+    def open_connection(self, connection_data, autocommit=True):
         """
         Открывает соединение с базой данных
         :param connection_data: Данные для подключение к СУБД
@@ -277,7 +300,7 @@ class MsSqlDbAdapter(Adapter):
         import pyodbc
 
         # noinspection PyUnresolvedReferences
-        return pyodbc.connect('DSN=%s;UID=%s;PWD=%s;DATABASE=%s' % connection_data, autocommit=True)
+        return pyodbc.connect('DSN=%s;UID=%s;PWD=%s;DATABASE=%s' % connection_data, autocommit=autocommit)
 
     def close_connection(self):
         """ Закрывает соединение с базой данных """
@@ -355,7 +378,17 @@ class MsSqlDbAdapter(Adapter):
             FieldTypes.DateTime: ["datetime", "datetime2"],
             FieldTypes.Time: ["time"],
             FieldTypes.Bytes: ["varbinary"]
+
         }
+
+    def start_transaction(self):
+        pass
+
+    def commit(self):
+        pass
+
+    def rollback(self):
+        pass
 
 
 # noinspection PyUnusedLocal
@@ -371,7 +404,7 @@ class MongoDbAdapter(AdapterLogger):
         self.dublicate_record_exception = pymongo.errors.DuplicateKeyError
         self.update_primary_exception = pymongo.errors.OperationFailure
 
-    def connect(self, connection_data: tuple):
+    def connect(self, connection_data: tuple, autocommit=True):
         """ Выполняет подключение к СУБД по переданным реквизитам
         @param connection_data: host, port, database
         """
@@ -509,3 +542,12 @@ class MongoDbAdapter(AdapterLogger):
                 self.autoincremented = True
 
         return {"_id": NoSqlField()}, "_id"
+
+    def start_transaction(self):
+        pass
+
+    def commit(self):
+        pass
+
+    def rollback(self):
+        pass

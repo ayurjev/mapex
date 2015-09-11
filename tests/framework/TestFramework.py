@@ -60,7 +60,7 @@ class DbMock(object, metaclass=ABCMeta):
         """ Возвращает новый экземпляр класса пользователя """
 
     @abstractmethod
-    def get_new_users_collection_instance(self, boundaries=None):
+    def get_new_users_collection_instance(self, boundaries=None) -> TableModel:
         """ Возвращает новый экземпляр коллекции пользователей """
 
     @abstractmethod
@@ -588,20 +588,21 @@ mysql_mock = MyDbMock()
 mysql_mock2 = MyDbMock2()
 pgsql_mock = PgDbMock()
 mongo_mock = MongoDbMock()
-#mssql_mock = MsDbMock()
+# mssql_mock = MsDbMock()
 
 def for_all_dbms(test_function):
     """
     Декоратор вызывающий декорируемую функцию для всех известных СУБД
     @param test_function: Функция-тест
     """
-    test_doc = re.sub("  +", "", test_function.__doc__).strip()
+    test_doc = re.sub("  +", "", test_function.__doc__).strip() if test_function.__doc__ else ""
 
     # noinspection PyDocstring
     def wrapped(*args, **kwargs):
-        print()
-        print("%s..." % test_doc)
-        for test_framework in [mysql_mock, pgsql_mock, mongo_mock]:
+        if test_doc:
+            print()
+            print("%s..." % test_doc)
+        for test_framework in [mysql_mock, pgsql_mock]:
             test_framework.up()
             try:
                 with Profiler() as p:

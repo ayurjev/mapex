@@ -17,7 +17,7 @@ class TableModel(object):
     mapper = None
 
     def __init__(self, *boundaries, pool=None):
-        self.pool = pool
+        self._pool = pool
         if self.__class__.mapper is None:
             raise TableModelException("No mapper for %s model" % self)
         # noinspection PyCallingNonCallable
@@ -29,6 +29,14 @@ class TableModel(object):
                     self.object_boundaries.update(b)
         # noinspection PyCallingNonCallable
         self.mapper = self.__class__.mapper()
+
+    @property
+    def pool(self):
+        return self._pool or self.mapper.pool
+
+    @pool.setter
+    def pool(self, pool):
+        self._pool = pool
 
     def get_new_item(self, data=None):
         """
@@ -366,7 +374,7 @@ class RecordModel(ValueInside, TrackChangesValue):
     mapper = None
 
     def __init__(self, data=None, loaded_from_db=False, pool=None):
-        self.pool = pool
+        self._pool = pool
         self._lazy_load = False
         self._changed = True
         # weakref.proxy решает проблему циклической связанности между экземплярами Primary и RecordModel
@@ -382,6 +390,14 @@ class RecordModel(ValueInside, TrackChangesValue):
         self.set_mapper(self.__class__.mapper())
         if data:
             self.load_from_array(data.get_data() if isinstance(data, RecordModel) else data, consider_as_unchanged=loaded_from_db)
+
+    @property
+    def pool(self):
+        return self._pool or self.mapper.pool
+
+    @pool.setter
+    def pool(self, pool):
+        self._pool = pool
 
     def get_value(self, deep=False):
         return self.primary.get_value(deep)
@@ -843,3 +859,36 @@ class TableModelCache(object):
                 key = item.primary.get_value(deep=True)
                 mapper_cache[key] = item.get_data()
         return mapper_cache
+
+
+class Transaction(object):
+    def __init__(self, pool):
+        self.pool = pool
+        self.in_transaction = False
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.in_transaction:
+            if exc_type:
+                self.rollback()
+            else:
+                self.commit()
+
+    def __del__(self):
+        if self.in_transaction:
+            self.rollback()
+
+    def start(self):
+        self.in_transaction = True
+        self.pool.db.start_transaction()
+
+    def commit(self):
+        self.pool.db.commit()
+        self.in_transaction = False
+
+    def rollback(self):
+        self.pool.db.rollback()
+        self.in_transaction = False
