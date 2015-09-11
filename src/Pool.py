@@ -1,7 +1,8 @@
 from queue import Queue, Empty
 from threading import local
+
 from mapex.src.Sql import Adapter
-from mapex.src.Mappers import SqlMapper
+from mapex.src.Models import Transaction
 
 
 class TooManyConnectionsError(Exception):
@@ -25,17 +26,17 @@ class Pool(object):
         self._pool = Queue()
         self._adapter = adapter
         self._dsn = dsn
+        self.in_transaction = False
         self._min_connections = min_connections
 
         self._local = local()
         self._preopen_connections()
 
-    @property
-    def _new_connection(self) -> Adapter:
+    def _new_connection(self, autocommit=True) -> Adapter:
         """ Новое соединение к базе данных или False
         @return: Adapter | False
         """
-        return self._adapter().connect(self._dsn)
+        return self._adapter().connect(self._dsn, autocommit)
 
     @property
     def _connection_from_pool(self):
@@ -49,7 +50,7 @@ class Pool(object):
 
     def _get_connection(self) -> Adapter:
         """ Берёт соединение из пула или открывает новое если пул пуст """
-        return self._connection_from_pool or self._new_connection
+        return self._connection_from_pool or self._new_connection()
 
     def _return_connection(self, db: Adapter):
         """ Возвращает соединение в пул если оно ещё нужно иначе закрывает его """
@@ -58,22 +59,32 @@ class Pool(object):
     def _preopen_connections(self):
         """ Наполняет пул минимальным количеством соединений """
         for i in range(self._min_connections):
-            self._return_connection(self._new_connection)
+            self._return_connection(self._new_connection())
 
     @property
     def db(self):
         """ Свойство хранит соединение с базой данных """
-        #TODO проверять состояние соединения и `del self._local.connection` если соединение умерло
-        if not hasattr(self._local, "connection"):
-            self._local.connection = self._get_connection()
-        return self._local.connection
+        if self.in_transaction:
+            if not hasattr(self._local, "tx_connection"):
+                self._local.tx_connection = self._new_connection(autocommit=False)
+            return self._local.tx_connection
+        else:
+            if not hasattr(self._local, "connection"):
+                self._local.connection = self._get_connection()
+            return self._local.connection
 
     @db.deleter
     def db(self):
         """ Освобождает соединение и возвращает в пул """
         if hasattr(self._local, "connection"):
+            if self.in_transaction:
+                self._local.connection.rollback()
             self._return_connection(self._local.connection)
             del self._local.connection
+
+    @property
+    def transaction(self) -> Transaction:
+        return Transaction(self)
 
     @property
     def size(self):
