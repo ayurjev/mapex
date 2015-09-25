@@ -31,6 +31,7 @@ class Pool(object):
 
         self._local = local()
         self._preopen_connections()
+        self.in_transaction = False
 
     def _new_connection(self, autocommit=True) -> Adapter:
         """ Новое соединение к базе данных или False

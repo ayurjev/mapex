@@ -864,31 +864,32 @@ class TableModelCache(object):
 class Transaction(object):
     def __init__(self, pool):
         self.pool = pool
-        self.in_transaction = False
 
     def __enter__(self):
         self.start()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.in_transaction:
+        print("TX", exc_type)
+        if self.pool.in_transaction:
             if exc_type:
+                print("TXRB", exc_type)
                 self.rollback()
             else:
                 self.commit()
 
     def __del__(self):
-        if self.in_transaction:
+        if self.pool.in_transaction:
             self.rollback()
 
     def start(self):
-        self.in_transaction = True
+        self.pool.in_transaction = True
         self.pool.db.start_transaction()
 
     def commit(self):
         self.pool.db.commit()
-        self.in_transaction = False
+        self.pool.in_transaction = False
 
     def rollback(self):
         self.pool.db.rollback()
-        self.in_transaction = False
+        self.pool.in_transaction = False
