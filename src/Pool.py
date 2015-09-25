@@ -26,12 +26,22 @@ class Pool(object):
         self._pool = Queue()
         self._adapter = adapter
         self._dsn = dsn
-        self.in_transaction = False
         self._min_connections = min_connections
 
         self._local = local()
         self._preopen_connections()
-        self.in_transaction = False
+
+    @property
+    def in_transaction(self):
+        if not hasattr(self._local, "in_transaction"):
+            self._local.in_transaction = False
+        return self._local.in_transaction
+
+    @in_transaction.setter
+    def in_transaction(self, value):
+        if not hasattr(self._local, "in_transaction"):
+            self._local.in_transaction = False
+        self._local.in_transaction = True if value else False
 
     def _new_connection(self, autocommit=True) -> Adapter:
         """ Новое соединение к базе данных или False

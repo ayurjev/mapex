@@ -1601,7 +1601,7 @@ class SqlMapper(metaclass=ABCMeta):
 
         # Выполняем запрос и начинаем отдавать результаты, переводя их в формат маппера на лету:
         pool = (model_pool if model_pool else self.pool)
-        if hasattr(pool, "in_transaction") and pool.in_transaction:
+        if pool.in_transaction:
             for row in pool.db.select_query(self.table_name, fields, conditions, params, joins, "get_rows", self.primary):
                 yield self.translate_and_convert(
                     {fields[it]: row[it] for it in range(len(fields))}, "database2mapper", cache, model_pool=model_pool
