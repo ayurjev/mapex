@@ -73,23 +73,29 @@ class Pool(object):
             self._return_connection(self._new_connection())
 
     @property
+    def _local_tx_connection(self):
+        if not hasattr(self._local, "tx_connection"):
+            self._local.tx_connection = self._new_connection(autocommit=False)
+        return self._local.tx_connection
+
+    @property
+    def _local_connection(self):
+        if not hasattr(self._local, "connection"):
+            self._local.connection = self._get_connection()
+        return self._local.connection
+
+    @property
     def db(self):
         """ Свойство хранит соединение с базой данных """
-        if self.in_transaction:
-            if not hasattr(self._local, "tx_connection"):
-                self._local.tx_connection = self._new_connection(autocommit=False)
-            return self._local.tx_connection
-        else:
-            if not hasattr(self._local, "connection"):
-                self._local.connection = self._get_connection()
-            return self._local.connection
+        return self._local_tx_connection if self.in_transaction else self._local_connection
 
     @db.deleter
     def db(self):
         """ Освобождает соединение и возвращает в пул """
+        if hasattr(self._local, "tx_connection"):
+            del self._local.tx_connection
+
         if hasattr(self._local, "connection"):
-            if self.in_transaction:
-                self._local.connection.rollback()
             self._return_connection(self._local.connection)
             del self._local.connection
 
@@ -104,6 +110,9 @@ class Pool(object):
 
     def __enter__(self):
         """ На входе получает из пула новое соединение и запоминает в локальной переменной потока """
+        if self.in_transaction:
+            return self.db
+
         if not hasattr(self._local, "connections"):
             self._local.connections = []
 
@@ -112,4 +121,5 @@ class Pool(object):
 
     def __exit__(self, *args):
         """ На выходе возвращает соединение в пул """
-        self._return_connection(self._local.connections.pop())
+        if not self.in_transaction:
+            self._return_connection(self._local.connections.pop())

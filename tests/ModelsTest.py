@@ -2350,5 +2350,31 @@ class TransactionTests(unittest.TestCase):
         do_tx()
         self.assertEqual(0, users.count())
 
+    @for_all_dbms
+    def test_select_after_update(self, dbms_fw: DbMock):
+        """ Если у пула открыта транзакция
+        то все работы с базой данных выполняются через общее соединения с транзакцией """
+        user = dbms_fw.get_new_user_instance({"name": "Petya"})
+        user.save()
+
+        users = dbms_fw.get_new_users_collection_instance()
+        self.assertEqual(1, len(users.get_items({"name": "Petya"})))
+        self.assertEqual(0, len(users.get_items({"name": "Vasya"})))
+        with users.pool.transaction:
+            users.update({"name": "Vasya"})
+            self.assertEqual(0, len(users.get_items({"name": "Petya"})))
+            self.assertEqual(1, len(users.get_items({"name": "Vasya"})))
+
+    @for_all_dbms
+    def test_asertion_of_dilicated_transactions(self, dbms_fw: DbMock):
+        """ Запрет нескольких транзакций для одного пула """
+        users = dbms_fw.get_new_users_collection_instance()
+        def tx_with_exception():
+            with users.pool.transaction:
+                with users.pool.transaction:
+                    pass
+
+        self.assertRaises(AssertionError, tx_with_exception)
+
 if __name__ == "__main__":
     unittest.main()
