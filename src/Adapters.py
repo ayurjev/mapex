@@ -266,7 +266,11 @@ class MySqlDbAdapter(Adapter):
 
     def start_transaction(self):
         if not self.connection.in_transaction:
-            self.connection.start_transaction()
+            try:
+                self.connection.start_transaction()
+            except self.lost_connection_error:
+                self.reconnect()
+                self.connection.start_transaction()
 
     def commit(self):
         if self.connection.in_transaction:
