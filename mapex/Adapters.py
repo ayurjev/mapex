@@ -1,10 +1,9 @@
 """ Модуль с адаптерами для подключения к СУБД """
 
-from mapex.src.Exceptions import AdapterException, DublicateRecordException
-from mapex.src.Sql import Adapter, PgDbField, MySqlDbField, MsSqlDbField
-from mapex.src.Mappers import FieldTypes
-from mapex.src.QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder
-from mapex.src.Sql import AdapterLogger
+from .Exceptions import AdapterException, DublicateRecordException
+from .Sql import Adapter, PgDbField, MySqlDbField, MsSqlDbField, AdapterLogger
+from .Mappers import FieldTypes
+from .QueryBuilders import PgSqlBuilder, MySqlBuilder, MsSqlBuilder
 
 
 class NoTableFound(Exception):
