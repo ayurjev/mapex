@@ -8,15 +8,13 @@ import os
 import unittest
 from datetime import date
 
-from mapex.tests.framework.TestFramework import for_all_dbms, CustomProperty, CustomPropertyFactory, \
-    CustomPropertyPositive, CustomPropertyNegative, DbMock,\
-    CustomPropertyWithNoneFactory, CustomPropertyWithoutNoneFactory, MyDbMock2
+from .framework.TestFramework import for_all_dbms, CustomProperty, CustomPropertyFactory, CustomPropertyPositive, \
+    CustomPropertyNegative, DbMock, CustomPropertyWithNoneFactory, CustomPropertyWithoutNoneFactory, MyDbMock2
 
-from mapex.tests.framework.TestFramework import AModel, BModel, CModel, ACollection, BCollection, CCollection
-from mapex.tests.framework.TestFramework import MyDbMock
+from .framework.TestFramework import AModel, BModel, CModel, ACollection, BCollection, CCollection
+from .framework.TestFramework import MyDbMock
 
-
-from mapex.src.Exceptions import TableModelException, TableMapperException, \
+from mapex.Exceptions import TableModelException, TableMapperException, \
     EmbeddedObjectFactoryException, DublicateRecordException
 
 
@@ -253,9 +251,9 @@ class TableModelTest(unittest.TestCase):
 
         # test update
         ausers.update({"age": 1}, {"name": "nikolay"})  # Изменяем возраст для nikolay в коллекции ausers
-        self.assertEqual(0, users.count({"age": 1}))    # Ничего измениться не должно, так как nikolay не в ausers
-        ausers.update({"age": 2})                       # Изменяем возраст для всех записей в коллекции ausers
-        self.assertEqual(2, users.count({"age": 2}))    # Обе записи в ausers изменены
+        self.assertEqual(0, users.count({"age": 1}))  # Ничего измениться не должно, так как nikolay не в ausers
+        ausers.update({"age": 2})  # Изменяем возраст для всех записей в коллекции ausers
+        self.assertEqual(2, users.count({"age": 2}))  # Обе записи в ausers изменены
 
         # test delete
         self.assertEqual(2, ausers.count())
@@ -277,7 +275,7 @@ class TableModelTest(unittest.TestCase):
         Проверим возможность создания мапперов с предопределенными границами, которые нельзя переопределять в моделях
         """
         users = dbms_fw.get_new_users_collection_instance()
-        ausers = dbms_fw.get_new_users_collection_instance_with_boundaries()        # {"name": ("match", "a*")}
+        ausers = dbms_fw.get_new_users_collection_instance_with_boundaries()  # {"name": ("match", "a*")}
 
         self.assertEqual(0, users.count())
         self.assertEqual(0, ausers.count())
@@ -525,8 +523,8 @@ class TableModelTest(unittest.TestCase):
         users = dbms_fw.get_new_users_collection_instance()
         tags = dbms_fw.get_new_tags_collection_instance()
 
-         # Поле tags маппера объявлено типом List.
-         # В него нельзя писать ничего кроме списков экземпляров класса dbms_fw.get_new_tag_instance().__class__
+        # Поле tags маппера объявлено типом List.
+        # В него нельзя писать ничего кроме списков экземпляров класса dbms_fw.get_new_tag_instance().__class__
         self.assertRaises(
             TableModelException,
             users.insert,
@@ -654,16 +652,16 @@ class TableModelTest(unittest.TestCase):
         # Теперь попробуем удалить запись по данным о тегах:
         # Сперва убедимся в корректности всех трех таблиц:
         users_tags_collection = dbms_fw.get_new_userstags_collection_instance()
-        self.assertEqual(2, users.count())                  # 2 пользователя
-        self.assertEqual(3, tags.count())                   # 3 тега
-        if users_tags_collection:                               # Для тех, кто реализует списки через таблицы отношений:
+        self.assertEqual(2, users.count())  # 2 пользователя
+        self.assertEqual(3, tags.count())  # 3 тега
+        if users_tags_collection:  # Для тех, кто реализует списки через таблицы отношений:
             self.assertEqual(3, users_tags_collection.count())  # 3 записи отношений
         # Удаляем:
-        users.delete({"tags.name": "SecondTag"})            # Должен удалиться только один пользователь SecondUser
+        users.delete({"tags.name": "SecondTag"})  # Должен удалиться только один пользователь SecondUser
         # Проверяем результат:
-        self.assertEqual(1, users.count())                  # Запись о пользователе удалена
-        self.assertEqual(3, tags.count())                   # Коллекция тегов не затронута
-        if users_tags_collection:                               # Для тех, кто реализует списки через таблицы отношений:
+        self.assertEqual(1, users.count())  # Запись о пользователе удалена
+        self.assertEqual(3, tags.count())  # Коллекция тегов не затронута
+        if users_tags_collection:  # Для тех, кто реализует списки через таблицы отношений:
             self.assertEqual(2, users_tags_collection.count())  # 2 записи отношений - одна удалена с пользователем
 
     @for_all_dbms
@@ -838,16 +836,16 @@ class TableModelTest(unittest.TestCase):
 
         # Теперь попробуем удалить запись по данным о статусах:
         # Сперва убедимся в корректности всех трех таблиц:
-        self.assertEqual(2, users.count())                                  # 2 пользователя
-        self.assertEqual(2, profiles.count())                               # 2 профиля
-        self.assertEqual(1, profiles.count({"user.name": "SecondUser"}))    # 1 из 2 принадлежит SecondUser
-        self.assertEqual(2, profiles.count({"user": ("exists", True)}))     # У всех записей указан пользователь
+        self.assertEqual(2, users.count())  # 2 пользователя
+        self.assertEqual(2, profiles.count())  # 2 профиля
+        self.assertEqual(1, profiles.count({"user.name": "SecondUser"}))  # 1 из 2 принадлежит SecondUser
+        self.assertEqual(2, profiles.count({"user": ("exists", True)}))  # У всех записей указан пользователь
         # Удаляем SecondUser:
-        users.delete({"profile.avatar": "SecondAvatar"})                   # Должен удалиться один юзер - SecondUser
+        users.delete({"profile.avatar": "SecondAvatar"})  # Должен удалиться один юзер - SecondUser
         # Проверяем результат:
-        self.assertEqual(1, users.count())                                  # Запись о пользователе удалена
-        self.assertEqual(2, profiles.count())                               # Кол-во профилей не изменилось
-        self.assertEqual(1, profiles.count({"user": ("exists", True)}))     # Но у одной из записей не указан юзер
+        self.assertEqual(1, users.count())  # Запись о пользователе удалена
+        self.assertEqual(2, profiles.count())  # Кол-во профилей не изменилось
+        self.assertEqual(1, profiles.count({"user": ("exists", True)}))  # Но у одной из записей не указан юзер
 
     @for_all_dbms
     def test_query_with_reversed_lists(self, dbms_fw: DbMock):
@@ -949,9 +947,9 @@ class TableModelTest(unittest.TestCase):
         second_user = users.get_item({"uid": second_user.uid})
         self.assertCountEqual([status2, status3], second_user.statuses)
 
-        self.assertCountEqual([status2], third_user.statuses)   # Ибо эта модель еще не знает, что ее изменили
+        self.assertCountEqual([status2], third_user.statuses)  # Ибо эта модель еще не знает, что ее изменили
         third_user = users.get_item({"uid": third_user.uid})
-        self.assertCountEqual([], third_user.statuses)          # Теперь все актуально...
+        self.assertCountEqual([], third_user.statuses)  # Теперь все актуально...
         self.assertEqual(3, users.count())
         self.assertEqual(3, statuses.count())
 
@@ -1010,16 +1008,16 @@ class TableModelTest(unittest.TestCase):
 
         # Теперь попробуем удалить запись по данным о статусах:
         # Сперва убедимся в корректности всех трех таблиц:
-        self.assertEqual(3, users.count())                                  # 3 пользователя
-        self.assertEqual(3, statuses.count())                               # 3 статуса
-        self.assertEqual(1, statuses.count({"user.name": "SecondUser"}))    # 1 из 3 принадлежит SecondUser
-        self.assertEqual(3, statuses.count({"user": ("exists", True)}))     # У всех записей указан пользователь
+        self.assertEqual(3, users.count())  # 3 пользователя
+        self.assertEqual(3, statuses.count())  # 3 статуса
+        self.assertEqual(1, statuses.count({"user.name": "SecondUser"}))  # 1 из 3 принадлежит SecondUser
+        self.assertEqual(3, statuses.count({"user": ("exists", True)}))  # У всех записей указан пользователь
         # Удаляем SecondUser:
-        users.delete({"statuses.weight": 91})                               # Должен удалиться только SecondUser
+        users.delete({"statuses.weight": 91})  # Должен удалиться только SecondUser
         # Проверяем результат:
-        self.assertEqual(2, users.count())                                  # Запись о пользователе удалена
-        self.assertEqual(3, statuses.count())                               # Кол-во статусов не изменилось
-        self.assertEqual(2, statuses.count({"user": ("exists", True)}))     # Но у одной из записей не указан юзер
+        self.assertEqual(2, users.count())  # Запись о пользователе удалена
+        self.assertEqual(3, statuses.count())  # Кол-во статусов не изменилось
+        self.assertEqual(2, statuses.count({"user": ("exists", True)}))  # Но у одной из записей не указан юзер
 
     @for_all_dbms
     def test_query_with_embeded_links(self, dbms_fw: DbMock):
@@ -1137,19 +1135,19 @@ class TableModelTest(unittest.TestCase):
 
         # Теперь попробуем удалить запись по данным о паспортах:
         # Сперва убедимся в корректности всех трех таблиц:
-        self.assertEqual(2, users.count())                                       # 2 пользователя
+        self.assertEqual(2, users.count())  # 2 пользователя
         if passports:
-            self.assertEqual(3, passports.count())                               # 3 паспорта
-            self.assertEqual(1, passports.count({"user.name": "SecondUser"}))    # 1 из 2 принадлежит SecondUser
-            self.assertEqual(2, passports.count({"user": ("exists", True)}))     # У 2 записей указан пользователь
+            self.assertEqual(3, passports.count())  # 3 паспорта
+            self.assertEqual(1, passports.count({"user.name": "SecondUser"}))  # 1 из 2 принадлежит SecondUser
+            self.assertEqual(2, passports.count({"user": ("exists", True)}))  # У 2 записей указан пользователь
 
         # Удаляем SecondUser:
-        users.delete({"passport.number": 789463})                                # Должен удалиться один SecondUser
+        users.delete({"passport.number": 789463})  # Должен удалиться один SecondUser
         # Проверяем результат:
-        self.assertEqual(1, users.count())                                       # Запись о пользователе удалена
+        self.assertEqual(1, users.count())  # Запись о пользователе удалена
         if passports:
-            self.assertEqual(2, passports.count())                               # На один паспорт меньше
-            self.assertEqual(1, passports.count({"user": ("exists", True)}))     # Только у одной из записей указан юзер
+            self.assertEqual(2, passports.count())  # На один паспорт меньше
+            self.assertEqual(1, passports.count({"user": ("exists", True)}))  # Только у одной из записей указан юзер
 
     @for_all_dbms
     def test_embedded_lists_with_not_autoincremented_primary_key(self, dbms_fw: DbMock):
@@ -1376,17 +1374,17 @@ class TableModelTest(unittest.TestCase):
 
         # Теперь попробуем удалить запись по данным о статусах:
         # Сперва убедимся в корректности всех трех таблиц:
-        self.assertEqual(3, users.count())                                   # 3 пользователя
+        self.assertEqual(3, users.count())  # 3 пользователя
         if documents:
-            self.assertEqual(3, documents.count())                               # 3 документа
-            self.assertEqual(1, documents.count({"user.name": "SecondUser"}))    # 1 из 3 принадлежит SecondUser
-            self.assertEqual(3, documents.count({"user": ("exists", True)}))     # У всех записей указан пользователь
+            self.assertEqual(3, documents.count())  # 3 документа
+            self.assertEqual(1, documents.count({"user.name": "SecondUser"}))  # 1 из 3 принадлежит SecondUser
+            self.assertEqual(3, documents.count({"user": ("exists", True)}))  # У всех записей указан пользователь
         # Удаляем SecondUser:
-        users.delete({"documents.series": 7859})                             # Должен удалиться только SecondUser
+        users.delete({"documents.series": 7859})  # Должен удалиться только SecondUser
         # Проверяем результат:
-        self.assertEqual(2, users.count())                                   # Запись о пользователе удалена
+        self.assertEqual(2, users.count())  # Запись о пользователе удалена
         if documents:
-            self.assertEqual(2, documents.count())                           # Стало на один паспорт меньше
+            self.assertEqual(2, documents.count())  # Стало на один паспорт меньше
 
     @for_all_dbms
     def test_working_with_table_without_primary_crud(self, dbms_fw: DbMock):
@@ -1647,7 +1645,8 @@ class TableModelTest(unittest.TestCase):
         )
 
     @for_all_dbms
-    def test_working_with_table_without_primary_as_secondary_table_joined_as_list_with_compound_key(self, dbms_fw: DbMock):
+    def test_working_with_table_without_primary_as_secondary_table_joined_as_list_with_compound_key(self,
+                                                                                                    dbms_fw: DbMock):
         """ Проверим особенности работы с таблицами без первичного ключа в качестве присоединенных м-к-м таблиц """
         users = dbms_fw.get_new_users_collection_instance()
         collection_without_primary = dbms_fw.get_new_noprimary_collection_instance()
@@ -1759,7 +1758,7 @@ class TableModelTest(unittest.TestCase):
         tags = dbms_fw.get_new_tags_collection_instance()
         accounts = dbms_fw.get_new_accounts_collection_instance()
 
-         # Создадим два тега
+        # Создадим два тега
         tag1 = dbms_fw.get_new_tag_instance()
         tag1.name = "FirstTag"
         tag1.weight = 12
@@ -1791,8 +1790,8 @@ class TableModelTest(unittest.TestCase):
 
         # Создадим пользователей
         users.insert(dbms_fw.get_new_user_instance({"name": "FirstUser", "account": account1, "tags": [tag1, tag2]}))
-        users.insert(dbms_fw.get_new_user_instance({"name": "SecondUser", "account": account2,  "tags": [tag2]}))
-        users.insert(dbms_fw.get_new_user_instance({"name": "ThirdUser", "account": account3,  "tags": [tag3]}))
+        users.insert(dbms_fw.get_new_user_instance({"name": "SecondUser", "account": account2, "tags": [tag2]}))
+        users.insert(dbms_fw.get_new_user_instance({"name": "ThirdUser", "account": account3, "tags": [tag3]}))
         self.assertEqual(3, users.count())
 
         def start_logging():
@@ -1854,11 +1853,12 @@ class TableModelTest(unittest.TestCase):
             tags_names = [tag.name for tag in user.tags]
             self.assertTrue(len(tags_names) > 0)
         count += dbms_fw.get_queries_amount("loading_tags")
-        self.assertEqual(count, count_queries())             # Потрачено три запроса
+        self.assertEqual(count, count_queries())  # Потрачено три запроса
 
 
 class RecordModelTest(unittest.TestCase):
     """ Модульные тесты для класса TableModel """
+
     def setUp(self):
         # noinspection PyPep8Naming
         self.maxDiff = None
@@ -2104,6 +2104,7 @@ class RecordModelTest(unittest.TestCase):
 
 class RecordModelTestMySqlOnly(unittest.TestCase):
     """ Некоторые тесты, которые не имеет смысла запускть для всех СУБД """
+
     def setUp(self):
         self.m2 = MyDbMock2()
         MyDbMock2().up()
@@ -2156,7 +2157,7 @@ class RecordModelTestMySqlOnly(unittest.TestCase):
         # m1 = MyDbMock()
         # m1.up()             # Такая последовательность вызовов up позволит оставить пулы исходных мапперов на m1.
 
-        from mapex.tests.framework.TestFramework import SqlUser, SqlUsers, SqlAccount, SqlAccounts, SqlTag, SqlTags
+        from .framework.TestFramework import SqlUser, SqlUsers, SqlAccount, SqlAccounts, SqlTag, SqlTags
 
 
         a_users = SqlUsers()
@@ -2240,9 +2241,9 @@ class RecordModelTestMySqlOnly(unittest.TestCase):
         self.assertEqual(0, b_users2.count())
 
 
-
 class EmbeddedObjectsFactoryUnittests(unittest.TestCase):
     """ Юниттесты EmbeddedObjectsFactory """
+
     def test_factory_default_instantiating(self):
         """ Тестирование дефолтной логики фабрики"""
         self.assertIsInstance(CustomPropertyWithNoneFactory(1), CustomPropertyWithNoneFactory.CustomType1)
@@ -2369,12 +2370,14 @@ class TransactionTests(unittest.TestCase):
     def test_asertion_of_dilicated_transactions(self, dbms_fw: DbMock):
         """ Запрет нескольких транзакций для одного пула """
         users = dbms_fw.get_new_users_collection_instance()
+
         def tx_with_exception():
             with users.pool.transaction:
                 with users.pool.transaction:
                     pass
 
         self.assertRaises(AssertionError, tx_with_exception)
+
 
 if __name__ == "__main__":
     unittest.main()

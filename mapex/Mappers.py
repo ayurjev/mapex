@@ -10,11 +10,11 @@ from collections import defaultdict
 from threading import RLock
 
 
-from mapex.src.Exceptions import TableModelException, TableMapperException, DublicateRecordException
-from mapex.src.Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
-from mapex.src.Common import TrackChangesValue, ValueInside
-from mapex.src.Sql import SqlBuilder
-from mapex.src.Utils import partition
+from .Exceptions import TableModelException, TableMapperException, DublicateRecordException
+from .Models import RecordModel, TableModel, EmbeddedObject, EmbeddedObjectFactory
+from .Common import TrackChangesValue, ValueInside
+from .Sql import SqlBuilder
+from .Utils import partition
 
 
 class Primary(object):
@@ -1320,7 +1320,7 @@ class SqlMapper(metaclass=ABCMeta):
         @type table_name: str
         @deprecated
         """
-        from mapex.src.Adapters import NoTableFound
+        from .Adapters import NoTableFound
         self.table_name = table_name
         try:
             self.db_fields, self.db_primary_key = self.pool.db.get_table_fields(self.table_name)

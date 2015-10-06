@@ -2,9 +2,9 @@
 """ Модуль для работы с БД """
 
 from abc import ABCMeta
-from mapex.src.Exceptions import TableModelException, EmbeddedObjectFactoryException
-from mapex.src.Common import TrackChangesValue, ValueInside
-from mapex.src.Utils import do_dict, merge_dict
+from .Exceptions import TableModelException, EmbeddedObjectFactoryException
+from .Common import TrackChangesValue, ValueInside
+from .Utils import do_dict, merge_dict
 from collections import OrderedDict
 import weakref
 import re
