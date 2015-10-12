@@ -1,7 +1,7 @@
 from unittest import TestCase
-from mapex.src.Pool import Pool, TooManyConnectionsError
+from mapex.Pool import Pool, TooManyConnectionsError
 from time import time
-from mapex.tests.framework.TestFramework import for_all_dbms, DbMock, MsDbMock
+from .framework.TestFramework import for_all_dbms, DbMock, MsDbMock
 from threading import Timer
 
 
