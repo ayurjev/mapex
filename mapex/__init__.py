@@ -1,4 +1,4 @@
-__version__ = '0.1'
+__version__ = '0.1.1'
 
 from .Sql import Adapter as DatabaseClient
 from .Mappers import SqlMapper, NoSqlMapper
