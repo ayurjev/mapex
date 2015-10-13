@@ -873,10 +873,10 @@ class Transaction(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.pool.in_transaction:
             if exc_type:
-                print("TXRB", id(self), exc_type)
+                # print("TXRB", id(self), exc_type)
                 self.rollback()
             else:
-                print("TXC", id(self))
+                # print("TXC", id(self))
                 self.commit()
 
     def __del__(self):
