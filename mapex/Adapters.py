@@ -147,7 +147,7 @@ class MySqlDbAdapter(Adapter):
         super().__init__()
         mysql.connector.errors.custom_error_exception(1040, MySqlDbAdapter.TooManyConnectionsError)
         self.dublicate_record_exception = mysql.connector.errors.IntegrityError
-        self.lost_connection_error = mysql.connector.errors.IntegrityError, mysql.connector.errors.OperationalError
+        self.lost_connection_error = mysql.connector.errors.IntegrityError, mysql.connector.errors.OperationalError, mysql.connector.errors.InterfaceError
         self.unread_result_error = mysql.connector.errors.InternalError
         self.no_table_connection = mysql.connector.errors.ProgrammingError
 
