@@ -17,7 +17,6 @@ class Pool(object):
         @param adapter: класс адаптера
         @param dsn: параметры подключения к БД
         @param min_connections: число минимально поддерживаемых в пуле соединений
-        @param preopen_connections: надо заполнить пул готовыми соединениями
         @return: Pool
         """
         assert min_connections >= 0
@@ -27,9 +26,7 @@ class Pool(object):
         self._adapter = adapter
         self._dsn = dsn
         self._min_connections = min_connections
-
         self._local = local()
-        self._preopen_connections()
 
     @property
     def in_transaction(self):

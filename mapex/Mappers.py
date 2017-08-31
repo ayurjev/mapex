@@ -1150,7 +1150,12 @@ class SqlMapper(metaclass=ABCMeta):
     def __new__(cls, *a, **kwa):
         with _new_lock:
             if cls._instance is None:
-                cls._instance = object.__new__(cls)
+                # noinspection PyBroadException
+                try:
+                    cls._instance = object.__new__(cls)
+                except Exception as err:
+                    cls._instance = None
+                    raise err
         return cls._instance
 
     @classmethod
@@ -1181,8 +1186,14 @@ class SqlMapper(metaclass=ABCMeta):
                 self._reversed_map = {}
                 self.is_mock = False
                 self.binded = False
-                self.bind()                     # Запускаем процесс инициализации маппера
-                self.binded = True
+                # noinspection PyBroadException
+                try:
+                    self.bind()                     # Запускаем процесс инициализации маппера
+                    self.binded = True
+                except Exception as err:
+                    self.__class__._inited = False
+                    self.binded = False
+                    raise err
 
     @staticmethod
     def factory_method(item):
