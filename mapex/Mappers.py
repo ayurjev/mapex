@@ -1,6 +1,7 @@
 """ Модуль для работы с БД """
 import re
 import time
+import json
 from enum import Enum, EnumMeta
 from copy import deepcopy
 from datetime import datetime, date, time as dtime
@@ -383,6 +384,20 @@ class FieldTypes(object):
 
             """
             return isinstance(v, str)
+
+    class Json(BaseField):
+        """ Класс для представления json типа поля уровня маппера """
+
+        ident = "Json"
+
+        def value_assertion(self, v) -> bool:
+            """ Проверка корректности значения
+            @param v: Значение для проверки
+            @return:  Корректно/Некорректно
+            @rtype : bool
+
+            """
+            return isinstance(v, (dict, list))
 
     class Enum(BaseField):
         """ Класс для представления перечисляемого типа поля уровня маппера """
@@ -1213,6 +1228,9 @@ class SqlMapper(metaclass=ABCMeta):
     def enum(self, mapper_field_name, db_field_name, model):
         return FieldTypes.Enum(self, mapper_field_name, db_field_name=db_field_name, model=model)
 
+    def json(self, mapper_field_name, db_field_name):
+        return FieldTypes.Json(self, mapper_field_name, db_field_name=db_field_name)
+
     def bytes(self, mapper_field_name, db_field_name):
         return FieldTypes.Bytes(self, mapper_field_name, db_field_name=db_field_name)
 
@@ -1707,7 +1725,6 @@ class SqlMapper(metaclass=ABCMeta):
         @param data: Данные для вставки
         @type data: list or dict
         @return: Значение первичного ключа для добавленной записи
-        
         """
         if type(data) is list:
             return [self.insert(it, model_pool) for it in data]
@@ -1735,7 +1752,6 @@ class SqlMapper(metaclass=ABCMeta):
         @param conditions: Условия выборки записей для применения обновлений
         @type conditions: dict
         @return: Значение первичного ключа для обновленной записи/записей
-        
         """
         conditions = conditions or {}
         if self.primary.exists():           # Если, конечно, первичный ключ определен
@@ -2421,7 +2437,7 @@ class FieldValues(object):
 
         def __len__(self):
             return 0
-        
+
         def __repr__(self):
             return "None"
 
@@ -2534,6 +2550,8 @@ class FieldTypesConverter(object):
         ("Float", "Enum"): lambda v, mf, *args: mf.model(v),
         ("String", "Enum"): lambda v, mf, *args: mf.model(v),
         ("Unknown", "Enum"): lambda v, mf, *args: mf.model(v),
+        ("Json", "Json"): lambda v, mf, cache, s, p: (
+            json.loads(v) if isinstance(v, str) else json.dumps(v)) if None != v else FNone(),
     }
 
     @staticmethod

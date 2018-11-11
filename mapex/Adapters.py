@@ -260,7 +260,8 @@ class MySqlDbAdapter(Adapter):
             FieldTypes.DateTime: ["datetime"],
             FieldTypes.Time: ["time"],
             FieldTypes.Bytes: ["binary", "varbinary", "tinyblob", "blob", "mediumblob", "longblob"],
-            FieldTypes.Enum: ["enum"]
+            FieldTypes.Enum: ["enum"],
+            FieldTypes.Json: ["json"],
         }
 
     def start_transaction(self):
